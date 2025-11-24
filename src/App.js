@@ -11,6 +11,7 @@ const App = () => {
   const [selectedCall, setSelectedCall] = useState(null);
   const [selectedCalls, setSelectedCalls] = useState([]);
   const [userEmail] = useState('inspector@sarthi.com');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleStartInspection = (call) => {
     setSelectedCall(call);
@@ -50,6 +51,14 @@ const App = () => {
           </div>
         </div>
         <div className="header-right">
+          <button
+            className="btn btn-sm btn-outline hamburger-btn"
+            onClick={() => setIsSidebarOpen(open => !open)}
+            aria-label="Toggle menu"
+            style={{ marginRight: '8px' }}
+          >
+            ☰
+          </button>
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
             {new Date('2025-11-14T17:00:00').toLocaleString()}
           </div>
@@ -65,32 +74,32 @@ const App = () => {
       </header>
 
       <div className="app-container">
-        <aside className="sidebar">
+        <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
           <nav>
             <ul className="sidebar-nav">
               <li 
                 className={`sidebar-item ${currentPage === 'landing' ? 'active' : ''}`}
-                onClick={handleBackToLanding}
+                onClick={() => { handleBackToLanding(); setIsSidebarOpen(false); }}
               >
                 🏠 Landing Page
               </li>
               <li 
                 className={`sidebar-item ${currentPage === 'raw-material' ? 'active' : ''}`}
-                onClick={() => selectedCall && setCurrentPage('raw-material')}
+                onClick={() => { if (selectedCall) { setCurrentPage('raw-material'); setIsSidebarOpen(false); } }}
                 style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
               >
                 📦 Raw Material Inspection
               </li>
               <li 
                 className={`sidebar-item ${currentPage === 'process' ? 'active' : ''}`}
-                onClick={() => selectedCall && setCurrentPage('process')}
+                onClick={() => { if (selectedCall) { setCurrentPage('process'); setIsSidebarOpen(false); } }}
                 style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
               >
                 ⚙️ Process Inspection
               </li>
               <li 
                 className={`sidebar-item ${currentPage === 'final-product' ? 'active' : ''}`}
-                onClick={() => selectedCall && setCurrentPage('final-product')}
+                onClick={() => { if (selectedCall) { setCurrentPage('final-product'); setIsSidebarOpen(false); } }}
                 style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
               >
                 ✅ Final Product Inspection

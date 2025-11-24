@@ -89,7 +89,8 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
         </select>
       </div>
 
-      <table className="data-table">
+      <div className="data-table-container">
+        <table className="data-table">
         <thead>
           <tr>
             {selectable && (
@@ -122,15 +123,16 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
                 </td>
               )}
               {columns.map(col => (
-                <td key={col.key}>
+                <td key={col.key} data-label={col.label}>
                   {col.render ? col.render(row[col.key], row) : row[col.key]}
                 </td>
               ))}
-              {actions && <td>{actions(row)}</td>}
+              {actions && <td data-label="Actions">{actions(row)}</td>}
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <div className="table-pagination">
         <div className="pagination-info">

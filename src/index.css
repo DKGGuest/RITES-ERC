@@ -1944,6 +1944,98 @@ input[type="number"] {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Berkeley Mono', monospace;
 }
 
+/* Mobile: stacked card view for tables */
+@media (max-width: 768px) {
+  .data-table-container {
+    overflow: visible;
+  }
+
+  .data-table {
+    border: 0;
+    min-width: 0;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tbody tr {
+    display: block;
+    margin-bottom: var(--space-12);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-base);
+    padding: var(--space-12);
+    background: var(--color-surface);
+  }
+
+  .data-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-8) 0;
+    border: none;
+  }
+
+  .data-table tbody td::before {
+    content: attr(data-label);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-secondary);
+    margin-right: var(--space-8);
+  }
+
+  .data-table tbody td:first-child {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+  }
+}
+
+/* Hamburger button for mobile to toggle sidebar */
+.hamburger-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-8);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+
+  /* Sidebar hidden by default on mobile; show when .open is present */
+  .sidebar {
+    display: none;
+  }
+
+  .sidebar.open {
+    display: block;
+    position: fixed;
+    top: 65px; /* below header */
+    left: 0;
+    width: 260px;
+    height: calc(100% - 65px);
+    z-index: 1100;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    background: var(--color-surface);
+  }
+
+  /* Add a subtle overlay when sidebar is open (created via .sidebar-overlay element) */
+  .sidebar-overlay {
+    position: fixed;
+    top: 65px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 1050;
+  }
+}
+
 /* Slightly reduce corner cases where an input is too narrow in compact grids */
 @media (max-width: 768px) {
   input[type="number"] {
