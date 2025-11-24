@@ -24,7 +24,6 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
   // Extract unique values for filter dropdowns
   const uniqueProductTypes = [...new Set(pendingCalls.map(c => c.product_type))];
   const uniqueVendors = [...new Set(pendingCalls.map(c => c.vendor_name))].sort();
-  const uniqueStages = [...new Set(pendingCalls.map(c => c.stage))];
   const uniquePONumbers = [...new Set(pendingCalls.map(c => c.po_no))].sort();
 
   // Apply filters to data
@@ -67,18 +66,7 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
     return result;
   }, [pendingCalls, filters]);
 
-  // Count active filters
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.productTypes.length > 0) count++;
-    if (filters.vendors.length > 0) count++;
-    if (filters.dateFrom || filters.dateTo) count++;
-    if (filters.poNumber) count++;
-    if (filters.statuses.length > 0) count++;
-    if (filters.stage) count++;
-    if (filters.callNumber) count++;
-    return count;
-  }, [filters]);
+  // (removed unused `uniqueStages` and `activeFilterCount` to satisfy CI lint rules)
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -106,19 +94,7 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
     });
   };
 
-  const removeFilter = (key, value = null) => {
-    if (value !== null) {
-      setFilters(prev => ({
-        ...prev,
-        [key]: prev[key].filter(v => v !== value)
-      }));
-    } else {
-      setFilters(prev => ({
-        ...prev,
-        [key]: Array.isArray(prev[key]) ? [] : ''
-      }));
-    }
-  };
+  // removeFilter helper removed (unused in current UI)
 
   const columns = [
     { key: 'call_no', label: 'Call No.' },
@@ -184,9 +160,7 @@ const effectivePendingCalls = (typeof pendingCalls !== 'undefined' && Array.isAr
   ? pendingCalls
   : (typeof window.pendingCalls !== 'undefined' ? window.pendingCalls : []);
 
-// helpers: find call by call_no or po_no (case-insensitive)
-const findCallByCallNo = (callNo) => effectivePendingCalls.find(c => (c.call_no || '').toLowerCase() === (callNo || '').toLowerCase());
-const findCallByPONo = (poNo) => effectivePendingCalls.find(c => (c.po_no || c.poNumber || '').toLowerCase() === (poNo || '').toLowerCase());
+// helpers removed: findCallByCallNo / findCallByPONo (unused in current UI)
 
 // prefer to call your handler handleFilterChange if present; otherwise update filters state directly
 const safeSetFilter = (key, value) => {
@@ -200,27 +174,7 @@ const safeSetFilter = (key, value) => {
   }
 };
 
-// Auto-sync call number -> PO and stage
-const handleCallNumberInput = (val) => {
-  const found = findCallByCallNo(val);
-  safeSetFilter('callNumber', val);
-  safeSetFilter('poNumber', found ? (found.po_no || found.poNumber || '') : '');
-  if (found) {
-    const mapped = stageMapping[(found.stage || found.stageName || '').toUpperCase()] || stageMapping[(found.stage || '').toUpperCase()] || '';
-    safeSetFilter('stage', mapped || '');
-  }
-};
-
-// Auto-sync PO -> call number and stage
-const handlePONumberInput = (val) => {
-  const found = findCallByPONo(val);
-  safeSetFilter('poNumber', val);
-  safeSetFilter('callNumber', found ? (found.call_no || '') : '');
-  if (found) {
-    const mapped = stageMapping[(found.stage || found.stageName || '').toUpperCase()] || '';
-    safeSetFilter('stage', mapped || '');
-  }
-};
+// auto-sync helpers removed (unused) to satisfy lint rules
 
 // helper to toggle product type checkboxes (works with your handler if present)
 const safeToggleMulti = (field, value) => {

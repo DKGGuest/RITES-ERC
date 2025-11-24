@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { MOCK_PO_DATA } from '../data/mockData';
 import { formatDate, calculateDaysLeft } from '../utils/helpers';
 import StatusBadge from '../components/StatusBadge';
@@ -21,7 +21,7 @@ const RawMaterialDashboard = ({ onBack }) => {
   ]);
 
   // Visual Defects State (exact order required by Excel)
-  const defectList = [
+  const defectList = useMemo(() => ([
     'No Defect',
     'Distortion',
     'Twist',
@@ -34,7 +34,7 @@ const RawMaterialDashboard = ({ onBack }) => {
     'Groove',
     'Excessive Scaling',
     'Internal Defect (Piping, Segregation)'
-  ];
+  ]), []);
   // Per-heat Visual & Dimensional state
   const [activeHeatTab, setActiveHeatTab] = useState(0);
 
@@ -58,7 +58,7 @@ const RawMaterialDashboard = ({ onBack }) => {
       if (activeHeatTab >= next.length) setActiveHeatTab(Math.max(0, next.length - 1));
       return next;
     });
-  }, [heats]);
+  }, [heats, activeHeatTab, defectList]);
 
   // Get PO data for header (move up so memo hooks can reference it)
   const poData = MOCK_PO_DATA["PO-2025-1001"];
@@ -83,11 +83,7 @@ const RawMaterialDashboard = ({ onBack }) => {
   }, [productModel]);
 
   // Validation helpers for defects and dimensional samples
-  const parseInteger = (v) => {
-    if (v === '' || v === null || v === undefined) return NaN;
-    const n = Number(String(v).trim());
-    return Number.isFinite(n) && Number.isInteger(n) ? n : NaN;
-  };
+  // parseInteger removed (unused) to satisfy lint rules
 
   const parseFloatStrict = (v) => {
     if (v === '' || v === null || v === undefined) return NaN;
@@ -136,14 +132,14 @@ const RawMaterialDashboard = ({ onBack }) => {
     return { valid: true };
   };
 
-  const validateDimSample = (sample) => {
+  const validateDimSample = useCallback((sample) => {
     const v = sample.diameter;
     if (v === '' || v === null || v === undefined) return { valid: false, message: 'Required' };
     const n = parseFloatStrict(v);
     if (Number.isNaN(n)) return { valid: false, message: 'Invalid number' };
     if (n < diameterConfig.min || n > diameterConfig.max) return { valid: false, message: `Out of range (${diameterConfig.min}-${diameterConfig.max})` };
     return { valid: true };
-  };
+  }, [diameterConfig]);
 
   const visualTotals = useMemo(() => {
     const hv = heatVisualData[activeHeatTab] || {};
@@ -160,7 +156,7 @@ const RawMaterialDashboard = ({ onBack }) => {
       }
     });
     return { sum, anyInvalid };
-  }, [heatVisualData, activeHeatTab]);
+  }, [heatVisualData, activeHeatTab, defectList]);
 
   const visualRejected = visualTotals.sum > 1;
 
@@ -175,7 +171,7 @@ const RawMaterialDashboard = ({ onBack }) => {
     });
     const rejected = invalidCount > 1;
     return { invalidCount, rejected, sampleResults };
-  }, [heatVisualData, activeHeatTab, diameterConfig]);
+  }, [heatVisualData, activeHeatTab, validateDimSample]);
 
   const overallRejected = visualRejected || dimensionalResults.rejected;
 

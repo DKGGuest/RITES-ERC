@@ -1,7 +1,4 @@
-import React, { useState } from 'react';
-import { MOCK_PO_DATA } from '../data/mockData';
-import { formatDate } from '../utils/helpers';
-import { getProductTypeDisplayName } from '../utils/helpers';
+import React, { useState, useEffect } from 'react';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
 
 const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
@@ -16,17 +13,15 @@ const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
   const [sectionCVerified, setSectionCVerified] = useState(false);
   const [sectionDVerified, setSectionDVerified] = useState(false);
   const currentDateTime = new Date('2025-11-14T17:00:00').toLocaleString();
-  const poData = MOCK_PO_DATA[call.po_no] || {};
 
-
-
-  const getOfferedQtyStatus = () => {
-    if (offeredQty < call.call_qty) return { type: 'error', message: 'Not allowed - Offered Qty cannot be less than Call Qty' };
-    if (offeredQty === call.call_qty) return { type: 'success', message: 'Allowed - Quantities match' };
-    if (offeredQty > call.call_qty) return { type: 'warning', message: 'Requires CM approval - Offered Qty exceeds Call Qty' };
-  };
-
-  const offeredQtyStatus = getOfferedQtyStatus();
+  // scroll to top when page mounts so navigation positions at the start
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    } catch (e) {
+      // ignore when not running in a browser
+    }
+  }, []);
 
   // Check if all required sections are verified
   const allSectionsVerified = sectionAVerified && sectionBVerified && sectionCVerified &&
@@ -34,15 +29,7 @@ const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
 
   const canProceed = shift && (offeredQty === call.call_qty || (offeredQty > call.call_qty && cmApproval)) && allSectionsVerified;
 
-  const addProductionLine = () => {
-    setProductionLines([...productionLines, { lineNumber: productionLines.length + 1, icNumber: '', poNumber: '', rawMaterialIC: '', productType: '' }]);
-  };
-
-  const updateProductionLine = (index, field, value) => {
-    const updated = [...productionLines];
-    updated[index][field] = value;
-    setProductionLines(updated);
-  };
+  // production line helpers removed (currently unused)
 
   const formData = {
     shift,

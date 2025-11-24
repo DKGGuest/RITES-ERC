@@ -1,6 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { MOCK_PO_DATA } from '../data/mockData';
-import { formatDate, calculateDaysLeft } from '../utils/helpers';
+import React, { useState } from 'react';
 import StatusBadge from '../components/StatusBadge';
 import Tabs from '../components/Tabs';
 import CalibrationModule from '../components/CalibrationModule';
@@ -18,8 +16,8 @@ const ProcessDashboard = ({ onBack }) => {
   const [reheatingFurnace, setReheatingFurnace] = useState(true);
   const [quenchingTime, setQuenchingTime] = useState(true);
   const [cleaningDone, setCleaningDone] = useState(false);
-  const [shearingData, setShearingData] = useState(Array(8).fill(null).map((_, i) => ({ hour: i + 1, noProduction: false, lotNo: '', lengthCutBar: '', sharpEdges: false, acceptedQty: '', rejectedQty: '', remarks: '' })));
-  const [turningData, setTurningData] = useState(Array(8).fill(null).map((_, i) => ({ hour: i + 1, noProduction: false, lotNo: '', straightLength: '', taperLength: '', dia: '', acceptedQty: '', rejectedQty: '', remarks: '' })));
+  const [shearingData] = useState(Array(8).fill(null).map((_, i) => ({ hour: i + 1, noProduction: false, lotNo: '', lengthCutBar: '', sharpEdges: false, acceptedQty: '', rejectedQty: '', remarks: '' })));
+  const [turningData] = useState(Array(8).fill(null).map((_, i) => ({ hour: i + 1, noProduction: false, lotNo: '', straightLength: '', taperLength: '', dia: '', acceptedQty: '', rejectedQty: '', remarks: '' })));
 
   const addLotNumber = () => {
     if (newLotNo && !lotNumbers.includes(newLotNo)) {
@@ -32,17 +30,6 @@ const ProcessDashboard = ({ onBack }) => {
     setHeatNumbersMap({ ...heatNumbersMap, [lotNo]: heatNo });
   };
 
-  const updateShearingData = (index, field, value) => {
-    const updated = [...shearingData];
-    updated[index][field] = value;
-    setShearingData(updated);
-  };
-
-  const updateTurningData = (index, field, value) => {
-    const updated = [...turningData];
-    updated[index][field] = value;
-    setTurningData(updated);
-  };
 
   const handleCleaningDone = (checked) => {
     if (checked && window.confirm('Are you sure the oil tank cleaning is complete? This will reset the counter to 0.')) {
@@ -63,19 +50,7 @@ const ProcessDashboard = ({ onBack }) => {
 
   const manufacturingLines = ['Line-1', 'Line-2', 'Line-3'];
 
-  const hourlyData = [
-    { hour: 1, lotNumber: 'LOT-001', quenchTemp: 75, quenchHardness: 48 },
-    { hour: 2, lotNumber: 'LOT-002', quenchTemp: 68, quenchHardness: 50 },
-    { hour: 3, lotNumber: 'LOT-003', quenchTemp: 72, quenchHardness: 52 },
-    { hour: 4, lotNumber: 'LOT-004', quenchTemp: 66, quenchHardness: 49 },
-    { hour: 5, lotNumber: 'LOT-005', quenchTemp: 70, quenchHardness: 51 },
-    { hour: 6, lotNumber: 'LOT-006', quenchTemp: 69, quenchHardness: 48 },
-    { hour: 7, lotNumber: 'LOT-007', quenchTemp: 71, quenchHardness: 50 },
-    { hour: 8, lotNumber: 'LOT-008', quenchTemp: 67, quenchHardness: 49 },
-  ];
-
-  const isQuenchTempValid = (temp) => temp < 70;
-  const isQuenchHardnessValid = (hardness) => hardness >= 45 && hardness <= 55;
+  // removed unused hourly data and validators to satisfy lint rules
 
   return (
     <div>

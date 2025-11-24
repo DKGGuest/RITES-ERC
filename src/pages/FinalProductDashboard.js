@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Tabs from '../components/Tabs';
-import StatusBadge from '../components/StatusBadge';
 import FormField from '../components/FormField';
 
 const FinalProductDashboard = ({ onBack }) => {
