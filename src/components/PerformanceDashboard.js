@@ -1,28 +1,59 @@
 import React from 'react';
 import { PERFORMANCE_METRICS } from '../data/mockData';
 
-const PerformanceDashboard = ({ metrics = PERFORMANCE_METRICS }) => (
-  <div>
-    <div className="stats-grid">
-      <div className="stat-card">
-        <div className="stat-label">Total Inspections</div>
-        <div className="stat-value">{metrics.total_inspections}</div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-label">Completed %</div>
-        <div className="stat-value">{metrics.completed_percentage}%</div>
-        <div className="stat-change positive">+5% from last month</div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-label">Average Time (hrs)</div>
-        <div className="stat-value">{metrics.average_time}</div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-label">Pending Calls</div>
-        <div className="stat-value">{metrics.pending_calls}</div>
+const cardStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '6px'
+};
+
+const helperStyle = {
+  fontSize: 'var(--font-size-xs)',
+  color: 'var(--color-text-secondary)'
+};
+
+const PerformanceDashboard = ({ metrics = PERFORMANCE_METRICS }) => {
+  const kpiCards = [
+    {
+      label: 'Acceptance / Rejection %',
+      value: `${metrics.acceptance_percentage}% / ${metrics.rejection_percentage}%`,
+      helper: 'Closed lots accepted vs rejected'
+    },
+    {
+      label: 'Response Time to Inspection Calls',
+      value: `${metrics.response_time_hours} hrs`,
+      helper: 'Avg. acknowledgement time'
+    },
+    {
+      label: 'Scheduling Delay (Days)',
+      value: `${metrics.scheduling_delay_days}`,
+      helper: 'Avg. delay from call to schedule'
+    },
+    {
+      label: 'Call Cancellation',
+      value: metrics.call_cancellations,
+      helper: 'Cancelled inspections this month'
+    },
+    {
+      label: 'Delay in IC Issuance',
+      value: `${metrics.ic_delay_days} days`,
+      helper: 'Avg. delay post inspection'
+    }
+  ];
+
+  return (
+    <div>
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        {kpiCards.map(card => (
+          <div className="stat-card" key={card.label} style={cardStyle}>
+            <div className="stat-label">{card.label}</div>
+            <div className="stat-value">{card.value}</div>
+            {card.helper && <div style={helperStyle}>{card.helper}</div>}
+          </div>
+        ))}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default PerformanceDashboard;

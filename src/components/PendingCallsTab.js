@@ -1,22 +1,134 @@
 import React, { useState, useMemo } from 'react';
 import DataTable from './DataTable';
 import StatusBadge from './StatusBadge';
+import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
+import { createStageValidationHandler, stageReverseMapping } from '../utils/stageValidation';
 
-const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, onBulkSchedule, onBulkStart }) => {
+// Responsive styles for mobile
+const responsiveStyles = `
+  @media (max-width: 768px) {
+    .pending-calls-dashboard-cards {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 12px !important;
+    }
+    .pending-calls-dashboard-card {
+      min-width: unset !important;
+      padding: 12px 8px !important;
+    }
+    .pending-calls-dashboard-card .card-icon {
+      font-size: 24px !important;
+    }
+    .pending-calls-dashboard-card .card-number {
+      font-size: 22px !important;
+    }
+    .pending-calls-dashboard-card .card-label {
+      font-size: 10px !important;
+    }
+    .pending-calls-filter-chips {
+      padding: 10px 12px !important;
+    }
+    .pending-calls-filter-chips-header {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 8px !important;
+    }
+    .pending-calls-filter-chip {
+      padding: 5px 8px !important;
+      font-size: 11px !important;
+    }
+    .pending-calls-filter-modal {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      border-radius: 0 !important;
+      top: 0 !important;
+      left: 0 !important;
+      transform: none !important;
+    }
+    .pending-calls-filter-modal-content {
+      flex-direction: column !important;
+    }
+    .pending-calls-filter-modal-sidebar {
+      width: 100% !important;
+      border-right: none !important;
+      border-bottom: 1px solid #e5e7eb !important;
+      display: flex !important;
+      flex-wrap: wrap !important;
+      padding: 8px !important;
+      gap: 6px !important;
+    }
+    .pending-calls-filter-modal-sidebar > div {
+      padding: 8px 12px !important;
+      border-radius: 20px !important;
+      border: 1px solid #e5e7eb !important;
+      border-left: none !important;
+      white-space: nowrap !important;
+    }
+    .pending-calls-filter-modal-options {
+      padding: 12px 16px !important;
+    }
+    .pending-calls-table-container {
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+    }
+    .pending-calls-bulk-actions {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 12px !important;
+      padding: 12px !important;
+    }
+    .pending-calls-bulk-actions-buttons {
+      flex-direction: column !important;
+      gap: 8px !important;
+    }
+    .pending-calls-bulk-actions-buttons button {
+      width: 100% !important;
+      min-height: 44px !important;
+    }
+    .pending-calls-filter-toggle {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 8px !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .pending-calls-dashboard-cards {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+    .pending-calls-dashboard-card {
+      padding: 10px 6px !important;
+    }
+    .pending-calls-dashboard-card .card-icon {
+      font-size: 20px !important;
+    }
+    .pending-calls-dashboard-card .card-number {
+      font-size: 18px !important;
+    }
+    .pending-calls-dashboard-card .card-label {
+      font-size: 9px !important;
+    }
+  }
+`;
+
+const PendingCallsTab = ({ calls, onSchedule, onStart, onBulkSchedule, onBulkStart }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Call Number');
+  const [selectionError, setSelectionError] = useState('');
   const [filters, setFilters] = useState({
     productTypes: [],
     vendors: [],
     dateFrom: '',
     dateTo: '',
-    poNumber: '',
+    poNumbers: [],
     statuses: [],
     stage: '',
-    callNumber: ''
+    callNumbers: []
   });
 
   const pendingCalls = calls.filter(c => c.status === 'Pending');
@@ -48,9 +160,9 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
       result = result.filter(call => new Date(call.requested_date) <= new Date(filters.dateTo));
     }
 
-    // PO Number filter
-    if (filters.poNumber) {
-      result = result.filter(call => call.po_no.toLowerCase().includes(filters.poNumber.toLowerCase()));
+    // PO Number filter (multi-select)
+    if (filters.poNumbers.length > 0) {
+      result = result.filter(call => filters.poNumbers.includes(call.po_no));
     }
 
     // Stage filter
@@ -58,9 +170,9 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
       result = result.filter(call => call.stage === filters.stage);
     }
 
-    // Call Number filter
-    if (filters.callNumber) {
-      result = result.filter(call => call.call_no.toLowerCase().includes(filters.callNumber.toLowerCase()));
+    // Call Number filter (multi-select)
+    if (filters.callNumbers.length > 0) {
+      result = result.filter(call => filters.callNumbers.includes(call.call_no));
     }
 
     return result;
@@ -87,10 +199,10 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
       vendors: [],
       dateFrom: '',
       dateTo: '',
-      poNumber: '',
+      poNumbers: [],
       statuses: [],
       stage: '',
-      callNumber: ''
+      callNumbers: []
     });
   };
 
@@ -107,21 +219,23 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
 
   const selectedCallsData = filteredCalls.filter(call => selectedRows.includes(call.id));
 
+  // Handler to validate and update selection - prevents selecting calls from different stages
+  const handleSelectionChange = createStageValidationHandler(
+    filteredCalls,
+    selectedRows,
+    setSelectedRows,
+    setSelectionError
+  );
+
   // Show individual actions only when exactly one row is selected
   const actions = selectedRows.length === 1 ? (row) => (
     selectedRows.includes(row.id) ? (
       <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
-        <button className="btn btn-sm btn-outline" onClick={() => onReturn(row)}>RETURN</button>
         <button className="btn btn-sm btn-secondary" onClick={() => onSchedule(row)}>SCHEDULE</button>
         <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>START</button>
       </div>
     ) : null
   ) : null;
-
-  const handleBulkReturn = () => {
-    onBulkReturn(selectedCallsData);
-    setSelectedRows([]);
-  };
 
   const handleBulkSchedule = () => {
     onBulkSchedule(selectedCallsData);
@@ -146,14 +260,16 @@ const PendingCallsTab = ({ calls, onReturn, onSchedule, onStart, onBulkReturn, o
 */
 
 // canonical stage labels for UI (user-visible)
-const CANONICAL_STAGES = ['RAW MATERIAL', 'PROCESS MATERIAL', 'FINAL'];
+const CANONICAL_STAGES = ['Raw Material', 'Process Material', 'Final'];
 
-// mapping to internal value: all map to 'ERC' as requested
+// mapping from display label to internal data value
 const stageMapping = {
-  'RAW MATERIAL': 'ERC',
-  'PROCESS MATERIAL': 'ERC',
-  'FINAL': 'ERC'
+  'Raw Material': 'RM',
+  'Process Material': 'Process Inspection',
+  'Final': 'Final'
 };
+
+// Reverse mapping for display (imported from utils/stageValidation.js)
 
 // Make sure pendingCalls exists in this scope (it does in your app). If not, provide it.
 const effectivePendingCalls = (typeof pendingCalls !== 'undefined' && Array.isArray(pendingCalls))
@@ -197,12 +313,196 @@ const poSuggestions = (typeof uniquePONumbers !== 'undefined') ? uniquePONumbers
 // UI: Drawer toggle + Drawer panel
 return (
   <div>
+    {/* Inject responsive styles */}
+    <style>{responsiveStyles}</style>
+
+    {/* Active Filters Display */}
+    {(() => {
+      const activeFilters = [];
+
+      // Stage filter
+      if (filters.stage) {
+        const stageColors = { 'RM': '#f59e0b', 'Process Inspection': '#3b82f6', 'Final': '#9333ea' };
+        activeFilters.push({
+          key: 'stage',
+          label: 'Stage',
+          value: stageReverseMapping[filters.stage] || filters.stage,
+          color: stageColors[filters.stage] || '#6b7280',
+          onRemove: () => handleFilterChange('stage', '')
+        });
+      }
+
+      // Product Types filter (multi-select)
+      filters.productTypes.forEach(pt => {
+        // Display just "ERC" for all product types
+        activeFilters.push({
+          key: `productType-${pt}`,
+          label: 'Product Type',
+          value: 'ERC',
+          color: '#10b981',
+          onRemove: () => handleMultiSelectToggle('productTypes', pt)
+        });
+      });
+
+      // Vendors filter (multi-select)
+      filters.vendors.forEach(vendor => {
+        activeFilters.push({
+          key: `vendor-${vendor}`,
+          label: 'Vendor',
+          value: vendor,
+          color: '#0ea5e9',
+          onRemove: () => handleMultiSelectToggle('vendors', vendor)
+        });
+      });
+
+      // Call Number filter (multi-select)
+      filters.callNumbers.forEach(callNo => {
+        activeFilters.push({
+          key: `callNumber-${callNo}`,
+          label: 'Call No',
+          value: callNo,
+          color: '#8b5cf6',
+          onRemove: () => handleMultiSelectToggle('callNumbers', callNo)
+        });
+      });
+
+      // PO Number filter (multi-select)
+      filters.poNumbers.forEach(poNo => {
+        activeFilters.push({
+          key: `poNumber-${poNo}`,
+          label: 'PO No',
+          value: poNo,
+          color: '#ec4899',
+          onRemove: () => handleMultiSelectToggle('poNumbers', poNo)
+        });
+      });
+
+      // Date Range filter
+      if (filters.dateFrom || filters.dateTo) {
+        const fromDate = filters.dateFrom || 'Start';
+        const toDate = filters.dateTo || 'End';
+        activeFilters.push({
+          key: 'dateRange',
+          label: 'Date',
+          value: `${fromDate} to ${toDate}`,
+          color: '#f97316',
+          onRemove: () => {
+            handleFilterChange('dateFrom', '');
+            handleFilterChange('dateTo', '');
+          }
+        });
+      }
+
+      if (activeFilters.length === 0) return null;
+
+      return (
+        <div className="pending-calls-filter-chips" style={{
+          marginBottom: '16px',
+          padding: '12px 16px',
+          backgroundColor: '#f9fafb',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb'
+        }}>
+          <div className="pending-calls-filter-chips-header" style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '8px'
+          }}>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+              Active Filters ({activeFilters.length})
+            </span>
+            <button
+              onClick={clearAllFilters}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#dc2626',
+                fontSize: '12px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                transition: 'background 0.2s',
+                minHeight: '36px'
+              }}
+              onMouseOver={(e) => e.target.style.background = '#fef2f2'}
+              onMouseOut={(e) => e.target.style.background = 'none'}
+            >
+              Clear All ×
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {activeFilters.map(filter => (
+              <div
+                className="pending-calls-filter-chip"
+                key={filter.key}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 10px',
+                  backgroundColor: 'white',
+                  border: `1px solid ${filter.color}40`,
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: filter.color,
+                  flexShrink: 0
+                }} />
+                <span style={{ color: '#6b7280', fontWeight: '500', whiteSpace: 'nowrap' }}>{filter.label}:</span>
+                <span style={{ color: '#1f2937', fontWeight: '600', wordBreak: 'break-word' }}>{filter.value}</span>
+                <button
+                  onClick={filter.onRemove}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#9ca3af',
+                    cursor: 'pointer',
+                    padding: '0 2px',
+                    fontSize: '14px',
+                    lineHeight: '1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%',
+                    width: '22px',
+                    height: '22px',
+                    minWidth: '22px',
+                    transition: 'all 0.2s',
+                    flexShrink: 0
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = '#fee2e2';
+                    e.target.style.color = '#dc2626';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = 'none';
+                    e.target.style.color = '#9ca3af';
+                  }}
+                  title={`Remove ${filter.label} filter`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })()}
+
     <div style={{ marginBottom: 'var(--space-16)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-12)' }}>
+      <div className="pending-calls-filter-toggle" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-12)' }}>
         <button
           className="btn btn-outline"
           onClick={() => setShowFilters(!showFilters)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-8)' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-8)', minHeight: '44px' }}
         >
           <span style={{ transform: showFilters ? 'rotate(180deg)' : 'none' }}>▾</span>
           <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
@@ -231,7 +531,7 @@ return (
         />
 
         {/* Filter Modal */}
-        <div style={{
+        <div className="pending-calls-filter-modal" style={{
           position: 'fixed',
           top: '50%',
           left: '50%',
@@ -249,7 +549,7 @@ return (
         }}>
           {/* Header */}
           <div style={{
-            padding: '20px 24px',
+            padding: '16px 20px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'space-between',
@@ -270,8 +570,8 @@ return (
                 cursor: 'pointer',
                 color: '#6b7280',
                 padding: '0',
-                width: '32px',
-                height: '32px',
+                width: '44px',
+                height: '44px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -284,7 +584,7 @@ return (
           </div>
 
           {/* Search Bar */}
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb' }}>
             <div style={{ position: 'relative' }}>
               <span style={{
                 position: 'absolute',
@@ -301,10 +601,10 @@ return (
                 onChange={(e) => setFilterSearch(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px 12px 10px 40px',
+                  padding: '12px 12px 12px 40px',
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   outline: 'none',
                   transition: 'border-color 0.2s'
                 }}
@@ -315,14 +615,14 @@ return (
           </div>
 
           {/* Content Area */}
-          <div style={{
+          <div className="pending-calls-filter-modal-content" style={{
             display: 'flex',
             flex: 1,
             overflow: 'hidden',
             minHeight: 0
           }}>
             {/* LEFT: Filter Categories */}
-            <div style={{
+            <div className="pending-calls-filter-modal-sidebar" style={{
               width: '140px',
               borderRight: '1px solid #e5e7eb',
               overflowY: 'auto',
@@ -340,7 +640,10 @@ return (
                     color: selectedCategory === cat ? '#16a34a' : '#4b5563',
                     backgroundColor: selectedCategory === cat ? '#f0fdf4' : 'transparent',
                     borderLeft: selectedCategory === cat ? '3px solid #16a34a' : '3px solid transparent',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    minHeight: '44px',
+                    display: 'flex',
+                    alignItems: 'center'
                   }}
                   onMouseEnter={(e) => {
                     if (selectedCategory !== cat) {
@@ -359,7 +662,7 @@ return (
             </div>
 
             {/* RIGHT: Options Panel */}
-            <div style={{
+            <div className="pending-calls-filter-modal-options" style={{
               flex: 1,
               overflowY: 'auto',
               padding: '16px 24px'
@@ -368,13 +671,8 @@ return (
               {selectedCategory === 'Product Type' && (
                 <div>
                   {(() => {
-                    const filteredTypes = productTypesList.filter(type => {
-                      if (!filterSearch) return true;
-                      const displayName = type.startsWith('ERC') ? type : `ERC-${type}`;
-                      return displayName.toLowerCase().includes(filterSearch.toLowerCase());
-                    });
-
-                    if (filteredTypes.length === 0) {
+                    // Show only "ERC" as a single option
+                    if (filterSearch && !'erc'.includes(filterSearch.toLowerCase())) {
                       return (
                         <div style={{
                           padding: '40px 20px',
@@ -387,55 +685,64 @@ return (
                       );
                     }
 
-                    return filteredTypes.map(type => {
-                      const checked = (filters.productTypes || []).includes(type);
-                      const displayName = type.startsWith('ERC') ? type : `ERC-${type}`;
-                      return (
-                        <label
-                          key={type}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '12px 0',
-                            borderBottom: '1px solid #f3f4f6',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
+                    // Check if any product type is selected (meaning ERC is selected)
+                    const isERCSelected = (filters.productTypes || []).length > 0;
+
+                    // Handler to select/deselect all product types when ERC is toggled
+                    const handleERCToggle = () => {
+                      if (isERCSelected) {
+                        // Clear all product types
+                        setFilters(prev => ({ ...prev, productTypes: [] }));
+                      } else {
+                        // Select all product types
+                        setFilters(prev => ({ ...prev, productTypes: [...productTypesList] }));
+                      }
+                    };
+
+                    return (
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '12px 0',
+                          borderBottom: '1px solid #f3f4f6',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          marginRight: '12px',
+                          backgroundColor: '#f3f4f6',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '18px'
+                        }}>📦</div>
+                        <div style={{ flex: 1 }}>
                           <div style={{
-                            width: '40px',
-                            height: '40px',
-                            marginRight: '12px',
-                            backgroundColor: '#f3f4f6',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '18px'
-                          }}>📦</div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{
-                              fontSize: '14px',
-                              fontWeight: '500',
-                              color: '#1f2937'
-                            }}>{displayName}</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => safeToggleMulti('productTypes', type)}
-                            style={{
-                              width: '20px',
-                              height: '20px',
-                              cursor: 'pointer',
-                              accentColor: '#16a34a'
-                            }}
-                          />
-                        </label>
-                      );
-                    });
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#1f2937'
+                          }}>ERC</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={isERCSelected}
+                          onChange={handleERCToggle}
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            cursor: 'pointer',
+                            accentColor: '#16a34a'
+                          }}
+                        />
+                      </label>
+                    );
                   })()}
                 </div>
               )}
@@ -568,7 +875,7 @@ return (
                       return callNo.toLowerCase().includes(filterSearch.toLowerCase());
                     })
                     .map(callNo => {
-                      const checked = filters.callNumber === callNo;
+                      const checked = (filters.callNumbers || []).includes(callNo);
                       return (
                         <label
                           key={callNo}
@@ -604,7 +911,7 @@ return (
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={() => safeSetFilter('callNumber', checked ? '' : callNo)}
+                            onChange={() => handleMultiSelectToggle('callNumbers', callNo)}
                             style={{
                               width: '20px',
                               height: '20px',
@@ -627,7 +934,7 @@ return (
                       return poNo.toLowerCase().includes(filterSearch.toLowerCase());
                     })
                     .map(poNo => {
-                      const checked = filters.poNumber === poNo;
+                      const checked = (filters.poNumbers || []).includes(poNo);
                       return (
                         <label
                           key={poNo}
@@ -663,7 +970,7 @@ return (
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={() => safeSetFilter('poNumber', checked ? '' : poNo)}
+                            onChange={() => handleMultiSelectToggle('poNumbers', poNo)}
                             style={{
                               width: '20px',
                               height: '20px',
@@ -825,9 +1132,18 @@ return (
 
 
 
+      {/* Selection Error Message */}
+      <Notification
+        message={selectionError}
+        type="error"
+        autoClose={true}
+        autoCloseDelay={5000}
+        onClose={() => setSelectionError('')}
+      />
+
       {/* Bulk Action Bar */}
       {selectedRows.length > 1 && (
-        <div style={{
+        <div className="pending-calls-bulk-actions" style={{
           marginBottom: 'var(--space-16)',
           padding: 'var(--space-16)',
           background: 'var(--color-bg-1)',
@@ -839,14 +1155,11 @@ return (
           <div style={{ fontWeight: 'var(--font-weight-medium)' }}>
             {selectedRows.length} inspection calls selected
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-12)' }}>
-            <button className="btn btn-outline" onClick={handleBulkReturn}>
-              RETURN FOR ALL
-            </button>
-            <button className="btn btn-secondary" onClick={handleBulkSchedule}>
+          <div className="pending-calls-bulk-actions-buttons" style={{ display: 'flex', gap: 'var(--space-12)' }}>
+            <button className="btn btn-secondary" onClick={handleBulkSchedule} style={{ minHeight: '44px' }}>
               SCHEDULE FOR ALL
             </button>
-            <button className="btn btn-primary" onClick={handleBulkStart}>
+            <button className="btn btn-primary" onClick={handleBulkStart} style={{ minHeight: '44px' }}>
               START FOR ALL
             </button>
           </div>
@@ -854,14 +1167,16 @@ return (
       )}
 
       {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={filteredCalls}
-        actions={actions}
-        selectable={true}
-        selectedRows={selectedRows}
-        onSelectionChange={setSelectedRows}
-      />
+      <div className="pending-calls-table-container">
+        <DataTable
+          columns={columns}
+          data={filteredCalls}
+          actions={actions}
+          selectable={true}
+          selectedRows={selectedRows}
+          onSelectionChange={handleSelectionChange}
+        />
+      </div>
     </div>
   );
 };

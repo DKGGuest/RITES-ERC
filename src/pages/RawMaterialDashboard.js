@@ -1,13 +1,333 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { MOCK_PO_DATA } from '../data/mockData';
-import { formatDate, calculateDaysLeft } from '../utils/helpers';
+import { formatDate } from '../utils/helpers';
 import StatusBadge from '../components/StatusBadge';
-import Tabs from '../components/Tabs';
-import FormField from '../components/FormField';
-import { CALIBRATION_DATA } from '../data/mockData';
+import HeatNumberDetails from '../components/HeatNumberDetails';
+import MobileResponsiveSelect from '../components/MobileResponsiveSelect';
 
-const RawMaterialDashboard = ({ onBack }) => {
-  const [activeTab, setActiveTab] = useState('visual');
+// Responsive styles for Raw Material Dashboard
+const responsiveStyles = `
+  /* 3-column grid layout for desktop */
+  .rm-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .rm-form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .rm-form-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+
+  .rm-form-label.required::after {
+    content: ' *';
+    color: #ef4444;
+  }
+
+  .rm-form-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .rm-form-input:focus {
+    outline: none;
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+  }
+
+  .rm-form-input:disabled {
+    background-color: #f3f4f6;
+    cursor: not-allowed;
+  }
+
+  .rm-form-hint {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+
+  .rm-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .rm-page-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+  }
+
+  .rm-back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    background-color: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 44px;
+  }
+
+  .rm-back-button:hover {
+    background-color: #e5e7eb;
+  }
+
+  /* Tablet: 2 columns */
+  @media (max-width: 1024px) {
+    .rm-form-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+  }
+
+  /* Mobile: 1 column */
+  @media (max-width: 768px) {
+    .rm-form-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .rm-form-input {
+      font-size: 16px;
+      min-height: 48px;
+      padding: 12px 14px;
+    }
+
+    .rm-page-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .rm-page-header h1 {
+      font-size: 20px;
+    }
+
+    .rm-back-button {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .rm-card-header {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .rm-card-title {
+      font-size: 16px !important;
+    }
+
+    .rm-action-buttons {
+      flex-direction: column !important;
+      gap: 12px !important;
+    }
+
+    .rm-action-buttons button {
+      width: 100% !important;
+      justify-content: center;
+    }
+
+    /* Make tables scrollable */
+    .data-table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  /* Small mobile */
+  @media (max-width: 480px) {
+    .rm-form-input {
+      font-size: 16px;
+      min-height: 52px;
+      padding: 14px 16px;
+    }
+
+    .rm-form-label {
+      font-size: 13px;
+    }
+
+    .rm-page-header h1 {
+      font-size: 18px;
+    }
+  }
+
+  /* Sub Module Session Styles */
+  .submodule-session {
+    padding: 24px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-top: 24px;
+  }
+
+  .submodule-session-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .submodule-session-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+  }
+
+  .submodule-session-subtitle {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+  }
+
+  .submodule-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .submodule-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 120px;
+  }
+
+  .submodule-btn:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    transform: translateY(-2px);
+  }
+
+  .submodule-btn-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+
+  .submodule-btn-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    text-align: center;
+    margin: 0;
+  }
+
+  .submodule-btn-desc {
+    font-size: 12px;
+    color: #64748b;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* Submodule Page Styles */
+  .submodule-page-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  .submodule-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #3b82f6;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .submodule-back-btn:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+  }
+
+  .submodule-page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    .submodule-buttons {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .submodule-btn {
+      padding: 20px 16px;
+      min-height: 100px;
+    }
+
+    .submodule-btn-icon {
+      font-size: 28px;
+    }
+
+    .submodule-btn-title {
+      font-size: 15px;
+    }
+
+    .submodule-page-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .submodule-back-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .submodule-page-title {
+      font-size: 18px;
+    }
+  }
+
+  @media (max-width: 1024px) and (min-width: 769px) {
+    .submodule-buttons {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+  }
+`;
+
+const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, onProductModelChange }) => {
 
   // Pre-Inspection Data Entry State
   const [sourceOfRawMaterial, setSourceOfRawMaterial] = useState('');
@@ -20,45 +340,7 @@ const RawMaterialDashboard = ({ onBack }) => {
     { certificateNo: 'TC-2025-001', heatNo: 'H001', certificateDate: '2025-11-10' }
   ]);
 
-  // Visual Defects State (exact order required by Excel)
-  const defectList = useMemo(() => ([
-    'No Defect',
-    'Distortion',
-    'Twist',
-    'Kink',
-    'Not Straight',
-    'Fold',
-    'Lap',
-    'Crack',
-    'Pit',
-    'Groove',
-    'Excessive Scaling',
-    'Internal Defect (Piping, Segregation)'
-  ]), []);
-  // Per-heat Visual & Dimensional state
-  const [activeHeatTab, setActiveHeatTab] = useState(0);
 
-  const [heatVisualData, setHeatVisualData] = useState(() => (
-    heats.map(() => ({
-      selectedDefects: defectList.reduce((acc, d) => { acc[d] = false; return acc; }, {}),
-      defectCounts: defectList.reduce((acc, d) => { acc[d] = ''; return acc; }, {}),
-      dimSamples: Array.from({ length: 20 }).map(() => ({ diameter: '' })),
-    }))
-  ));
-
-  // Keep heatVisualData in sync when heats change
-  useEffect(() => {
-    setHeatVisualData(prev => {
-      const next = heats.map((h, idx) => prev[idx] || {
-        selectedDefects: defectList.reduce((acc, d) => { acc[d] = false; return acc; }, {}),
-        defectCounts: defectList.reduce((acc, d) => { acc[d] = ''; return acc; }, {}),
-        dimSamples: Array.from({ length: 20 }).map(() => ({ diameter: '' })),
-      });
-      // ensure activeHeatTab is within bounds
-      if (activeHeatTab >= next.length) setActiveHeatTab(Math.max(0, next.length - 1));
-      return next;
-    });
-  }, [heats, activeHeatTab, defectList]);
 
   // Get PO data for header (move up so memo hooks can reference it)
   const poData = MOCK_PO_DATA["PO-2025-1001"];
@@ -74,194 +356,14 @@ const RawMaterialDashboard = ({ onBack }) => {
     return 'MK-III';
   }, [poData]);
 
-  const diameterConfig = useMemo(() => {
-    if (productModel === 'MK-V') {
-      return { standard: 23.0, min: 22.81, max: 23.23 };
-    }
-    // default to MK-III
-    return { standard: 20.64, min: 20.47, max: 20.84 };
-  }, [productModel]);
-
-  // Validation helpers for defects and dimensional samples
-  // parseInteger removed (unused) to satisfy lint rules
-
-  const parseFloatStrict = (v) => {
-    if (v === '' || v === null || v === undefined) return NaN;
-    const n = Number(String(v).trim());
-    return Number.isFinite(n) ? n : NaN;
-  };
-
-  const updateHeatVisual = (heatIndex, updater) => {
-    setHeatVisualData(prev => prev.map((h, idx) => idx === heatIndex ? updater(h) : h));
-  };
-
-  const handleDefectToggle = (defect, heatIndex = activeHeatTab) => {
-    updateHeatVisual(heatIndex, prev => {
-      const next = { ...prev };
-      const nextSelected = { ...prev.selectedDefects };
-      if (defect === 'No Defect') {
-        const newVal = !nextSelected['No Defect'];
-        defectList.forEach(d => { nextSelected[d] = (d === 'No Defect') ? newVal : false; });
-      } else {
-        nextSelected['No Defect'] = false;
-        nextSelected[defect] = !nextSelected[defect];
-      }
-      next.selectedDefects = nextSelected;
-      return next;
-    });
-  };
-
-  const handleDefectCountChange = (defect, value, heatIndex = activeHeatTab) => {
-    updateHeatVisual(heatIndex, prev => ({ ...prev, defectCounts: { ...prev.defectCounts, [defect]: value } }));
-  };
-
-  const handleDimSampleChange = (index, value, heatIndex = activeHeatTab) => {
-    updateHeatVisual(heatIndex, prev => ({ ...prev, dimSamples: prev.dimSamples.map((s, i) => i === index ? { diameter: value } : s) }));
-  };
-
-  const validateDefectField = (defect, heatIndex = activeHeatTab) => {
-    const hv = heatVisualData[heatIndex] || {};
-    const selected = hv.selectedDefects || {};
-    const counts = hv.defectCounts || {};
-    if (!selected[defect] || defect === 'No Defect') return { valid: true };
-    const v = counts[defect];
-    if (v === '' || v === null || v === undefined) return { valid: false, message: 'Required' };
-    const n = Number(String(v).trim());
-    if (!Number.isFinite(n) || !Number.isInteger(n)) return { valid: false, message: 'Must be an integer' };
-    if (n < 0) return { valid: false, message: 'Must be ≥ 0' };
-    return { valid: true };
-  };
-
-  const validateDimSample = useCallback((sample) => {
-    const v = sample.diameter;
-    if (v === '' || v === null || v === undefined) return { valid: false, message: 'Required' };
-    const n = parseFloatStrict(v);
-    if (Number.isNaN(n)) return { valid: false, message: 'Invalid number' };
-    if (n < diameterConfig.min || n > diameterConfig.max) return { valid: false, message: `Out of range (${diameterConfig.min}-${diameterConfig.max})` };
-    return { valid: true };
-  }, [diameterConfig]);
-
-  const visualTotals = useMemo(() => {
-    const hv = heatVisualData[activeHeatTab] || {};
-    const selected = hv.selectedDefects || {};
-    const counts = hv.defectCounts || {};
-    let sum = 0;
-    let anyInvalid = false;
-    defectList.forEach(d => {
-      if (d === 'No Defect') return;
-      if (selected[d]) {
-        const v = Number(String(counts[d]).trim());
-        if (!Number.isFinite(v)) anyInvalid = true;
-        else sum += v;
-      }
-    });
-    return { sum, anyInvalid };
-  }, [heatVisualData, activeHeatTab, defectList]);
-
-  const visualRejected = visualTotals.sum > 1;
-
-  const dimensionalResults = useMemo(() => {
-    const hv = heatVisualData[activeHeatTab] || {};
-    const samples = hv.dimSamples || [];
-    let invalidCount = 0;
-    const sampleResults = samples.map(s => {
-      const res = validateDimSample(s);
-      if (!res.valid) invalidCount += 1;
-      return res;
-    });
-    const rejected = invalidCount > 1;
-    return { invalidCount, rejected, sampleResults };
-  }, [heatVisualData, activeHeatTab, validateDimSample]);
-
-  const overallRejected = visualRejected || dimensionalResults.rejected;
-
-  const tabs = [
-    { id: 'calibration', label: 'Calibration & Documents' },
-    { id: 'visual', label: 'Visual & Dimensional' },
-    { id: 'material', label: 'Material Testing' },
-    { id: 'summary', label: 'Summary / Reports' },
-  ];
-
-  // Material testing state: per-heat, two samples each
-  const [materialData, setMaterialData] = useState(() => heats.map(() => ({
-    samples: [
-      { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclA: '', inclB: '', inclC: '', inclD: '', hardness: '', decarb: '', remarks: '' },
-      { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclA: '', inclB: '', inclC: '', inclD: '', hardness: '', decarb: '', remarks: '' }
-    ]
-  })));
-
-  // Keep materialData in sync when heats change (add/remove)
+  // Sync heats and productModel to parent for submodule pages
   useEffect(() => {
-    setMaterialData(prev => {
-      const next = heats.map((h, idx) => prev[idx] || {
-        samples: [
-          { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclA: '', inclB: '', inclC: '', inclD: '', hardness: '', decarb: '', remarks: '' },
-          { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclA: '', inclB: '', inclC: '', inclD: '', hardness: '', decarb: '', remarks: '' }
-        ]
-      });
-      return next;
-    });
-  }, [heats]);
+    if (onHeatsChange) onHeatsChange(heats);
+  }, [heats, onHeatsChange]);
 
-  // Validation helpers
-  const parseNumber = (v) => {
-    if (v === null || v === undefined || v === '') return NaN;
-    const n = Number(String(v).trim());
-    return Number.isFinite(n) ? n : NaN;
-  };
-
-  const validateSample = (sample) => {
-    const errors = {};
-    const c = parseNumber(sample.c);
-    if (Number.isNaN(c) || c < 0.5 || c > 0.6) errors.c = '%C must be between 0.50 and 0.60';
-
-    const si = parseNumber(sample.si);
-    if (Number.isNaN(si) || si < 1.5 || si > 2.0) errors.si = '%Si must be between 1.50 and 2.00';
-
-    const mn = parseNumber(sample.mn);
-    if (Number.isNaN(mn) || mn < 0.8 || mn > 1.0) errors.mn = '%Mn must be between 0.80 and 1.00';
-
-    const p = parseNumber(sample.p);
-    if (Number.isNaN(p) || p > 0.03) errors.p = '%P must be ≤ 0.030';
-
-    const s = parseNumber(sample.s);
-    if (Number.isNaN(s) || s > 0.03) errors.s = '%S must be ≤ 0.030';
-
-    const grain = parseNumber(sample.grainSize);
-    if (Number.isNaN(grain) || grain < 6) errors.grainSize = 'Grain size must be ≥ 6';
-
-    ['inclA','inclB','inclC','inclD'].forEach(k => {
-      const v = parseNumber(sample[k]);
-      if (Number.isNaN(v) || v > 2.0) errors[k] = 'Inclusion rating must be ≤ 2.0';
-    });
-
-    const hardness = parseNumber(sample.hardness);
-    if (Number.isNaN(hardness) || hardness < 45 || hardness > 55) errors.hardness = 'Hardness must be between 45 and 55';
-
-    const decarb = parseNumber(sample.decarb);
-    if (Number.isNaN(decarb) || decarb > 0.25) errors.decarb = 'Depth of decarb must be ≤ 0.25mm';
-
-    return { errors, isSampleValid: Object.keys(errors).length === 0 };
-  };
-
-  const updateMaterialField = (heatIndex, sampleIndex, field, value) => {
-    setMaterialData(prev => {
-      const next = prev.map((h, hi) => {
-        if (hi !== heatIndex) return h;
-        const samples = h.samples.map((s, si) => si === sampleIndex ? { ...s, [field]: value } : s);
-        return { ...h, samples };
-      });
-      return next;
-    });
-  };
-
-  const validateHeat = (heatIndex) => {
-    const heat = materialData[heatIndex];
-    if (!heat) return { isValid: false, errors: [] };
-    const sampleResults = heat.samples.map(s => validateSample(s));
-    const isValid = sampleResults.every(r => r.isSampleValid);
-    return { isValid, sampleResults };
-  };
+  useEffect(() => {
+    if (onProductModelChange) onProductModelChange(productModel);
+  }, [productModel, onProductModelChange]);
 
   // Auto-calculated values
   const totalQuantity = useMemo(() => {
@@ -327,7 +429,10 @@ const RawMaterialDashboard = ({ onBack }) => {
   const heatNumbers = useMemo(() => heats.map(h => h.heatNo).filter(Boolean), [heats]);
 
   return (
-    <div>
+    <div className="rm-dashboard-container">
+      {/* Inject responsive styles */}
+      <style>{responsiveStyles}</style>
+
       <div className="breadcrumb">
         <div className="breadcrumb-item" onClick={onBack} style={{ cursor: 'pointer' }}>Landing Page</div>
         <span className="breadcrumb-separator">/</span>
@@ -336,758 +441,217 @@ const RawMaterialDashboard = ({ onBack }) => {
         <div className="breadcrumb-item breadcrumb-active">ERC Raw Material</div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
+      <div className="rm-page-header">
         <h1>ERC Raw Material Inspection</h1>
+        <button className="rm-back-button" onClick={onBack}>
+          ← Back to Landing Page
+        </button>
       </div>
 
       {/* Header with Static Data */}
       <div className="card" style={{ background: 'var(--color-gray-100)', marginBottom: 'var(--space-24)' }}>
-        <div className="card-header">
-          <h3 className="card-title">Inspection Details (Static Data)</h3>
+        <div className="card-header rm-card-header">
+          <h3 className="card-title rm-card-title">Inspection Details (Static Data)</h3>
           <p className="card-subtitle">Auto-fetched from PO/Sub PO information</p>
         </div>
-        <div className="input-grid">
-          <FormField label="PO / Sub PO Number">
-            <input type="text" className="form-control" value={poData.sub_po_no || poData.po_no} disabled style={{ background: 'var(--color-gray-200)' }} />
-          </FormField>
-          <FormField label="PO / Sub PO Date">
-            <input type="text" className="form-control" value={formatDate(poData.sub_po_date || poData.po_date)} disabled style={{ background: 'var(--color-gray-200)' }} />
-          </FormField>
-          <FormField label="Contractor Name">
-            <input type="text" className="form-control" value={poData.contractor} disabled style={{ background: 'var(--color-gray-200)' }} />
-          </FormField>
-          <FormField label="Manufacturer">
-            <input type="text" className="form-control" value={poData.manufacturer} disabled style={{ background: 'var(--color-gray-200)' }} />
-          </FormField>
-          <FormField label="Place of Inspection">
-            <input type="text" className="form-control" value={poData.place_of_inspection} disabled style={{ background: 'var(--color-gray-200)' }} />
-          </FormField>
-          <FormField label="Stage of Inspection">
-            <input type="text" className="form-control" value="Raw Material Inspection" disabled style={{ background: 'var(--color-gray-200)' }} />
-          </FormField>
+        <div className="rm-form-grid">
+          <div className="rm-form-group">
+            <label className="rm-form-label">PO / Sub PO Number</label>
+            <input type="text" className="rm-form-input" value={poData.sub_po_no || poData.po_no} disabled />
+          </div>
+          <div className="rm-form-group">
+            <label className="rm-form-label">PO / Sub PO Date</label>
+            <input type="text" className="rm-form-input" value={formatDate(poData.sub_po_date || poData.po_date)} disabled />
+          </div>
+          <div className="rm-form-group">
+            <label className="rm-form-label">Contractor Name</label>
+            <input type="text" className="rm-form-input" value={poData.contractor} disabled />
+          </div>
+          <div className="rm-form-group">
+            <label className="rm-form-label">Manufacturer</label>
+            <input type="text" className="rm-form-input" value={poData.manufacturer} disabled />
+          </div>
+          <div className="rm-form-group">
+            <label className="rm-form-label">Place of Inspection</label>
+            <input type="text" className="rm-form-input" value={poData.place_of_inspection} disabled />
+          </div>
+          <div className="rm-form-group">
+            <label className="rm-form-label">Stage of Inspection</label>
+            <input type="text" className="rm-form-input" value="Raw Material Inspection" disabled />
+          </div>
         </div>
       </div>
 
       {/* Pre-Inspection Data Entry */}
       <div className="card" style={{ marginBottom: 'var(--space-24)' }}>
-        <div className="card-header">
-          <h3 className="card-title">Pre-Inspection Data Entry</h3>
+        <div className="card-header rm-card-header">
+          <h3 className="card-title rm-card-title">Pre-Inspection Data Entry</h3>
           <p className="card-subtitle">Enter raw material details before starting inspection</p>
         </div>
 
-        <div className="input-grid">
-          <FormField label="Source of Raw Material" required>
-            <select
-              className="form-control"
+        <div className="rm-form-grid">
+          <div className="rm-form-group">
+            <label className="rm-form-label required">Source of Raw Material</label>
+            <MobileResponsiveSelect
               value={sourceOfRawMaterial}
               onChange={(e) => setSourceOfRawMaterial(e.target.value)}
-              required
-            >
-              <option value="">Select Source</option>
-              <option value="domestic">Domestic</option>
-              <option value="imported">Imported</option>
-            </select>
-          </FormField>
+              options={[
+                { value: '', label: 'Select Source' },
+                { value: 'domestic', label: 'Domestic' },
+                { value: 'imported', label: 'Imported' }
+              ]}
+              required={true}
+            />
+          </div>
 
-          <FormField label="No. of Bundles" required>
+          <div className="rm-form-group">
+            <label className="rm-form-label required">No. of Bundles</label>
             <input
               type="number"
-              className="form-control"
+              className="rm-form-input"
               value={numberOfBundles}
               onChange={(e) => setNumberOfBundles(e.target.value)}
               required
             />
-          </FormField>
+          </div>
 
-          <FormField label="Total Quantity of Raw Material (MT)">
+          <div className="rm-form-group">
+            <label className="rm-form-label">Total Quantity of Raw Material (MT)</label>
             <input
               type="text"
-              className="form-control"
+              className="rm-form-input"
               value={totalQuantity}
               disabled
-              style={{ background: 'var(--color-gray-200)', fontWeight: 'var(--font-weight-medium)' }}
             />
-            <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Auto-calculated from heat weights</small>
-          </FormField>
+            <span className="rm-form-hint">Auto-calculated from heat weights</span>
+          </div>
 
-          <FormField label="No. of Heats">
+          <div className="rm-form-group">
+            <label className="rm-form-label">No. of Heats</label>
             <input
               type="text"
-              className="form-control"
+              className="rm-form-input"
               value={numberOfHeats}
               disabled
-              style={{ background: 'var(--color-gray-200)', fontWeight: 'var(--font-weight-medium)' }}
             />
-            <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Auto-calculated from heat entries</small>
-          </FormField>
+            <span className="rm-form-hint">Auto-calculated from heat entries</span>
+          </div>
 
-          <FormField label="No. of ERC (to be inspected)">
+          <div className="rm-form-group">
+            <label className="rm-form-label">No. of ERC (to be inspected)</label>
             <input
               type="text"
-              className="form-control"
+              className="rm-form-input"
               value={numberOfERC}
               disabled
-              style={{ background: 'var(--color-gray-200)', fontWeight: 'var(--font-weight-medium)' }}
             />
-            <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Auto-calculated (1 ERC per 0.5 MT)</small>
-          </FormField>
+            <span className="rm-form-hint">Auto-calculated (1 ERC per 0.5 MT)</span>
+          </div>
         </div>
 
-        {/* Heat Number Entry Section */}
-        <div style={{ marginTop: 'var(--space-24)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-16)' }}>
-            <h4>Heat Number Details</h4>
-            <button className="btn btn-secondary" onClick={addHeat}>
-              + Add Heat
-            </button>
-          </div>
+        {/* Heat Number Details with nested Test Certificates */}
+        <HeatNumberDetails />
+      </div>
 
-          {heats.map((heat, index) => (
-            <div key={index} style={{
-              padding: 'var(--space-16)',
-              background: 'var(--color-bg-2)',
-              borderRadius: 'var(--radius-base)',
-              marginBottom: 'var(--space-16)',
-              border: '1px solid var(--color-border)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-12)' }}>
-                <strong>Heat #{index + 1}</strong>
-                {heats.length > 1 && (
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => removeHeat(index)}
-                    style={{ padding: 'var(--space-4) var(--space-12)', fontSize: 'var(--font-size-sm)' }}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              <div className="input-grid">
-                <FormField label="Heat No." required>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={heat.heatNo}
-                    onChange={(e) => updateHeat(index, 'heatNo', e.target.value)}
-                    placeholder="e.g., H001"
-                    required
-                  />
-                </FormField>
-                <FormField label="Wt. of Material (MT)" required>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    value={heat.weight}
-                    onChange={(e) => updateHeat(index, 'weight', e.target.value)}
-                    placeholder="e.g., 2.5"
-                    required
-                  />
-                </FormField>
-                <FormField label="Color Code" required>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={heat.colorCode}
-                    onChange={(e) => updateHeat(index, 'colorCode', e.target.value)}
-                    placeholder="e.g., RED"
-                    required
-                  />
-                </FormField>
-              </div>
-            </div>
-          ))}
+      {/* Sub Module Session */}
+      <div className="submodule-session">
+        <div className="submodule-session-header">
+          <h3 className="submodule-session-title">📋 Sub Module Session</h3>
+          <p className="submodule-session-subtitle">Select a module to proceed with inspection</p>
         </div>
-
-        {/* Test Certificates Entry Section */}
-        <div style={{ marginTop: 'var(--space-24)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-16)' }}>
-            <div>
-              <h4>Test Certificates of Raw Material</h4>
-              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-4)' }}>
-                Multiple test certificates can be added for same or different heat numbers
-              </p>
-            </div>
-            <button className="btn btn-secondary" onClick={addTestCertificate}>
-              + Add Test Certificate
-            </button>
-          </div>
-
-          {testCertificates.map((cert, index) => (
-            <div key={index} style={{
-              padding: 'var(--space-16)',
-              background: 'var(--color-bg-2)',
-              borderRadius: 'var(--radius-base)',
-              marginBottom: 'var(--space-16)',
-              border: '1px solid var(--color-border)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-12)' }}>
-                <strong>Test Certificate #{index + 1}</strong>
-                {testCertificates.length > 1 && (
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => removeTestCertificate(index)}
-                    style={{ padding: 'var(--space-4) var(--space-12)', fontSize: 'var(--font-size-sm)' }}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              <div className="input-grid">
-                <FormField label="Test Certificate No." required>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={cert.certificateNo}
-                    onChange={(e) => updateTestCertificate(index, 'certificateNo', e.target.value)}
-                    placeholder="e.g., TC-2025-001"
-                    required
-                  />
-                </FormField>
-                <FormField label="Heat Number" required>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={cert.heatNo}
-                    onChange={(e) => updateTestCertificate(index, 'heatNo', e.target.value)}
-                    placeholder="e.g., H001"
-                    required
-                  />
-                  <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                    Can be same or different across certificates
-                  </small>
-                </FormField>
-                <FormField label="Date of Certificate" required>
-                  <input
-                    type="date"
-                    className="form-control"
-                    value={cert.certificateDate}
-                    onChange={(e) => updateTestCertificate(index, 'certificateDate', e.target.value)}
-                    required
-                  />
-                </FormField>
-              </div>
-            </div>
-          ))}
+        <div className="submodule-buttons">
+          <button className="submodule-btn" onClick={() => onNavigateToSubModule('calibration-documents')}>
+            <span className="submodule-btn-icon">📄</span>
+            <p className="submodule-btn-title">Calibration & Documents</p>
+            <p className="submodule-btn-desc">Verify instrument calibration</p>
+          </button>
+          <button className="submodule-btn" onClick={() => onNavigateToSubModule('visual-material-testing')}>
+            <span className="submodule-btn-icon">🔬</span>
+            <p className="submodule-btn-title">Visual & Material Testing</p>
+            <p className="submodule-btn-desc">Inspect samples & test materials</p>
+          </button>
+          <button className="submodule-btn" onClick={() => onNavigateToSubModule('summary-reports')}>
+            <span className="submodule-btn-icon">📊</span>
+            <p className="submodule-btn-title">Summary and Reports</p>
+            <p className="submodule-btn-desc">View consolidated results</p>
+          </button>
         </div>
       </div>
 
-      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+      {/* Post Inspection Session - Always visible at bottom of page */}
+      <div className="card" style={{ marginTop: '32px', borderTop: '4px solid var(--color-primary)' }}>
+        <div className="card-header rm-card-header" style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' }}>
+          <h3 className="card-title rm-card-title" style={{ fontSize: '20px', color: '#0369a1' }}>🔍 Post Inspection Session</h3>
+          <p className="card-subtitle" style={{ color: '#0284c7' }}>Final results and decision for the inspection</p>
+        </div>
 
-      {activeTab === 'visual' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Visual &amp; Dimensional Check (20 samples per Heat)</h3>
-            <p className="card-subtitle">Raw Material Specific - Check for material defects and dimensional accuracy</p>
-          </div>
-
-          <div style={{ marginBottom: 'var(--space-20)' }}>
-            <div style={{ display: 'flex', gap: 'var(--space-8)', marginBottom: 'var(--space-12)', flexWrap: 'wrap' }}>
-              {heats.map((h, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
-                  onClick={() => setActiveHeatTab(idx)}
-                >
-                  {`Heat ${h.heatNo || `#${idx + 1}`}`}
-                </button>
-              ))}
-            </div>
-
-            <h4 style={{ marginBottom: 'var(--space-12)' }}>Visual Defects Checklist</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--space-12)' }}>
-              {(() => {
-                const hv = heatVisualData[activeHeatTab] || {};
-                const selected = hv.selectedDefects || {};
-                const counts = hv.defectCounts || {};
-                return defectList.map((d) => {
-                  const isNoDefect = d === 'No Defect';
-                  const checked = selected[d];
-                  const disabled = isNoDefect ? false : selected['No Defect'];
-                  const defectValidation = validateDefectField(d, activeHeatTab);
-                  return (
-                    <div key={d} className="checkbox-item" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', width: '100%' }}>
-                      <input
-                        type="checkbox"
-                        id={`defect-${d}`}
-                        checked={!!checked}
-                        onChange={() => handleDefectToggle(d)}
-                        disabled={disabled}
-                      />
-                      <label htmlFor={`defect-${d}`} style={{ flex: '1 1 auto', marginRight: 'var(--space-8)' }}>{d}</label>
-
-                      {/* For selected defects (except No Defect) show count input */}
-                      {!isNoDefect && selected[d] && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)', justifyContent: 'flex-end' }}>
-                          <div style={{ minWidth: 160 }}>
-                            <input
-                              type="number"
-                              className={`form-control ${!defectValidation.valid ? 'error' : ''}`}
-                              value={counts[d]}
-                              onChange={(e) => handleDefectCountChange(d, e.target.value)}
-                              placeholder="Number of defective pieces"
-                              step="1"
-                              min="0"
-                              required
-                            />
-                            {!defectValidation.valid && <div className="form-error">{defectValidation.message}</div>}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-
-            {/* Visual status */}
-            <div style={{ marginTop: 'var(--space-12)' }}>
-              <strong>Visual Status: </strong>
-              {visualRejected ? (
-                <span className="alert alert-error" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>REJECTED</span>
-              ) : (
-                <span className="alert alert-success" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>ACCEPTED</span>
-              )}
-            </div>
-            {visualRejected && (
-              <div className="alert alert-error" style={{ marginTop: 'var(--space-12)' }}>
-                Sum of defective pieces &gt; 1 — Visual check failed.
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginBottom: 'var(--space-20)' }}>
-            <h4 style={{ marginBottom: 'var(--space-12)' }}>Standard Diameter</h4>
-            <div className="input-grid">
-              <FormField label="Product Model">
-                <input type="text" className="form-control" value={productModel} disabled />
-              </FormField>
-              <FormField label="Standard Rod Diameter (mm)">
-                <input type="text" className="form-control" value={diameterConfig.standard} disabled />
-                <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Auto-fetched from PO</small>
-              </FormField>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 'var(--space-12)' }}>
-            <h4 style={{ marginBottom: 'var(--space-12)' }}>Dimensional Check (20 samples)</h4>
-            <div style={{ maxWidth: '900px', margin: 'auto' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Sample No.</th>
-                    <th>Bar Diameter (mm)</th>
-                    <th>Status</th>
+        {/* Final Results Table */}
+        <div style={{ marginBottom: '24px' }}>
+          <h4 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>Final Results - Raw Material (Auto-Populated)</h4>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Heat No.</th>
+                  <th>Status</th>
+                  <th>Weight of Material (Tons)</th>
+                  <th>Remarks (Required)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {heatNumbers.map(heat => (
+                  <tr key={heat}>
+                    <td><strong>{heat}</strong></td>
+                    <td><StatusBadge status="Valid" /> Accepted</td>
+                    <td>2.75 tons</td>
+                    <td>
+                      <input type="text" className="rm-form-input" placeholder="Enter remarks..." required style={{ minWidth: '200px' }} />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const hv = heatVisualData[activeHeatTab] || {};
-                    const samples = hv.dimSamples || [];
-                    return samples.map((s, idx) => {
-                      const res = dimensionalResults.sampleResults[idx];
-                      return (
-                        <tr key={idx}>
-                          <td><strong>{idx + 1}</strong></td>
-                          <td style={{ minWidth: 160 }}>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className={`form-control ${res && !res.valid ? 'error' : ''}`}
-                              value={s.diameter}
-                              onChange={(e) => handleDimSampleChange(idx, e.target.value)}
-                              required
-                            />
-                            {res && !res.valid && <div className="form-error">{res.message}</div>}
-                          </td>
-                          <td>
-                            {res && res.valid ? <StatusBadge status="Valid" /> : <StatusBadge status="Invalid" />}
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 'var(--space-12)' }}>
-              <strong>Dimensional Status: </strong>
-              {dimensionalResults.rejected ? (
-                <span className="alert alert-error" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>REJECTED</span>
-              ) : (
-                <span className="alert alert-success" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>ACCEPTED</span>
-              )}
-            </div>
-            {dimensionalResults.rejected && (
-              <div className="alert alert-error" style={{ marginTop: 'var(--space-12)' }}>
-                Invalid diameter count &gt; 1 — Dimensional check failed.
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginTop: 'var(--space-12)' }}>
-            <strong>Overall Heat Status: </strong>
-            {overallRejected ? (
-              <span className="alert alert-error" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>REJECTED</span>
-            ) : (
-              <span className="alert alert-success" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>ACCEPTED</span>
-            )}
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
 
-      {activeTab === 'material' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Material Testing (2 samples per Heat)</h3>
-            <p className="card-subtitle">Chemical Analysis &amp; Mechanical Properties - Raw Material Specific</p>
-          </div>
-          <div className="alert alert-info" style={{ marginBottom: 'var(--space-24)' }}>
-            ℹ️ Calibration status of testing instruments is verified and valid (see Calibration tab)
-          </div>
-
-          {/* Render material testing table for each heat */}
-          {heats.map((heat, heatIndex) => {
-            const heatValidation = validateHeat(heatIndex);
-            return (
-              <div key={heatIndex} style={{ marginBottom: 'var(--space-24)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-12)' }}>
-                  <h4>Heat: {heat.heatNo || `#${heatIndex + 1}`} — Material Testing (2 samples)</h4>
-                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>2 samples per heat (Sample 1 &amp; Sample 2)</div>
-                </div>
-
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Sample No.</th>
-                        <th>%C</th>
-                        <th>%Si</th>
-                        <th>%Mn</th>
-                        <th>%P</th>
-                        <th>%S</th>
-                        <th>Grain Size</th>
-                        <th>Inclusion A</th>
-                        <th>Inclusion B</th>
-                        <th>Inclusion C</th>
-                        <th>Inclusion D</th>
-                        <th>Hardness (HRC)</th>
-                        <th>Depth of Decarb (mm)</th>
-                        <th>Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[0, 1].map(sampleIndex => {
-                        const sample = materialData[heatIndex]?.samples[sampleIndex] || {};
-                        const sampleErrors = heatValidation.sampleResults && heatValidation.sampleResults[sampleIndex] ? heatValidation.sampleResults[sampleIndex].errors : {};
-                        return (
-                          <tr key={sampleIndex}>
-                            <td><strong>{sampleIndex + 1}</strong></td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`form-control ${sampleErrors.c ? 'error' : ''}`}
-                                value={sample.c}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'c', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.c && <div className="form-error">{sampleErrors.c}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`form-control ${sampleErrors.si ? 'error' : ''}`}
-                                value={sample.si}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'si', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.si && <div className="form-error">{sampleErrors.si}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`form-control ${sampleErrors.mn ? 'error' : ''}`}
-                                value={sample.mn}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'mn', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.mn && <div className="form-error">{sampleErrors.mn}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.001"
-                                className={`form-control ${sampleErrors.p ? 'error' : ''}`}
-                                value={sample.p}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'p', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.p && <div className="form-error">{sampleErrors.p}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.001"
-                                className={`form-control ${sampleErrors.s ? 'error' : ''}`}
-                                value={sample.s}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 's', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.s && <div className="form-error">{sampleErrors.s}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.1"
-                                className={`form-control ${sampleErrors.grainSize ? 'error' : ''}`}
-                                value={sample.grainSize}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'grainSize', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.grainSize && <div className="form-error">{sampleErrors.grainSize}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.1"
-                                className={`form-control ${sampleErrors.inclA ? 'error' : ''}`}
-                                value={sample.inclA}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclA', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.inclA && <div className="form-error">{sampleErrors.inclA}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.1"
-                                className={`form-control ${sampleErrors.inclB ? 'error' : ''}`}
-                                value={sample.inclB}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclB', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.inclB && <div className="form-error">{sampleErrors.inclB}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.1"
-                                className={`form-control ${sampleErrors.inclC ? 'error' : ''}`}
-                                value={sample.inclC}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclC', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.inclC && <div className="form-error">{sampleErrors.inclC}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.1"
-                                className={`form-control ${sampleErrors.inclD ? 'error' : ''}`}
-                                value={sample.inclD}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclD', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.inclD && <div className="form-error">{sampleErrors.inclD}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.1"
-                                className={`form-control ${sampleErrors.hardness ? 'error' : ''}`}
-                                value={sample.hardness}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'hardness', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.hardness && <div className="form-error">{sampleErrors.hardness}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.01"
-                                className={`form-control ${sampleErrors.decarb ? 'error' : ''}`}
-                                value={sample.decarb}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'decarb', e.target.value)}
-                                required
-                              />
-                              {sampleErrors.decarb && <div className="form-error">{sampleErrors.decarb}</div>}
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                className="form-control"
-                                value={sample.remarks}
-                                onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'remarks', e.target.value)}
-                                placeholder="Remarks (optional)"
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Heat-level Acceptance / Rejection */}
-                <div style={{ marginTop: 'var(--space-12)' }}>
-                  <strong>Overall Heat Status: </strong>
-                  {heatValidation.isValid ? (
-                    <span className="alert alert-success" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>Heat Accepted</span>
-                  ) : (
-                    <span className="alert alert-error" style={{ display: 'inline-block', marginLeft: 'var(--space-8)' }}>Heat Rejected</span>
-                  )}
-                </div>
-                {!heatValidation.isValid && (
-                  <div className="alert alert-error" style={{ marginTop: 'var(--space-12)' }}>
-                    If any data is outside the tolerance then the complete heat is rejected.
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {activeTab === 'calibration' && (
-        <div>
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">Calibration &amp; Document Verification - Raw Material</h3>
-              <p className="card-subtitle">Instrument calibration information for Raw Material inspection. Vendor can enter data, IE verifies.</p>
+        {/* Accept/Reject Decision */}
+        <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <h4 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>Accept/Reject Decision</h4>
+          <div className="rm-form-grid">
+            <div className="rm-form-group">
+              <label className="rm-form-label">Material Lot Status</label>
+              <MobileResponsiveSelect
+                value="accepted"
+                onChange={() => {}}
+                options={[
+                  { value: 'accepted', label: 'Accepted' },
+                  { value: 'rejected', label: 'Rejected' }
+                ]}
+              />
             </div>
-            {CALIBRATION_DATA.map((item, idx) => {
-              const daysLeft = calculateDaysLeft(item.due_date);
-              return (
-                <div key={idx} className="calibration-item">
-                  <div className="calibration-info">
-                    <div className="calibration-name">{item.instrument}</div>
-                    <div className="calibration-date">Due: {formatDate(item.due_date)}</div>
-                  </div>
-                  <div className="calibration-countdown">
-                    <StatusBadge status={daysLeft > 0 ? 'Valid' : 'Expired'} />
-                    <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-4)' }}>
-                      {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
-                    </div>
-                  </div>
-                  <div style={{ marginLeft: 'var(--space-16)', flex: 1 }}>
-                    <input type="text" className="form-control" placeholder="IE Remarks" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="card" style={{ marginTop: 'var(--space-24)' }}>
-            <div className="card-header">
-              <h3 className="card-title">Vendor Document Verification</h3>
+            <div className="rm-form-group">
+              <label className="rm-form-label">Reason for Rejection (if rejected)</label>
+              <input type="text" className="rm-form-input" placeholder="Enter reason..." />
             </div>
-            <FormField label="IE Verification Remarks">
-              <textarea className="form-control" rows="3" placeholder="Enter your verification remarks for vendor documentation..."></textarea>
-            </FormField>
-            <div style={{ display: 'flex', gap: 'var(--space-12)' }}>
-              <button className="btn btn-secondary">Request Vendor Update</button>
-              <button className="btn btn-primary">Approve Calibration</button>
+            <div className="rm-form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="rm-form-label required">Overall IE Remarks</label>
+              <textarea className="rm-form-input" rows="3" placeholder="Enter your overall remarks..." style={{ minHeight: '80px', resize: 'vertical' }}></textarea>
             </div>
           </div>
         </div>
-      )}
 
-      {activeTab === 'summary' && (
-        <div>
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">Raw Material Inspection Summary - Auto-Compiled</h3>
-              <p className="card-subtitle">Consolidated results from all RM inspection modules</p>
-            </div>
-            <div className="alert alert-success">
-              ✓ Raw Material inspection completed successfully
-            </div>
-            <div style={{ marginBottom: 'var(--space-20)' }}>
-              <h4 style={{ marginBottom: 'var(--space-12)' }}>Calibration Module Results:</h4>
-              <p>All instruments calibrated and valid. 1 instrument expiring soon (Dimensional Gauge - Nov 10)</p>
-            </div>
-            <div style={{ marginBottom: 'var(--space-20)' }}>
-              <h4 style={{ marginBottom: 'var(--space-12)' }}>Visual &amp; Dimensional Check Results:</h4>
-              <p><strong>Samples Inspected:</strong> 20 samples per heat</p>
-              <p><strong>Defects Found:</strong> 2 minor defects (Kink, Pit)</p>
-              <p><strong>Dimensional Measurements:</strong> All within tolerance</p>
-            </div>
-            <div style={{ marginBottom: 'var(--space-20)' }}>
-              <h4 style={{ marginBottom: 'var(--space-12)' }}>Material Testing Results:</h4>
-              <p><strong>Chemical Analysis:</strong></p>
-              <ul style={{ marginLeft: 'var(--space-20)' }}>
-                <li>Carbon %: 0.55 (Valid - Range: 0.50-0.60)</li>
-                <li>Grain Size: 5</li>
-              </ul>
-              <p><strong>Mechanical Properties:</strong></p>
-              <ul style={{ marginLeft: 'var(--space-20)' }}>
-                <li>Hardness: 48 HRC (Valid - Range: 45-55)</li>
-                <li>Depth of Decarb: 0.2mm</li>
-              </ul>
-            </div>
-          </div>
-          <div className="card" style={{ marginTop: 'var(--space-24)' }}>
-            <div className="card-header">
-              <h3 className="card-title">Final Results - Raw Material (Auto-Populated)</h3>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Heat No.</th>
-                    <th>Status</th>
-                    <th>Weight of Material (Tons)</th>
-                    <th>Remarks (Required)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {heatNumbers.map(heat => (
-                    <tr key={heat}>
-                      <td><strong>{heat}</strong></td>
-                      <td><StatusBadge status="Valid" /> Accepted</td>
-                      <td>2.75 tons</td>
-                      <td>
-                        <input type="text" className="form-control" placeholder="Enter remarks..." required />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="card" style={{ marginTop: 'var(--space-24)' }}>
-            <div className="card-header">
-              <h3 className="card-title">Accept/Reject Decision</h3>
-            </div>
-            <FormField label="Material Lot Status">
-              <select className="form-control" style={{ maxWidth: '300px' }}>
-                <option value="accepted">Accepted</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </FormField>
-            <FormField label="Reason for Rejection (if rejected)">
-              <input type="text" className="form-control" placeholder="Enter reason..." />
-            </FormField>
-            <FormField label="Overall IE Remarks" required>
-              <textarea className="form-control" rows="3" placeholder="Enter your overall remarks..."></textarea>
-            </FormField>
-            <div style={{ display: 'flex', gap: 'var(--space-16)', justifyContent: 'flex-end' }}>
-              <button className="btn btn-outline">Save Draft</button>
-              <button className="btn btn-secondary" onClick={() => { if (window.confirm('Are you sure you want to reject this lot?')) { alert('Raw Material lot rejected'); } }}>Reject Lot</button>
-              <button className="btn btn-primary" onClick={() => { alert('Raw Material lot accepted and inspection completed!'); onBack(); }}>Accept Lot &amp; Complete Inspection</button>
-            </div>
-          </div>
+        {/* Action Buttons */}
+        <div className="rm-action-buttons" style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '24px' }}>
+          <button className="btn btn-outline" style={{ minHeight: '44px', padding: '10px 20px' }}>Save Draft</button>
+          <button className="btn btn-secondary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { if (window.confirm('Are you sure you want to reject this lot?')) { alert('Raw Material lot rejected'); } }}>Reject Lot</button>
+          <button className="btn btn-primary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { alert('Raw Material lot accepted and inspection completed!'); onBack(); }}>Accept Lot &amp; Complete Inspection</button>
         </div>
-      )}
+      </div>
 
-      <div style={{ marginTop: 'var(--space-24)' }}>
-        <button className="btn btn-secondary" onClick={onBack}>Return to Landing Page</button>
+      <div className="rm-action-buttons" style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+        <button className="rm-back-button" onClick={onBack} style={{ maxWidth: '300px' }}>
+          ← Return to Landing Page
+        </button>
       </div>
     </div>
   );

@@ -1,10 +1,105 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MOCK_PO_DATA } from '../data/mockData';
 import { formatDate } from '../utils/helpers';
 import { getProductTypeDisplayName } from '../utils/helpers';
+import MobileResponsiveSelect from './MobileResponsiveSelect';
 
-const InspectionInitiationFormContent = ({ call, formData, onFormDataChange }) => {
+// Responsive styles for mobile form elements
+const responsiveFormStyles = `
+  @media (max-width: 768px) {
+    .inspection-form-container .form-grid {
+      grid-template-columns: 1fr !important;
+      gap: 16px !important;
+    }
+    .inspection-form-container .form-group {
+      width: 100% !important;
+    }
+    .inspection-form-container .form-input,
+    .inspection-form-container select.form-input,
+    .inspection-form-container input.form-input,
+    .inspection-form-container textarea.form-textarea {
+      font-size: 16px !important;
+      min-height: 48px !important;
+      padding: 12px 14px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      border-radius: 8px !important;
+    }
+    .inspection-form-container select.form-input {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: right 14px center !important;
+      padding-right: 40px !important;
+    }
+    .inspection-form-container .form-label {
+      font-size: 14px !important;
+      margin-bottom: 8px !important;
+    }
+    .inspection-form-container .card-header {
+      flex-wrap: wrap !important;
+      gap: 12px !important;
+    }
+    .inspection-form-container .card-header h3 {
+      font-size: 16px !important;
+      flex: 1 !important;
+      min-width: 200px !important;
+    }
+    .inspection-form-container .card-header button {
+      min-width: 44px !important;
+      min-height: 44px !important;
+    }
+    .inspection-form-container .checkbox-item {
+      padding: 12px 0 !important;
+    }
+    .inspection-form-container .checkbox-item input[type="checkbox"] {
+      width: 22px !important;
+      height: 22px !important;
+      min-width: 22px !important;
+    }
+    .inspection-form-container .checkbox-item label {
+      font-size: 14px !important;
+      line-height: 1.4 !important;
+    }
+    .inspection-form-container .data-table {
+      font-size: 13px !important;
+    }
+    .inspection-form-container .data-table th,
+    .inspection-form-container .data-table td {
+      padding: 10px 8px !important;
+    }
+    .inspection-form-container .data-table input,
+    .inspection-form-container .data-table select {
+      font-size: 14px !important;
+      min-height: 40px !important;
+      padding: 8px !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .inspection-form-container .form-input,
+    .inspection-form-container select.form-input,
+    .inspection-form-container input.form-input {
+      font-size: 16px !important;
+      min-height: 52px !important;
+      padding: 14px 16px !important;
+    }
+    .inspection-form-container select.form-input {
+      padding-right: 44px !important;
+    }
+    .inspection-form-container .card-header h3 {
+      font-size: 15px !important;
+    }
+  }
+`;
+
+const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, showSectionA = true, showSectionB = true }) => {
   const poData = MOCK_PO_DATA[call.po_no] || {};
+  const [sectionAExpanded, setSectionAExpanded] = useState(true);
+  const [sectionBExpanded, setSectionBExpanded] = useState(true);
+  const [sectionCExpanded, setSectionCExpanded] = useState(true);
+  const [sectionDExpanded, setSectionDExpanded] = useState(true);
 
   const getOfferedQtyStatus = () => {
     if (formData.offeredQty < call.call_qty) return { type: 'error', message: 'Not allowed - Offered Qty cannot be less than Call Qty' };
@@ -33,12 +128,25 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange }) =
   };
 
   return (
-    <div className="form-container">
+    <div className="form-container inspection-form-container">
+      {/* Inject responsive form styles */}
+      <style>{responsiveFormStyles}</style>
+
       {/* SECTION A: Main PO Information */}
+      {showSectionA && (
       <div className="card">
-        <div className="card-header">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 className="card-title">SECTION A: Main PO Information (Auto-Fetched)</h3>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setSectionAExpanded(!sectionAExpanded)}
+            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+          >
+            {sectionAExpanded ? '-' : '+'}
+          </button>
         </div>
+        {sectionAExpanded && (
         <div className="form-grid">
           <div className="form-group">
             <label className="form-label">PO Number</label>
@@ -110,35 +218,70 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange }) =
             </div>
           </div>
         </div>
+        )}
       </div>
+      )}
 
-      {/* SECTION B: Details of PO Item */}
+      {/* SECTION B: Inspection Call Details */}
+      {showSectionB && (
       <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">SECTION B: Details of PO Item (Auto-Fetched + Manual)</h3>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="card-title">SECTION B: Inspection Call Details</h3>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setSectionBExpanded(!sectionBExpanded)}
+            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xxl)' }}
+          >
+            {sectionBExpanded ? '-' : '+'}
+          </button>
         </div>
+        {sectionBExpanded && (
         <div className="form-grid">
           <div className="form-group">
             <label className="form-label required">Shift of Inspection</label>
-            <select className="form-select" value={formData.shift} onChange={(e) => onFormDataChange({ shift: e.target.value })}>
-              <option value="">Select Shift</option>
-              <option value="Day">Day</option>
-              <option value="Night">Night</option>
-              <option value="General">General</option>
-            </select>
+            <MobileResponsiveSelect
+              value={formData.shiftOfInspection || ''}
+              onChange={(e) => onFormDataChange({ shiftOfInspection: e.target.value })}
+              options={[
+                { value: '', label: 'Select Shift' },
+                { value: 'A', label: 'A' },
+                { value: 'B', label: 'B' },
+                { value: 'C', label: 'C' },
+                { value: 'General', label: 'General' }
+              ]}
+              required={true}
+            />
           </div>
           <div className="form-group">
-            <label className="form-label">Date of Inspection</label>
-            <input
-              type="date"
-              className="form-input"
-              value={formData.inspectionDate}
-              onChange={(e) => onFormDataChange({ inspectionDate: e.target.value })}
-              max="2025-11-14"
-              min="2025-11-13"
-              disabled={formData.shift !== 'Night'}
-            />
-            <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Stage C: Manual entry (today or yesterday)</small>
+            <label className="form-label required">Date of Inspection</label>
+            {formData.shiftOfInspection === 'C' ? (
+              <MobileResponsiveSelect
+                value={formData.dateOfInspection || ''}
+                onChange={(e) => onFormDataChange({ dateOfInspection: e.target.value })}
+                options={[
+                  {
+                    value: new Date().toISOString().split('T')[0],
+                    label: `${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} (Today)`
+                  },
+                  {
+                    value: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+                    label: `${new Date(Date.now() - 86400000).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })} (Yesterday)`
+                  }
+                ]}
+                required={true}
+              />
+            ) : (
+              <input
+                type="text"
+                className="form-input"
+                value={formData.dateOfInspection ? new Date(formData.dateOfInspection).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}
+                disabled
+              />
+            )}
+            <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-4)', color: 'var(--color-text-secondary)' }}>
+              {formData.shiftOfInspection === 'C' ? 'Stage C: Manual entry (today or yesterday)' : 'Auto-fetched (read-only for shifts A, B, General)'}
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Inspection Call No.</label>
@@ -234,14 +377,25 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange }) =
             </div>
           </div>
         </div>
+        )}
       </div>
+      )}
 
       {/* SECTION C: Sub PO Details (if applicable) */}
       {(call.product_type === 'Raw Material' || call.product_type.includes('Process')) && (
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="card-title">SECTION C: Details of Sub PO in case inspection call is requested for Raw Material / process</h3>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSectionCExpanded(!sectionCExpanded)}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {sectionCExpanded ? '-' : '+'}
+            </button>
           </div>
+          {sectionCExpanded && (
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Raw Material Name</label>
@@ -292,15 +446,26 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange }) =
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
 
       {/* SECTION D: Multiple Production Lines */}
       {call.product_type.includes('Process') && (
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="card-title">SECTION D: Multiple Production Lines (if applicable)</h3>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSectionDExpanded(!sectionDExpanded)}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {sectionDExpanded ? '-' : '+'}
+            </button>
           </div>
+        {sectionDExpanded && (
+        <>
         <div className="checkbox-item" style={{ marginBottom: 'var(--space-16)' }}>
           <input
             type="checkbox"
@@ -333,12 +498,16 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange }) =
                       <td><input type="text" className="form-input" value={line.poNumber} onChange={(e) => updateProductionLine(idx, 'poNumber', e.target.value)} disabled /></td>
                       <td><input type="text" className="form-input" value={line.rawMaterialIC} onChange={(e) => updateProductionLine(idx, 'rawMaterialIC', e.target.value)} placeholder="RM-IC-001, RM-IC-002" /></td>
                       <td>
-                        <select className="form-select" value={line.productType} onChange={(e) => updateProductionLine(idx, 'productType', e.target.value)}>
-                          <option value="">Select</option>
-                          <option value="ERC Process">ERC-PROCESS MATERIAL</option>
-                          <option value="Raw Material">ERC-RAW MATERIAL</option>
-                          <option value="Final Product">ERC-FINAL</option>
-                        </select>
+                        <MobileResponsiveSelect
+                          value={line.productType}
+                          onChange={(e) => updateProductionLine(idx, 'productType', e.target.value)}
+                          options={[
+                            { value: '', label: 'Select' },
+                            { value: 'ERC Process', label: 'ERC-PROCESS MATERIAL' },
+                            { value: 'Raw Material', label: 'ERC-RAW MATERIAL' },
+                            { value: 'Final Product', label: 'ERC-FINAL' }
+                          ]}
+                        />
                       </td>
                       <td>
                         <button className="btn btn-sm btn-outline" onClick={() => onFormDataChange({ productionLines: formData.productionLines.filter((_, i) => i !== idx) })}>Remove</button>
@@ -367,6 +536,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange }) =
             </label>
           </div>
         </div>
+        </>
+        )}
       </div>
       )}
     </div>

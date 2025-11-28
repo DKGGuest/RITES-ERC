@@ -3,6 +3,7 @@ import { MOCK_INSPECTION_CALLS } from '../data/mockData';
 import Tabs from '../components/Tabs';
 import PendingCallsTab from '../components/PendingCallsTab';
 import CompletedCallsTab from '../components/CompletedCallsTab';
+import IssuanceOfICTab from '../components/IssuanceOfICTab';
 import PerformanceDashboard from '../components/PerformanceDashboard';
 import Modal from '../components/Modal';
 
@@ -15,20 +16,15 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections }) => {
   const [remarks, setRemarks] = useState('');
   const [isBulkSchedule, setIsBulkSchedule] = useState(false);
 
+  const pendingCount = MOCK_INSPECTION_CALLS.filter(call => call.status === 'Pending').length;
+  const completedCount = MOCK_INSPECTION_CALLS.filter(call => call.status === 'Completed').length;
+
   const tabs = [
-    { id: 'pending', label: 'Inspection Call Pending for IE' },
-    { id: 'completed', label: 'Inspection Call Completed by IE' },
-    { id: 'performance', label: 'IE Performance Dashboard' },
-    { id: 'certificates', label: 'Issuance of Inspection Certificate' },
+    { id: 'pending', label: 'List of Calls Pending', description: `${pendingCount} pending` },
+    { id: 'certificates', label: 'Issuance of IC', description: `${completedCount} ready for IC` },
+    { id: 'completed', label: 'Calls Completed', description: `${completedCount} completed` },
+    { id: 'performance', label: 'Performance', description: 'KPI overview' },
   ];
-
-  const handleReturn = (call) => {
-    console.log('Return clicked for:', call.call_no);
-  };
-
-  const handleBulkReturn = (calls) => {
-    console.log('Bulk return for:', calls.map(c => c.call_no));
-  };
 
   const handleSchedule = (call) => {
     setSelectedCall(call);
@@ -75,36 +71,30 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections }) => {
       
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
       
+      {/* 1. List of Calls Pending - First */}
       {activeTab === 'pending' && (
         <PendingCallsTab
           calls={MOCK_INSPECTION_CALLS}
-          onReturn={handleReturn}
           onSchedule={handleSchedule}
           onStart={handleStart}
-          onBulkReturn={handleBulkReturn}
           onBulkSchedule={handleBulkSchedule}
           onBulkStart={handleBulkStart}
         />
       )}
-      
+
+      {/* 2. Issuance of IC - Second */}
+      {activeTab === 'certificates' && (
+        <IssuanceOfICTab calls={MOCK_INSPECTION_CALLS} />
+      )}
+
+      {/* 3. Calls Completed - Third */}
       {activeTab === 'completed' && (
         <CompletedCallsTab calls={MOCK_INSPECTION_CALLS} />
       )}
-      
+
+      {/* 4. Performance - Fourth (Last) */}
       {activeTab === 'performance' && (
         <PerformanceDashboard />
-      )}
-      
-      {activeTab === 'certificates' && (
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Issuance of Inspection Certificate</h3>
-            <p className="card-subtitle">View and manage inspection certificates</p>
-          </div>
-          <div style={{ padding: 'var(--space-16)', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-            Certificate management module - Coming soon
-          </div>
-        </div>
       )}
 
       <Modal

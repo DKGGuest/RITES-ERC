@@ -1,17 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import IELandingPage from './pages/IELandingPage';
 import InspectionInitiationPage from './pages/InspectionInitiationPage';
 import MultiTabInspectionInitiationPage from './pages/MultiTabInspectionInitiationPage';
 import RawMaterialDashboard from './pages/RawMaterialDashboard';
 import ProcessDashboard from './pages/ProcessDashboard';
 import FinalProductDashboard from './pages/FinalProductDashboard';
+import CalibrationDocumentsPage from './pages/CalibrationDocumentsPage';
+import VisualMaterialTestingPage from './pages/VisualMaterialTestingPage';
+import SummaryReportsPage from './pages/SummaryReportsPage';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('landing');
   const [selectedCall, setSelectedCall] = useState(null);
   const [selectedCalls, setSelectedCalls] = useState([]);
   const [userEmail] = useState('inspector@sarthi.com');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile overlay
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop collapse
+
+  // Shared state for submodule pages
+  const [rmHeats, setRmHeats] = useState([{ heatNo: '', weight: '' }]);
+  const [rmProductModel, setRmProductModel] = useState('MK-III');
+
+  useEffect(() => {
+    // Ensure page scrolls to top when switching pages
+    try {
+      window.scrollTo(0, 0);
+      const mainEl = document.querySelector('.main-content');
+      if (mainEl) mainEl.scrollTop = 0;
+    } catch (e) {
+      // ignore in non-browser environments
+    }
+  }, [currentPage]);
 
   const handleStartInspection = (call) => {
     setSelectedCall(call);
@@ -39,6 +58,15 @@ const App = () => {
     setCurrentPage('landing');
     setSelectedCall(null);
     setSelectedCalls([]);
+  };
+
+  // Navigation to submodule pages
+  const handleNavigateToSubModule = (subModule) => {
+    setCurrentPage(subModule);
+  };
+
+  const handleBackToRawMaterial = () => {
+    setCurrentPage('raw-material');
   };
 
   return (
@@ -73,40 +101,65 @@ const App = () => {
         </div>
       </header>
 
-      <div className="app-container">
-        <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+      <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+          {/* Desktop collapse toggle button */}
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? '»' : '«'}
+          </button>
           <nav>
             <ul className="sidebar-nav">
-              <li 
+              <li
                 className={`sidebar-item ${currentPage === 'landing' ? 'active' : ''}`}
                 onClick={() => { handleBackToLanding(); setIsSidebarOpen(false); }}
+                title="Landing Page"
               >
-                🏠 Landing Page
+                <span className="sidebar-icon">🏠</span>
+                <span className="sidebar-text">Landing Page</span>
               </li>
-              <li 
+              <li
                 className={`sidebar-item ${currentPage === 'raw-material' ? 'active' : ''}`}
                 onClick={() => { if (selectedCall) { setCurrentPage('raw-material'); setIsSidebarOpen(false); } }}
                 style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
+                title="Raw Material Inspection"
               >
-                📦 Raw Material Inspection
+                <span className="sidebar-icon">📦</span>
+                <span className="sidebar-text">Raw Material Inspection</span>
               </li>
-              <li 
+              <li
                 className={`sidebar-item ${currentPage === 'process' ? 'active' : ''}`}
                 onClick={() => { if (selectedCall) { setCurrentPage('process'); setIsSidebarOpen(false); } }}
                 style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
+                title="Process Inspection"
               >
-                ⚙️ Process Inspection
+                <span className="sidebar-icon">⚙️</span>
+                <span className="sidebar-text">Process Inspection</span>
               </li>
-              <li 
+              <li
                 className={`sidebar-item ${currentPage === 'final-product' ? 'active' : ''}`}
                 onClick={() => { if (selectedCall) { setCurrentPage('final-product'); setIsSidebarOpen(false); } }}
                 style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
+                title="Final Product Inspection"
               >
-                ✅ Final Product Inspection
+                <span className="sidebar-icon">✅</span>
+                <span className="sidebar-text">Final Product Inspection</span>
               </li>
             </ul>
           </nav>
         </aside>
+
+        {/* Mobile overlay when sidebar is open */}
+        {isSidebarOpen && (
+          <div
+            className="sidebar-overlay"
+            onClick={() => setIsSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
 
         <main className="main-content">
           {currentPage === 'landing' && (
@@ -130,13 +183,38 @@ const App = () => {
             />
           )}
           {currentPage === 'raw-material' && (
-            <RawMaterialDashboard onBack={handleBackToLanding} />
+            <RawMaterialDashboard
+              onBack={handleBackToLanding}
+              onNavigateToSubModule={handleNavigateToSubModule}
+              onHeatsChange={setRmHeats}
+              onProductModelChange={setRmProductModel}
+            />
           )}
           {currentPage === 'process' && (
             <ProcessDashboard onBack={handleBackToLanding} />
           )}
           {currentPage === 'final-product' && (
             <FinalProductDashboard onBack={handleBackToLanding} />
+          )}
+
+          {/* Sub Module Pages - Completely Separate Pages */}
+          {currentPage === 'calibration-documents' && (
+            <CalibrationDocumentsPage
+              onBack={handleBackToRawMaterial}
+              heats={rmHeats}
+            />
+          )}
+          {currentPage === 'visual-material-testing' && (
+            <VisualMaterialTestingPage
+              onBack={handleBackToRawMaterial}
+              heats={rmHeats}
+              productModel={rmProductModel}
+            />
+          )}
+          {currentPage === 'summary-reports' && (
+            <SummaryReportsPage
+              onBack={handleBackToRawMaterial}
+            />
           )}
         </main>
       </div>

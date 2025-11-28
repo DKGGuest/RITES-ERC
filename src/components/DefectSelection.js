@@ -73,7 +73,7 @@ const DefectSelection = ({ onRejection }) => {
                                 onChange={(e) =>
                                     handleCountChange(defectName, e.target.value)
                                 }
-                                placeholder="Number of defective pieces"
+                                placeholder={`${defectName} Count`}
                             />
                         )}
                     </div>

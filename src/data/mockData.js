@@ -66,5 +66,11 @@ export const PERFORMANCE_METRICS = {
   total_inspections: 45,
   completed_percentage: 88,
   average_time: 2.5,
-  pending_calls: 5
+  pending_calls: 5,
+  acceptance_percentage: 92,
+  rejection_percentage: 8,
+  response_time_hours: 1.8,
+  scheduling_delay_days: 2,
+  call_cancellations: 3,
+  ic_delay_days: 1.2
 };
