@@ -331,12 +331,12 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
 
   // Pre-Inspection Data Entry State
   const [sourceOfRawMaterial, setSourceOfRawMaterial] = useState('');
-  const [heats, setHeats] = useState([
+  const [heats] = useState([
     { heatNo: 'H001', weight: '2.5', colorCode: 'RED' },
     { heatNo: 'H002', weight: '3.0', colorCode: 'BLUE' }
   ]);
   const [numberOfBundles, setNumberOfBundles] = useState('10');
-  const [testCertificates, setTestCertificates] = useState([
+  const [testCertificates] = useState([
     { certificateNo: 'TC-2025-001', heatNo: 'H001', certificateDate: '2025-11-10' }
   ]);
 
@@ -380,43 +380,6 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
   }, [totalQuantity]);
 
   // (defect lists and counts handled in visual module state)
-
-  
-
-  // Add/Remove Heat functionality
-  const addHeat = () => {
-    setHeats([...heats, { heatNo: '', weight: '', colorCode: '' }]);
-  };
-
-  const removeHeat = (index) => {
-    if (heats.length > 1) {
-      setHeats(heats.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateHeat = (index, field, value) => {
-    const updatedHeats = [...heats];
-    updatedHeats[index][field] = value;
-    setHeats(updatedHeats);
-  };
-
-  // Add/Remove Test Certificate functionality
-  const addTestCertificate = () => {
-    setTestCertificates([...testCertificates, { certificateNo: '', heatNo: '', certificateDate: '' }]);
-  };
-
-  const removeTestCertificate = (index) => {
-    if (testCertificates.length > 1) {
-      setTestCertificates(testCertificates.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateTestCertificate = (index, field, value) => {
-    const updatedCertificates = [...testCertificates];
-    updatedCertificates[index][field] = value;
-    setTestCertificates(updatedCertificates);
-  };
-
 
   const isInitialMount = useRef(true);
 

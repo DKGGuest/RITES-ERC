@@ -38,8 +38,8 @@ const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
   const [sectionBVerified, setSectionBVerified] = useState(false);
   const [sectionCVerified, setSectionCVerified] = useState(false);
   const [sectionDVerified, setSectionDVerified] = useState(false);
-  const [showSectionA, setShowSectionA] = useState(true);
-  const [showSectionB, setShowSectionB] = useState(true);
+  const [showSectionA] = useState(true);
+  const [showSectionB] = useState(true);
   const currentDateTime = new Date('2025-11-14T17:00:00').toLocaleString();
 
   // scroll to top when page mounts so navigation positions at the start
