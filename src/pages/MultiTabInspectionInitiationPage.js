@@ -50,7 +50,7 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
         cmApproval: false,
         dateOfInspection: today,
         multipleLinesActive: false,
-        productionLines: [{ lineNumber: 1, icNumber: '', poNumber: '', rawMaterialIC: '', productType: '' }],
+        productionLines: [{ lineNumber: 1, icNumber: '', poNumber: '', rawMaterialICs: [], productType: '' }],
         sectionAVerified: false,
         sectionBVerified: false,
         sectionCVerified: false,

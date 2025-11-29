@@ -33,7 +33,7 @@ const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
   const [cmApproval, setCmApproval] = useState(false);
   const [dateOfInspection, setDateOfInspection] = useState(new Date().toISOString().split('T')[0]);
   const [multipleLinesActive, setMultipleLinesActive] = useState(false);
-  const [productionLines, setProductionLines] = useState([{ lineNumber: 1, icNumber: '', poNumber: '', rawMaterialIC: '', productType: '' }]);
+  const [productionLines, setProductionLines] = useState([{ lineNumber: 1, icNumber: '', poNumber: '', rawMaterialICs: [], productType: '' }]);
   const [sectionAVerified, setSectionAVerified] = useState(false);
   const [sectionBVerified, setSectionBVerified] = useState(false);
   const [sectionCVerified, setSectionCVerified] = useState(false);

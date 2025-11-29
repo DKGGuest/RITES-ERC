@@ -116,16 +116,14 @@ const pageStyles = `
   .visual-defect-row {
     display: flex;
     align-items: center;
-    gap: var(--defect-gap-non-matching);
     padding: 10px 12px;
     border-radius: 10px;
-    border: 1px solid transparent;
+    border: 1px solid #e5e7eb;
     background: #ffffff;
-    transition: gap 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+    transition: border-color 0.25s ease, background-color 0.25s ease;
   }
 
   .visual-defect-row.matching {
-    gap: var(--defect-gap-matching);
     border-color: #d1fae5;
     background: #f0fdf4;
   }
@@ -134,10 +132,12 @@ const pageStyles = `
     width: 18px;
     height: 18px;
     flex-shrink: 0;
+    margin-right: 8px;
   }
 
   .visual-defect-row label {
-    flex: 1 1 auto;
+    margin-right: 8px;
+    white-space: nowrap;
     font-weight: 500;
     color: #1f2937;
   }
@@ -207,6 +207,179 @@ const pageStyles = `
       grid-template-columns: repeat(1, minmax(0, 1fr));
     }
   }
+
+  /* ===== Material Testing Responsive Styles ===== */
+
+  /* Desktop: Make table fit screen without horizontal scroll */
+  .material-testing-table-wrapper {
+    width: 100%;
+    overflow-x: visible;
+  }
+
+  .material-testing-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .material-testing-table th,
+  .material-testing-table td {
+    padding: 10px 8px;
+    text-align: center;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 14px;
+  }
+
+  .material-testing-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    font-size: 13px;
+    color: #475569;
+    white-space: nowrap;
+  }
+
+  .material-testing-table th:first-child {
+    width: 60px;
+  }
+
+  .material-testing-table .form-control {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 6px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  /* Inclusion Rating Grid - Desktop */
+  .inclusion-rating-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .inclusion-rating-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .inclusion-rating-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    color: #64748b;
+  }
+
+  .inclusion-rating-inputs {
+    display: flex;
+    gap: 8px;
+  }
+
+  .inclusion-rating-inputs .form-control {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Tablet: 2 columns for inclusion */
+  @media (max-width: 1024px) {
+    .inclusion-rating-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  /* Mobile: Card-based layout for Material Testing */
+  @media (max-width: 768px) {
+    .material-testing-table-wrapper {
+      overflow: visible;
+    }
+
+    .material-testing-table {
+      display: block;
+    }
+
+    .material-testing-table thead {
+      display: none;
+    }
+
+    .material-testing-table tbody {
+      display: block;
+    }
+
+    .material-testing-table tbody tr {
+      display: block;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .material-testing-table tbody td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border: none;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .material-testing-table tbody td:last-child {
+      border-bottom: none;
+    }
+
+    .material-testing-table tbody td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      color: #475569;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-right: 12px;
+      min-width: 120px;
+    }
+
+    .material-testing-table tbody td .form-control {
+      width: 120px;
+      flex-shrink: 0;
+    }
+
+    /* Inclusion Rating - Mobile: 1 column */
+    .inclusion-rating-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .inclusion-rating-item {
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .inclusion-rating-label {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .inclusion-rating-inputs {
+      gap: 12px;
+    }
+
+    .inclusion-rating-inputs .form-control {
+      min-height: 44px;
+      font-size: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .material-testing-table tbody td::before {
+      min-width: 100px;
+      font-size: 12px;
+    }
+
+    .material-testing-table tbody td .form-control {
+      width: 100px;
+    }
+  }
 `;
 
 const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12' }) => {
@@ -216,6 +389,7 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
   const tabs = [
     { id: 'visual', label: 'Visual & Dimensional Check' },
     { id: 'material', label: 'Material Testing' },
+    { id: 'packing', label: 'Packing & Storage Verification' },
   ];
 
   // Visual Defects List
@@ -306,8 +480,8 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
   // Material testing state
   const [materialData, setMaterialData] = useState(() => heats.map(() => ({
     samples: [
-      { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclA: '', inclB: '', inclC: '', inclD: '', hardness: '', decarb: '', remarks: '' },
-      { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclA: '', inclB: '', inclC: '', inclD: '', hardness: '', decarb: '', remarks: '' }
+      { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclTypeA: '', inclA: '', inclTypeB: '', inclB: '', inclTypeC: '', inclC: '', inclTypeD: '', inclD: '', hardness: '', decarb: '', remarks: '' },
+      { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclTypeA: '', inclA: '', inclTypeB: '', inclB: '', inclTypeC: '', inclC: '', inclTypeD: '', inclD: '', hardness: '', decarb: '', remarks: '' }
     ]
   })));
 
@@ -318,6 +492,60 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
       next[heatIndex].samples[sampleIndex] = { ...next[heatIndex].samples[sampleIndex], [field]: value };
       return next;
     });
+  };
+
+  // Packing & Storage Verification state
+  const [packingData, setPackingData] = useState({
+    isPaintMarkingAvailable: false,
+    paintMarkingRemarks: '',
+    areBarStoredHeatWise: false,
+    areBarsBundled: false,
+    isMetalTagPresent: false,
+    packingRemarks: '',
+  });
+
+  const [packingErrors, setPackingErrors] = useState({
+    paintMarkingRemarks: false,
+    packingRemarks: false,
+  });
+
+  const [packingSubmitted, setPackingSubmitted] = useState(false);
+
+  const handlePackingChange = (field, value) => {
+    setPackingData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user types
+    if (field === 'paintMarkingRemarks' || field === 'packingRemarks') {
+      if (value.trim()) {
+        setPackingErrors(prev => ({ ...prev, [field]: false }));
+      }
+    }
+  };
+
+  const validatePackingForm = () => {
+    const errors = {
+      paintMarkingRemarks: !packingData.paintMarkingRemarks.trim(),
+      packingRemarks: !packingData.packingRemarks.trim(),
+    };
+    setPackingErrors(errors);
+    return !errors.paintMarkingRemarks && !errors.packingRemarks;
+  };
+
+  const handlePackingSubmit = () => {
+    if (validatePackingForm()) {
+      setPackingSubmitted(true);
+      const jsonOutput = {
+        isPaintMarkingAvailable: packingData.isPaintMarkingAvailable,
+        paintMarkingRemarks: packingData.paintMarkingRemarks,
+        areBarStoredHeatWise: packingData.areBarStoredHeatWise,
+        areBarsBundled: packingData.areBarsBundled,
+        isMetalTagPresent: packingData.isMetalTagPresent,
+        packingRemarks: packingData.packingRemarks,
+      };
+      console.log('Packing & Storage Verification Data:', JSON.stringify(jsonOutput, null, 2));
+      alert('Packing & Storage data saved successfully!\n\nCheck console for JSON output.');
+      return jsonOutput;
+    }
+    return null;
   };
 
   return (
@@ -357,7 +585,7 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
 
             {/* Visual Defects Checklist */}
             <h4 style={{ marginBottom: '12px' }}>Visual Defects Checklist</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
               {(() => {
                 const hv = heatVisualData[activeHeatTab] || {};
                 const selected = hv.selectedDefects || {};
@@ -381,12 +609,12 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
                         onChange={() => handleDefectToggle(d)}
                         disabled={disabled}
                       />
-                      <label htmlFor={`defect-${d}`}>{d}</label>
+                      <label htmlFor={`defect-${d}`} style={{ minWidth: '100px' }}>{d}</label>
                       {!isNoDefect && selected[d] && (
                         <input
                           type="number"
                           className="form-control"
-                          style={{ width: '140px' }}
+                          style={{ width: '140px', marginLeft: '0' }}
                           value={counts[d]}
                           onChange={(e) => handleDefectCountChange(d, e.target.value)}
                           placeholder={`${d} Count`}
@@ -459,8 +687,9 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
                   <h4>Heat: {heat.heatNo || `#${heatIndex + 1}`} — Material Testing (2 samples)</h4>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="data-table">
+                {/* Chemical Composition & Mechanical Properties Table */}
+                <div className="material-testing-table-wrapper" style={{ marginBottom: '24px' }}>
+                  <table className="material-testing-table">
                     <thead>
                       <tr>
                         <th>Sample</th>
@@ -470,12 +699,8 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
                         <th>%P</th>
                         <th>%S</th>
                         <th>Grain Size</th>
-                        <th>Incl A</th>
-                        <th>Incl B</th>
-                        <th>Incl C</th>
-                        <th>Incl D</th>
-                        <th>Hardness</th>
-                        <th>Decarb</th>
+                        <th>Hardness (HRC)</th>
+                        <th>Decarb (mm)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -483,54 +708,40 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
                         const sample = materialData[heatIndex]?.samples[sampleIndex] || {};
                         return (
                           <tr key={sampleIndex}>
-                            <td><strong>{sampleIndex + 1}</strong></td>
-                            <td>
-                              <input type="number" step="0.01" className="form-control" style={{ width: '70px' }}
+                            <td data-label="Sample"><strong>Sample {sampleIndex + 1}</strong></td>
+                            <td data-label="%C (Carbon)">
+                              <input type="number" step="0.01" className="form-control" required
                                 value={sample.c} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'c', e.target.value)} />
                             </td>
-                            <td>
-                              <input type="number" step="0.01" className="form-control" style={{ width: '70px' }}
+                            <td data-label="%Si (Silicon)">
+                              <input type="number" step="0.01" className="form-control" required
                                 value={sample.si} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'si', e.target.value)} />
                             </td>
-                            <td>
-                              <input type="number" step="0.01" className="form-control" style={{ width: '70px' }}
+                            <td data-label="%Mn (Manganese)">
+                              <input type="number" step="0.01" className="form-control" required
                                 value={sample.mn} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'mn', e.target.value)} />
                             </td>
-                            <td>
-                              <input type="number" step="0.01" className="form-control" style={{ width: '70px' }}
+                            <td data-label="%P (Phosphorus)">
+                              <input type="number" step="0.01" className="form-control" required
                                 value={sample.p} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'p', e.target.value)} />
                             </td>
-                            <td>
-                              <input type="number" step="0.01" className="form-control" style={{ width: '70px' }}
+                            <td data-label="%S (Sulphur)">
+                              <input type="number" step="0.01" className="form-control" required
                                 value={sample.s} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 's', e.target.value)} />
                             </td>
-                            <td>
-                              <input type="number" step="1" className="form-control" style={{ width: '70px' }}
-                                value={sample.grainSize} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'grainSize', e.target.value)} />
+                            <td data-label="Grain Size (≥6)">
+                              <input type="number" step="1" className="form-control" required min="6"
+                                value={sample.grainSize} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'grainSize', e.target.value)}
+                                placeholder="≥6" />
                             </td>
-                            <td>
-                              <input type="number" step="0.1" className="form-control" style={{ width: '60px' }}
-                                value={sample.inclA} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclA', e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="number" step="0.1" className="form-control" style={{ width: '60px' }}
-                                value={sample.inclB} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclB', e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="number" step="0.1" className="form-control" style={{ width: '60px' }}
-                                value={sample.inclC} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclC', e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="number" step="0.1" className="form-control" style={{ width: '60px' }}
-                                value={sample.inclD} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclD', e.target.value)} />
-                            </td>
-                            <td>
-                              <input type="number" step="1" className="form-control" style={{ width: '70px' }}
+                            <td data-label="Hardness (HRC)">
+                              <input type="number" step="1" className="form-control" required
                                 value={sample.hardness} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'hardness', e.target.value)} />
                             </td>
-                            <td>
-                              <input type="number" step="0.01" className="form-control" style={{ width: '70px' }}
-                                value={sample.decarb} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'decarb', e.target.value)} />
+                            <td data-label="Decarb (≤0.25mm)">
+                              <input type="number" step="0.01" className="form-control" required max="0.25"
+                                value={sample.decarb} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'decarb', e.target.value)}
+                                placeholder="≤0.25" />
                             </td>
                           </tr>
                         );
@@ -539,8 +750,253 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
                   </table>
                 </div>
 
+                {/* Inclusion Rating (Type) - Separate Section */}
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h5 style={{ marginBottom: '16px', color: '#334155' }}>Inclusion Rating (Type)</h5>
+
+                  {[0, 1].map(sampleIndex => {
+                    const sample = materialData[heatIndex]?.samples[sampleIndex] || {};
+                    return (
+                      <div key={sampleIndex} style={{ marginBottom: sampleIndex === 0 ? '16px' : '0', padding: '12px', background: '#fff', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontWeight: '600', marginBottom: '12px', color: '#475569' }}>Sample {sampleIndex + 1}</div>
+                        <div className="inclusion-rating-grid">
+                          {/* Inclusion A */}
+                          <div className="inclusion-rating-item">
+                            <label className="inclusion-rating-label">
+                              Inclusion Rating (A) <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div className="inclusion-rating-inputs">
+                              <select className="form-control" required
+                                value={sample.inclTypeA} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclTypeA', e.target.value)}>
+                                <option value="">Type</option>
+                                <option value="Thick">Thick</option>
+                                <option value="Thin">Thin</option>
+                              </select>
+                              <input type="number" step="0.1" className="form-control" required max="2.0"
+                                value={sample.inclA} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclA', e.target.value)}
+                                placeholder="≤2.0" />
+                            </div>
+                          </div>
+
+                          {/* Inclusion B */}
+                          <div className="inclusion-rating-item">
+                            <label className="inclusion-rating-label">
+                              Inclusion Rating (B) <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div className="inclusion-rating-inputs">
+                              <select className="form-control" required
+                                value={sample.inclTypeB} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclTypeB', e.target.value)}>
+                                <option value="">Type</option>
+                                <option value="Thick">Thick</option>
+                                <option value="Thin">Thin</option>
+                              </select>
+                              <input type="number" step="0.1" className="form-control" required max="2.0"
+                                value={sample.inclB} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclB', e.target.value)}
+                                placeholder="≤2.0" />
+                            </div>
+                          </div>
+
+                          {/* Inclusion C */}
+                          <div className="inclusion-rating-item">
+                            <label className="inclusion-rating-label">
+                              Inclusion Rating (C) <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div className="inclusion-rating-inputs">
+                              <select className="form-control" required
+                                value={sample.inclTypeC} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclTypeC', e.target.value)}>
+                                <option value="">Type</option>
+                                <option value="Thick">Thick</option>
+                                <option value="Thin">Thin</option>
+                              </select>
+                              <input type="number" step="0.1" className="form-control" required max="2.0"
+                                value={sample.inclC} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclC', e.target.value)}
+                                placeholder="≤2.0" />
+                            </div>
+                          </div>
+
+                          {/* Inclusion D */}
+                          <div className="inclusion-rating-item">
+                            <label className="inclusion-rating-label">
+                              Inclusion Rating (D) <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div className="inclusion-rating-inputs">
+                              <select className="form-control" required
+                                value={sample.inclTypeD} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclTypeD', e.target.value)}>
+                                <option value="">Type</option>
+                                <option value="Thick">Thick</option>
+                                <option value="Thin">Thin</option>
+                              </select>
+                              <input type="number" step="0.1" className="form-control" required max="2.0"
+                                value={sample.inclD} onChange={(e) => updateMaterialField(heatIndex, sampleIndex, 'inclD', e.target.value)}
+                                placeholder="≤2.0" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
               </div>
             ))}
+        </div>
+      )}
+
+      {/* Packing & Storage Verification Tab */}
+      {activeTab === 'packing' && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">📦 Packing & Storage Verification</h3>
+            <p className="card-subtitle">Verify packing conditions and storage compliance</p>
+          </div>
+
+          <div style={{ padding: '20px' }}>
+            {/* Checkbox Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '24px' }}>
+
+              {/* 1. Is Paint Marking available at end of Bars */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <input
+                  type="checkbox"
+                  id="isPaintMarkingAvailable"
+                  checked={packingData.isPaintMarkingAvailable}
+                  onChange={(e) => handlePackingChange('isPaintMarkingAvailable', e.target.checked)}
+                  style={{ width: '20px', height: '20px', marginTop: '2px', cursor: 'pointer' }}
+                />
+                <label htmlFor="isPaintMarkingAvailable" style={{ fontSize: '15px', fontWeight: '500', color: '#334155', cursor: 'pointer' }}>
+                  Is Paint Marking available at end of Bars
+                </label>
+              </div>
+
+              {/* 2. Paint Marking at End of Bars – Remarks (Required) */}
+              <div style={{ padding: '16px', background: '#fff', borderRadius: '8px', border: packingErrors.paintMarkingRemarks ? '1px solid #ef4444' : '1px solid #e2e8f0' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#334155' }}>
+                  Paint Marking at End of Bars – Remarks <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={packingData.paintMarkingRemarks}
+                  onChange={(e) => handlePackingChange('paintMarkingRemarks', e.target.value)}
+                  placeholder="Enter remarks about paint marking..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    borderRadius: '6px',
+                    border: packingErrors.paintMarkingRemarks ? '1px solid #ef4444' : '1px solid #d1d5db',
+                    resize: 'vertical'
+                  }}
+                  required
+                />
+                {packingErrors.paintMarkingRemarks && (
+                  <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    ⚠ This field is required
+                  </span>
+                )}
+              </div>
+
+              {/* 3. Are Bars stored in heat wise stacks */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <input
+                  type="checkbox"
+                  id="areBarStoredHeatWise"
+                  checked={packingData.areBarStoredHeatWise}
+                  onChange={(e) => handlePackingChange('areBarStoredHeatWise', e.target.checked)}
+                  style={{ width: '20px', height: '20px', marginTop: '2px', cursor: 'pointer' }}
+                />
+                <label htmlFor="areBarStoredHeatWise" style={{ fontSize: '15px', fontWeight: '500', color: '#334155', cursor: 'pointer' }}>
+                  Are Bars stored in heat wise stacks
+                </label>
+              </div>
+
+              {/* 4. Are bars bundled with binding wires & packing strips */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <input
+                  type="checkbox"
+                  id="areBarsBundled"
+                  checked={packingData.areBarsBundled}
+                  onChange={(e) => handlePackingChange('areBarsBundled', e.target.checked)}
+                  style={{ width: '20px', height: '20px', marginTop: '2px', cursor: 'pointer' }}
+                />
+                <label htmlFor="areBarsBundled" style={{ fontSize: '15px', fontWeight: '500', color: '#334155', cursor: 'pointer', lineHeight: '1.5' }}>
+                  Are bars bundled with binding wires &amp; packing strips at minimum 3 locations having manufacturer's seal/name/logo/code
+                </label>
+              </div>
+
+              {/* 5. Is Metal Tag present */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <input
+                  type="checkbox"
+                  id="isMetalTagPresent"
+                  checked={packingData.isMetalTagPresent}
+                  onChange={(e) => handlePackingChange('isMetalTagPresent', e.target.checked)}
+                  style={{ width: '20px', height: '20px', marginTop: '2px', cursor: 'pointer' }}
+                />
+                <label htmlFor="isMetalTagPresent" style={{ fontSize: '15px', fontWeight: '500', color: '#334155', cursor: 'pointer', lineHeight: '1.5' }}>
+                  Is Metal Tag present with PO Number, Heat Number, Date, Grade, Size &amp; Length
+                </label>
+              </div>
+
+              {/* 6. Packing Remarks (Required) */}
+              <div style={{ padding: '16px', background: '#fff', borderRadius: '8px', border: packingErrors.packingRemarks ? '1px solid #ef4444' : '1px solid #e2e8f0' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#334155' }}>
+                  Packing Remarks <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={packingData.packingRemarks}
+                  onChange={(e) => handlePackingChange('packingRemarks', e.target.value)}
+                  placeholder="Enter packing remarks..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '14px',
+                    borderRadius: '6px',
+                    border: packingErrors.packingRemarks ? '1px solid #ef4444' : '1px solid #d1d5db',
+                    resize: 'vertical'
+                  }}
+                  required
+                />
+                {packingErrors.packingRemarks && (
+                  <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    ⚠ This field is required
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+              <button
+                type="button"
+                onClick={handlePackingSubmit}
+                style={{
+                  padding: '12px 32px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  color: '#fff',
+                  background: '#2563eb',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+                onMouseOver={(e) => e.target.style.background = '#1d4ed8'}
+                onMouseOut={(e) => e.target.style.background = '#2563eb'}
+              >
+                Save Packing & Storage Data
+              </button>
+            </div>
+
+            {/* Success Message */}
+            {packingSubmitted && (
+              <div style={{ marginTop: '16px', padding: '12px 16px', background: '#d1fae5', border: '1px solid #10b981', borderRadius: '8px', color: '#065f46' }}>
+                ✅ Packing & Storage Verification data saved successfully!
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

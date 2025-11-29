@@ -52,12 +52,13 @@ const ladleStyles = `
     background: rgba(220, 53, 69, 0.1);
     color: #b91c1c;
     border: none;
-    border-radius: 999px;
-    padding: 0.45rem 0.9rem;
-    font-weight: 600;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 4px;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.2s ease;
   }
@@ -65,6 +66,10 @@ const ladleStyles = `
   .ladle-card__remove:hover {
     background: rgba(220, 53, 69, 0.18);
     transform: translateY(-1px);
+  }
+
+  .ladle-card__remove svg {
+    font-size: 16px;
   }
 
   .ladle-section-title {
@@ -182,7 +187,7 @@ const CalibrationHeatRow = ({
           <p className="ladle-card__hint">Fetched from pre inspection data entered on main module</p>
         </div>
 
-        {canRemove && (
+        {/* {canRemove && (
           <button
             type="button"
             className="ladle-card__remove"
@@ -191,7 +196,7 @@ const CalibrationHeatRow = ({
             <DeleteIcon fontSize="small" />
             Remove heat
           </button>
-        )}
+        )} */}
       </div>
 
       <Typography className="ladle-section-title">

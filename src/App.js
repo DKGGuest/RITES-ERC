@@ -8,6 +8,12 @@ import FinalProductDashboard from './pages/FinalProductDashboard';
 import CalibrationDocumentsPage from './pages/CalibrationDocumentsPage';
 import VisualMaterialTestingPage from './pages/VisualMaterialTestingPage';
 import SummaryReportsPage from './pages/SummaryReportsPage';
+// Process Material SubModule Pages
+import ProcessCalibrationDocumentsPage from './pages/ProcessCalibrationDocumentsPage';
+import ProcessStaticPeriodicCheckPage from './pages/ProcessStaticPeriodicCheckPage';
+import ProcessOilTankCounterPage from './pages/ProcessOilTankCounterPage';
+import ProcessParametersGridPage from './pages/ProcessParametersGridPage';
+import ProcessSummaryReportsPage from './pages/ProcessSummaryReportsPage';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('landing');
@@ -17,9 +23,15 @@ const App = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile overlay
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop collapse
 
+  // Track which inspection type is currently active (to show only that option in nav)
+  const [activeInspectionType, setActiveInspectionType] = useState(null); // 'raw-material', 'process', or 'final-product'
+
   // Shared state for submodule pages
   const [rmHeats, setRmHeats] = useState([{ heatNo: '', weight: '' }]);
   const [rmProductModel, setRmProductModel] = useState('MK-III');
+
+  // Process Material shared state - lot numbers from main module
+  const [processLotNumbers, setProcessLotNumbers] = useState(['LOT-001', 'LOT-002', 'LOT-003']);
 
   useEffect(() => {
     // Ensure page scrolls to top when switching pages
@@ -47,10 +59,13 @@ const App = () => {
   const handleProceedToInspection = (productType) => {
     if (productType === 'Raw Material') {
       setCurrentPage('raw-material');
+      setActiveInspectionType('raw-material');
     } else if (productType === 'ERC Process' || productType.includes('Process')) {
       setCurrentPage('process');
+      setActiveInspectionType('process');
     } else if (productType === 'Final Product' || productType.includes('Final')) {
       setCurrentPage('final-product');
+      setActiveInspectionType('final-product');
     }
   };
 
@@ -58,6 +73,7 @@ const App = () => {
     setCurrentPage('landing');
     setSelectedCall(null);
     setSelectedCalls([]);
+    setActiveInspectionType(null); // Reset active inspection type when returning to landing
   };
 
   // Navigation to submodule pages
@@ -67,6 +83,10 @@ const App = () => {
 
   const handleBackToRawMaterial = () => {
     setCurrentPage('raw-material');
+  };
+
+  const handleBackToProcess = () => {
+    setCurrentPage('process');
   };
 
   return (
@@ -121,33 +141,42 @@ const App = () => {
                 <span className="sidebar-icon">🏠</span>
                 <span className="sidebar-text">Landing Page</span>
               </li>
+              {/* Only show Raw Material if it's the active inspection type or no type selected yet */}
+              {(activeInspectionType === 'raw-material' || activeInspectionType === null) && (
               <li
                 className={`sidebar-item ${currentPage === 'raw-material' ? 'active' : ''}`}
-                onClick={() => { if (selectedCall) { setCurrentPage('raw-material'); setIsSidebarOpen(false); } }}
-                style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
+                onClick={() => { if (activeInspectionType === 'raw-material') { setCurrentPage('raw-material'); setIsSidebarOpen(false); } }}
+                style={{ opacity: activeInspectionType === 'raw-material' ? 1 : 0.5, cursor: activeInspectionType === 'raw-material' ? 'pointer' : 'not-allowed' }}
                 title="Raw Material Inspection"
               >
                 <span className="sidebar-icon">📦</span>
                 <span className="sidebar-text">Raw Material Inspection</span>
               </li>
+              )}
+              {/* Only show Process Inspection if it's the active inspection type or no type selected yet */}
+              {(activeInspectionType === 'process' || activeInspectionType === null) && (
               <li
                 className={`sidebar-item ${currentPage === 'process' ? 'active' : ''}`}
-                onClick={() => { if (selectedCall) { setCurrentPage('process'); setIsSidebarOpen(false); } }}
-                style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
+                onClick={() => { if (activeInspectionType === 'process') { setCurrentPage('process'); setIsSidebarOpen(false); } }}
+                style={{ opacity: activeInspectionType === 'process' ? 1 : 0.5, cursor: activeInspectionType === 'process' ? 'pointer' : 'not-allowed' }}
                 title="Process Inspection"
               >
                 <span className="sidebar-icon">⚙️</span>
                 <span className="sidebar-text">Process Inspection</span>
               </li>
+              )}
+              {/* Only show Final Product if it's the active inspection type or no type selected yet */}
+              {(activeInspectionType === 'final-product' || activeInspectionType === null) && (
               <li
                 className={`sidebar-item ${currentPage === 'final-product' ? 'active' : ''}`}
-                onClick={() => { if (selectedCall) { setCurrentPage('final-product'); setIsSidebarOpen(false); } }}
-                style={{ opacity: selectedCall ? 1 : 0.5, cursor: selectedCall ? 'pointer' : 'not-allowed' }}
+                onClick={() => { if (activeInspectionType === 'final-product') { setCurrentPage('final-product'); setIsSidebarOpen(false); } }}
+                style={{ opacity: activeInspectionType === 'final-product' ? 1 : 0.5, cursor: activeInspectionType === 'final-product' ? 'pointer' : 'not-allowed' }}
                 title="Final Product Inspection"
               >
                 <span className="sidebar-icon">✅</span>
                 <span className="sidebar-text">Final Product Inspection</span>
               </li>
+              )}
             </ul>
           </nav>
         </aside>
@@ -191,7 +220,10 @@ const App = () => {
             />
           )}
           {currentPage === 'process' && (
-            <ProcessDashboard onBack={handleBackToLanding} />
+            <ProcessDashboard
+              onBack={handleBackToLanding}
+              onNavigateToSubModule={handleNavigateToSubModule}
+            />
           )}
           {currentPage === 'final-product' && (
             <FinalProductDashboard onBack={handleBackToLanding} />
@@ -215,6 +247,26 @@ const App = () => {
             <SummaryReportsPage
               onBack={handleBackToRawMaterial}
             />
+          )}
+
+          {/* Process Material Sub Module Pages */}
+          {currentPage === 'process-calibration-documents' && (
+            <ProcessCalibrationDocumentsPage onBack={handleBackToProcess} />
+          )}
+          {currentPage === 'process-static-periodic-check' && (
+            <ProcessStaticPeriodicCheckPage onBack={handleBackToProcess} />
+          )}
+          {currentPage === 'process-oil-tank-counter' && (
+            <ProcessOilTankCounterPage onBack={handleBackToProcess} />
+          )}
+          {currentPage === 'process-parameters-grid' && (
+            <ProcessParametersGridPage
+              onBack={handleBackToProcess}
+              lotNumbers={processLotNumbers}
+            />
+          )}
+          {currentPage === 'process-summary-reports' && (
+            <ProcessSummaryReportsPage onBack={handleBackToProcess} />
           )}
         </main>
       </div>

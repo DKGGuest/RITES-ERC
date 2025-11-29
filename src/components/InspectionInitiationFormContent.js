@@ -94,12 +94,33 @@ const responsiveFormStyles = `
   }
 `;
 
+// Mock data for available inspection calls (for dropdown)
+const AVAILABLE_INSPECTION_CALLS = [
+  { callNo: 'IC-2025-001', poNo: 'PO-2025-1001' },
+  { callNo: 'IC-2025-002', poNo: 'PO-2025-1002' },
+  { callNo: 'IC-2025-003', poNo: 'PO-2025-1003' },
+  { callNo: 'IC-2025-004', poNo: 'PO-2025-1004' },
+  { callNo: 'IC-2025-005', poNo: 'PO-2025-1005' },
+];
+
+// Mock data for Raw Material IC Numbers from previous stage
+const AVAILABLE_RAW_MATERIAL_ICS = [
+  { id: 'RM-IC-001', label: 'RM-IC-001' },
+  { id: 'RM-IC-002', label: 'RM-IC-002' },
+  { id: 'RM-IC-003', label: 'RM-IC-003' },
+  { id: 'RM-IC-004', label: 'RM-IC-004' },
+  { id: 'RM-IC-005', label: 'RM-IC-005' },
+];
+
 const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, showSectionA = true, showSectionB = true }) => {
   const poData = MOCK_PO_DATA[call.po_no] || {};
   const [sectionAExpanded, setSectionAExpanded] = useState(true);
   const [sectionBExpanded, setSectionBExpanded] = useState(true);
   const [sectionCExpanded, setSectionCExpanded] = useState(true);
   const [sectionDExpanded, setSectionDExpanded] = useState(true);
+
+  // Validation state for production lines
+  const [productionLineErrors, setProductionLineErrors] = useState({});
 
   const getOfferedQtyStatus = () => {
     if (formData.offeredQty < call.call_qty) return { type: 'error', message: 'Not allowed - Offered Qty cannot be less than Call Qty' };
@@ -115,7 +136,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         lineNumber: formData.productionLines.length + 1,
         icNumber: '',
         poNumber: '',
-        rawMaterialIC: '',
+        rawMaterialICs: [], // Changed to array for multi-select
         productType: ''
       }]
     });
@@ -124,7 +145,54 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
   const updateProductionLine = (index, field, value) => {
     const updated = [...formData.productionLines];
     updated[index][field] = value;
+
+    // Auto-fill PO Number when Inspection Call Number is selected
+    if (field === 'icNumber' && value) {
+      const selectedCall = AVAILABLE_INSPECTION_CALLS.find(c => c.callNo === value);
+      if (selectedCall) {
+        updated[index].poNumber = selectedCall.poNo;
+      }
+    }
+
+    // Clear error when value is provided
+    if (value && (field === 'icNumber' || field === 'rawMaterialICs' || field === 'productType')) {
+      setProductionLineErrors(prev => {
+        const newErrors = { ...prev };
+        if (newErrors[index]) {
+          delete newErrors[index][field];
+          if (Object.keys(newErrors[index]).length === 0) {
+            delete newErrors[index];
+          }
+        }
+        return newErrors;
+      });
+    }
+
     onFormDataChange({ productionLines: updated });
+  };
+
+  // Handle multi-select for Raw Material ICs
+  const handleRawMaterialICToggle = (lineIndex, icId) => {
+    const line = formData.productionLines[lineIndex];
+    const currentICs = line.rawMaterialICs || [];
+    const newICs = currentICs.includes(icId)
+      ? currentICs.filter(id => id !== icId)
+      : [...currentICs, icId];
+    updateProductionLine(lineIndex, 'rawMaterialICs', newICs);
+  };
+
+  // Validate production line fields
+  const validateProductionLine = (line, index) => {
+    const errors = {};
+    if (!line.icNumber) errors.icNumber = 'Required';
+    if (!line.rawMaterialICs || line.rawMaterialICs.length === 0) errors.rawMaterialICs = 'Required';
+    if (!line.productType) errors.productType = 'Required';
+    return errors;
+  };
+
+  // Check if field has error
+  const hasError = (lineIndex, field) => {
+    return productionLineErrors[lineIndex]?.[field];
   };
 
   return (
@@ -483,32 +551,130 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 <thead>
                   <tr>
                     <th>Line Number</th>
-                    <th>Inspection Call Number</th>
+                    <th>Inspection Call Number <span style={{ color: '#ef4444' }}>*</span></th>
                     <th>PO Number</th>
-                    <th>Raw Material IC Number(s)</th>
-                    <th>Product Type</th>
+                    <th>Raw Material IC Number(s) <span style={{ color: '#ef4444' }}>*</span></th>
+                    <th>Product Type <span style={{ color: '#ef4444' }}>*</span></th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {formData.productionLines.map((line, idx) => (
                     <tr key={idx}>
-                      <td><input type="number" className="form-input" value={line.lineNumber} onChange={(e) => updateProductionLine(idx, 'lineNumber', e.target.value)} /></td>
-                      <td><input type="text" className="form-input" value={line.icNumber} onChange={(e) => updateProductionLine(idx, 'icNumber', e.target.value)} placeholder="IC-2025-xxx" /></td>
-                      <td><input type="text" className="form-input" value={line.poNumber} onChange={(e) => updateProductionLine(idx, 'poNumber', e.target.value)} disabled /></td>
-                      <td><input type="text" className="form-input" value={line.rawMaterialIC} onChange={(e) => updateProductionLine(idx, 'rawMaterialIC', e.target.value)} placeholder="RM-IC-001, RM-IC-002" /></td>
                       <td>
-                        <MobileResponsiveSelect
-                          value={line.productType}
-                          onChange={(e) => updateProductionLine(idx, 'productType', e.target.value)}
-                          options={[
-                            { value: '', label: 'Select' },
-                            { value: 'ERC Process', label: 'ERC-PROCESS MATERIAL' },
-                            { value: 'Raw Material', label: 'ERC-RAW MATERIAL' },
-                            { value: 'Final Product', label: 'ERC-FINAL' }
-                          ]}
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={line.lineNumber}
+                          readOnly
+                          disabled
+                          style={{
+                            width: '80px',
+                            backgroundColor: '#f3f4f6',
+                            cursor: 'not-allowed',
+                            color: '#374151',
+                            fontWeight: '500'
+                          }}
                         />
                       </td>
+
+                      {/* Inspection Call Number - Required Dropdown */}
+                      <td>
+                        <div>
+                          <select
+                            className="form-input"
+                            value={line.icNumber || ''}
+                            onChange={(e) => updateProductionLine(idx, 'icNumber', e.target.value)}
+                            style={{
+                              minWidth: '150px',
+                              border: hasError(idx, 'icNumber') ? '2px solid #ef4444' : '1px solid #d1d5db',
+                              backgroundColor: hasError(idx, 'icNumber') ? '#fef2f2' : '#fff'
+                            }}
+                            required
+                          >
+                            <option value="">Select Call Number</option>
+                            {AVAILABLE_INSPECTION_CALLS.map(c => (
+                              <option key={c.callNo} value={c.callNo}>{c.callNo}</option>
+                            ))}
+                          </select>
+                          {hasError(idx, 'icNumber') && (
+                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>⚠ Required</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* PO Number - Auto-filled (disabled) */}
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={line.poNumber || ''}
+                          disabled
+                          style={{
+                            minWidth: '120px',
+                            backgroundColor: '#f3f4f6',
+                            cursor: 'not-allowed'
+                          }}
+                          placeholder="Auto-filled"
+                        />
+                      </td>
+
+                      {/* Raw Material IC Number(s) - Required Multi-Select Dropdown */}
+                      <td style={{ overflow: 'visible', position: 'relative' }}>
+                        <div style={{ position: 'relative' }}>
+                          <select
+                            multiple
+                            className="form-input"
+                            value={line.rawMaterialICs || []}
+                            onChange={(e) => {
+                              const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                              updateProductionLine(idx, 'rawMaterialICs', selectedOptions);
+                            }}
+                            style={{
+                              minWidth: '180px',
+                              minHeight: '80px',
+                              padding: '8px',
+                              border: hasError(idx, 'rawMaterialICs') ? '2px solid #ef4444' : '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              backgroundColor: hasError(idx, 'rawMaterialICs') ? '#fef2f2' : '#fff',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {AVAILABLE_RAW_MATERIAL_ICS.map(ic => (
+                              <option key={ic.id} value={ic.id}>{ic.label}</option>
+                            ))}
+                          </select>
+                          <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                            Hold Ctrl/Cmd to select multiple
+                          </div>
+                          {hasError(idx, 'rawMaterialICs') && (
+                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>⚠ Required</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Product Type - Dropdown with MK-III and MK-V only */}
+                      <td>
+                        <div>
+                          <MobileResponsiveSelect
+                            value={line.productType || ''}
+                            onChange={(e) => updateProductionLine(idx, 'productType', e.target.value)}
+                            options={[
+                              { value: '', label: 'Select' },
+                              { value: 'MK-III', label: 'MK-III' },
+                              { value: 'MK-V', label: 'MK-V' }
+                            ]}
+                            style={{
+                              border: hasError(idx, 'productType') ? '2px solid #ef4444' : undefined,
+                              backgroundColor: hasError(idx, 'productType') ? '#fef2f2' : undefined
+                            }}
+                          />
+                          {hasError(idx, 'productType') && (
+                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>⚠ Required</span>
+                          )}
+                        </div>
+                      </td>
+
                       <td>
                         <button className="btn btn-sm btn-outline" onClick={() => onFormDataChange({ productionLines: formData.productionLines.filter((_, i) => i !== idx) })}>Remove</button>
                       </td>

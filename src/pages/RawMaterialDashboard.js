@@ -97,37 +97,7 @@ const responsiveStyles = `
     background-color: #e5e7eb;
   }
 
-  /* Tablet: 2 columns */
-  @media (max-width: 1024px) {
-    .rm-form-grid {
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-    }
-  }
-
-  /* Mobile: 1 column */
-  @media (max-width: 768px) {
-    .rm-form-grid {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-
-    .rm-form-input {
-      font-size: 16px;
-      min-height: 48px;
-      padding: 12px 14px;
-    }
-
-    .rm-page-header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .rm-page-header h1 {
-      font-size: 20px;
-    }
-
-    .rm-back-button {
+ 
       width: 100%;
       justify-content: center;
     }
