@@ -306,11 +306,15 @@ html {
   background-color: var(--color-background);
   -webkit-font-smoothing: antialiased;
   box-sizing: border-box;
+  overflow-x: hidden;
+  height: 100%;
 }
 
 body {
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 *,
@@ -883,6 +887,7 @@ body {
 
 #root {
   min-height: 100vh;
+  overflow: visible;
 }
 
 /* Header Styles */
@@ -897,6 +902,8 @@ body {
   position: sticky;
   top: 0;
   z-index: 1000;
+  /* Ensure header sticks on all devices */
+  -webkit-sticky: sticky;
 }
 
 .header-left {
@@ -943,6 +950,7 @@ body {
   display: flex;
   min-height: calc(100vh - 65px);
   transition: all var(--duration-normal) var(--ease-standard);
+  overflow: visible;
 }
 
 .sidebar {
@@ -1052,7 +1060,8 @@ body {
 .main-content {
   flex: 1;
   padding: var(--space-24);
-  overflow-y: auto;
+  overflow-y: visible;
+  overflow-x: hidden;
   transition: all var(--duration-normal) var(--ease-standard);
 }
 
@@ -1748,6 +1757,7 @@ select.form-control {
 @media (max-width: 768px) {
   .app-container {
     flex-direction: column;
+    overflow: visible;
   }
 
   /* Hide sidebar toggle button on mobile (use hamburger instead) */
@@ -1767,10 +1777,10 @@ select.form-control {
   .sidebar.open {
     display: block;
     position: fixed;
-    top: 120px; /* below header */
+    top: 60px; /* below fixed header */
     left: 0;
     width: 280px;
-    height: calc(100% - 120px);
+    height: calc(100% - 60px);
     z-index: 1100;
     overflow-y: auto;
     box-shadow: 0 10px 30px rgba(0,0,0,0.15);
@@ -1849,10 +1859,18 @@ select.form-control {
     gap: var(--space-8);
     padding: var(--space-12) var(--space-16);
     align-items: center;
-    /* Ensure header stays sticky on mobile */
-    position: sticky;
+    /* Use fixed position on mobile for reliable sticky header */
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 1000;
+    background: var(--color-surface);
+  }
+
+  /* Add padding to body to account for fixed header on mobile */
+  .app-container {
+    padding-top: 60px;
   }
 
   .header-left {
@@ -2215,10 +2233,17 @@ input[type="number"] {
   .app-header {
     padding: var(--space-8) var(--space-12);
     gap: var(--space-4);
-    /* Ensure header stays sticky on extra small screens */
-    position: sticky;
+    /* Fixed header on extra small screens */
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 1000;
+  }
+
+  /* Adjust padding for smaller fixed header */
+  .app-container {
+    padding-top: 50px;
   }
 
   .header-left .app-logo {
@@ -2550,10 +2575,12 @@ input[type="number"] {
 @media (max-width: 768px) {
   body, html {
     overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .main-content {
     overflow-x: hidden;
+    overflow-y: visible;
     padding: var(--space-16);
   }
 
