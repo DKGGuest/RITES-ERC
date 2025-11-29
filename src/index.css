@@ -1849,6 +1849,10 @@ select.form-control {
     gap: var(--space-8);
     padding: var(--space-12) var(--space-16);
     align-items: center;
+    /* Ensure header stays sticky on mobile */
+    position: sticky;
+    top: 0;
+    z-index: 1000;
   }
 
   .header-left {
@@ -2211,6 +2215,10 @@ input[type="number"] {
   .app-header {
     padding: var(--space-8) var(--space-12);
     gap: var(--space-4);
+    /* Ensure header stays sticky on extra small screens */
+    position: sticky;
+    top: 0;
+    z-index: 1000;
   }
 
   .header-left .app-logo {
