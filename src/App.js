@@ -31,6 +31,7 @@ const App = () => {
   const [rmProductModel, setRmProductModel] = useState('MK-III');
 
   // Process Material shared state - lot numbers from main module
+  // eslint-disable-next-line no-unused-vars
   const [processLotNumbers, setProcessLotNumbers] = useState(['LOT-001', 'LOT-002', 'LOT-003']);
 
   useEffect(() => {

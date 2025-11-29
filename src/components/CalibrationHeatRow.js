@@ -1,5 +1,7 @@
 import React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
+// DeleteIcon kept for future use when Remove heat button is re-enabled
+// eslint-disable-next-line no-unused-vars
 import DeleteIcon from '@mui/icons-material/Delete';
 
 const LADLE_FIELDS = [

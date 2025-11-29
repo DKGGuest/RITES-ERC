@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { MOCK_PO_DATA } from '../data/mockData';
 import { formatDate } from '../utils/helpers';
 import { getProductTypeDisplayName } from '../utils/helpers';
@@ -172,6 +172,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
   };
 
   // Handle multi-select for Raw Material ICs
+  // eslint-disable-next-line no-unused-vars
   const handleRawMaterialICToggle = (lineIndex, icId) => {
     const line = formData.productionLines[lineIndex];
     const currentICs = line.rawMaterialICs || [];
@@ -182,7 +183,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
   };
 
   // Validate production line fields
-  const validateProductionLine = (line, index) => {
+  // eslint-disable-next-line no-unused-vars
+  const validateProductionLine = (line, _index) => {
     const errors = {};
     if (!line.icNumber) errors.icNumber = 'Required';
     if (!line.rawMaterialICs || line.rawMaterialICs.length === 0) errors.rawMaterialICs = 'Required';

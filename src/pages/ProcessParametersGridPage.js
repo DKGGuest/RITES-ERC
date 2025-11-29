@@ -652,7 +652,10 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
             <tbody>
               {temperingData.map((row, idx) => {
                 // Once/Shift rule: if Hour 1 has value, other hours don't need it
+                // These variables are kept for future validation logic
+                // eslint-disable-next-line no-unused-vars
                 const isTempRequired = idx === 0; // Only required in first hour
+                // eslint-disable-next-line no-unused-vars
                 const isDurationRequired = idx === 0; // Only required in first hour
                 const showTempHint = idx > 0 && isTemperingTempTakenInFirstHour;
                 const showDurationHint = idx > 0 && isTemperingDurationTakenInFirstHour;
