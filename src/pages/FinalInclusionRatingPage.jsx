@@ -40,7 +40,7 @@ const FinalInclusionRatingPage = ({ onBack }) => {
 
   const currentLot = useMemo(() =>
     availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot]
+    [selectedLot, availableLots]
   );
 
   // Calculate sample size: 6 or 0.5% of hardness sample size (whichever is higher)

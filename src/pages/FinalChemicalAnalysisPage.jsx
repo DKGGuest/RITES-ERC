@@ -22,7 +22,7 @@ const FinalChemicalAnalysisPage = ({ onBack }) => {
 
   const currentLot = useMemo(() =>
     availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot]
+    [selectedLot, availableLots]
   );
 
   const handleChemChange = (element, value) => {
@@ -103,7 +103,7 @@ const FinalChemicalAnalysisPage = ({ onBack }) => {
     if (anyFailed) return { status: 'REJECTED', color: '#ef4444', icon: '✗' };
     if (allPassed && !anyEmpty) return { status: 'ACCEPTED', color: '#22c55e', icon: '✓' };
     return { status: 'PENDING', color: '#f59e0b', icon: '⏳' };
-  }, [chemValues, currentLot]);
+  }, [chemValues, currentLot, validateElement]);
 
   const chemicalFields = [
     { id: 'c', label: '% C (Carbon)', range: '0.50 - 0.60', tolerance: '±0.03 from Ladle' },

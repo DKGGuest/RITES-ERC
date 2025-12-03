@@ -27,7 +27,7 @@ const FinalVisualDimensionalPage = ({ onBack }) => {
 
   const currentLot = useMemo(() =>
     availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot]
+    [selectedLot, availableLots]
   );
 
   // Check if 2nd sampling is needed for Visual

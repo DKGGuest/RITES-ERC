@@ -1,5 +1,5 @@
 // src/pages/FinalWeightTestPage.jsx
-import React, { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import "./FinalWeightTestPage.css";
 
 /* Mock lots - replace with API */
@@ -87,7 +87,7 @@ export default function FinalWeightTestPage({ onBack }) {
     }
 
     return { status: "PENDING", color: "#f59e0b", icon: "⏳" };
-  }, [rejected1, rejected2, totalRejected, samples1]);
+  }, [rejected1, rejected2, totalRejected, samples1, currentLot.accpNo, currentLot.rejNo, currentLot.cummRejNo]);
 
   const handleSave = () => {
     if (!colorCode.trim()) return alert("Color Code is required.");

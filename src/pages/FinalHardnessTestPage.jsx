@@ -19,7 +19,7 @@ const FinalHardnessTestPage = ({ onBack }) => {
 
   const currentLot = useMemo(() =>
     availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot]
+    [selectedLot, availableLots]
   );
 
   // Count rejected pieces in 1st sampling (hardness outside 40-44 range)

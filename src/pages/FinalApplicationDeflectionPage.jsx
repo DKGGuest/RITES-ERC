@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import "./FinalApplicationDeflectionPage.css";
 
 /**
@@ -30,7 +30,7 @@ const FinalApplicationDeflectionPage = ({ onBack }) => {
 
   const currentLot = useMemo(
     () => LOTS.find((l) => l.lotNo === selectedLot) || LOTS[0],
-    [selectedLot]
+    [selectedLot, LOTS]
   );
 
   const toInt = (v) => (!v || isNaN(v) ? 0 : parseInt(v));
