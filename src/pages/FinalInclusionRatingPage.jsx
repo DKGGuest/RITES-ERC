@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 
-const FinalInclusionRatingPage = ({ onBack }) => {
-  // Mock lot data from Process IC
-  const availableLots = [
-    { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500, hardnessSampleSize: 50, barDia: 14 },
-    { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800, hardnessSampleSize: 80, barDia: 16 },
-    { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200, hardnessSampleSize: 125, barDia: 14 }
-  ];
+// Mock lot data (moved outside component)
+const availableLots = [
+  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500, hardnessSampleSize: 50, barDia: 14 },
+  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800, hardnessSampleSize: 80, barDia: 16 },
+  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200, hardnessSampleSize: 125, barDia: 14 }
+];
 
+const FinalInclusionRatingPage = ({ onBack }) => {
   const [selectedLot, setSelectedLot] = useState(availableLots[0].lotNo);
   const [colorCode, setColorCode] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -40,7 +40,7 @@ const FinalInclusionRatingPage = ({ onBack }) => {
 
   const currentLot = useMemo(() =>
     availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot, availableLots]
+    [selectedLot]
   );
 
   // Calculate sample size: 6 or 0.5% of hardness sample size (whichever is higher)

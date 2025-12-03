@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 
-const FinalHardnessTestPage = ({ onBack }) => {
-  // Mock lot data from Process IC
-  const availableLots = [
-    { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500, sampleSize: 50, accpNo: 2, rejNo: 3, cummRejNo: 4 },
-    { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800, sampleSize: 80, accpNo: 3, rejNo: 4, cummRejNo: 6 },
-    { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200, sampleSize: 125, accpNo: 5, rejNo: 6, cummRejNo: 8 }
-  ];
+// Mock lot data (moved outside component)
+const availableLots = [
+  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500, sampleSize: 50, accpNo: 2, rejNo: 3, cummRejNo: 4 },
+  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800, sampleSize: 80, accpNo: 3, rejNo: 4, cummRejNo: 6 },
+  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200, sampleSize: 125, accpNo: 5, rejNo: 6, cummRejNo: 8 }
+];
 
+const FinalHardnessTestPage = ({ onBack }) => {
   const [selectedLot, setSelectedLot] = useState(availableLots[0].lotNo);
   const [colorCode, setColorCode] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -19,7 +19,7 @@ const FinalHardnessTestPage = ({ onBack }) => {
 
   const currentLot = useMemo(() =>
     availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot, availableLots]
+    [selectedLot]
   );
 
   // Count rejected pieces in 1st sampling (hardness outside 40-44 range)

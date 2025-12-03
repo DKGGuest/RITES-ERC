@@ -1,16 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+
+// Mock lot data (moved outside component)
+const availableLots = [
+  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500,
+    ladleAnalysis: { c: 0.55, si: 1.75, mn: 0.90, s: 0.020, p: 0.025 } },
+  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800,
+    ladleAnalysis: { c: 0.54, si: 1.80, mn: 0.88, s: 0.018, p: 0.022 } },
+  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200,
+    ladleAnalysis: { c: 0.56, si: 1.70, mn: 0.92, s: 0.015, p: 0.020 } }
+];
 
 const FinalChemicalAnalysisPage = ({ onBack }) => {
-  // Mock lot data from Process IC
-  const availableLots = [
-    { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500,
-      ladleAnalysis: { c: 0.55, si: 1.75, mn: 0.90, s: 0.020, p: 0.025 } },
-    { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800,
-      ladleAnalysis: { c: 0.54, si: 1.80, mn: 0.88, s: 0.018, p: 0.022 } },
-    { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200,
-      ladleAnalysis: { c: 0.56, si: 1.70, mn: 0.92, s: 0.015, p: 0.020 } }
-  ];
-
   const [selectedLot, setSelectedLot] = useState(availableLots[0].lotNo);
   const [colorCode, setColorCode] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -22,15 +22,15 @@ const FinalChemicalAnalysisPage = ({ onBack }) => {
 
   const currentLot = useMemo(() =>
     availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot, availableLots]
+    [selectedLot]
   );
 
   const handleChemChange = (element, value) => {
     setChemValues(prev => ({ ...prev, [element]: value }));
   };
 
-  // Validation logic for each element
-  const validateElement = (element, value) => {
+  // Validation logic for each element - wrapped in useCallback
+  const validateElement = useCallback((element, value) => {
     if (!value || value === '') return { valid: null, message: '' };
     const val = parseFloat(value);
     const ladle = currentLot.ladleAnalysis;
@@ -89,7 +89,7 @@ const FinalChemicalAnalysisPage = ({ onBack }) => {
       default:
         return { valid: null, message: '' };
     }
-  };
+  }, [currentLot]);
 
   // Calculate overall result
   const overallResult = useMemo(() => {
@@ -103,7 +103,7 @@ const FinalChemicalAnalysisPage = ({ onBack }) => {
     if (anyFailed) return { status: 'REJECTED', color: '#ef4444', icon: '✗' };
     if (allPassed && !anyEmpty) return { status: 'ACCEPTED', color: '#22c55e', icon: '✓' };
     return { status: 'PENDING', color: '#f59e0b', icon: '⏳' };
-  }, [chemValues, currentLot, validateElement]);
+  }, [chemValues, validateElement]);
 
   const chemicalFields = [
     { id: 'c', label: '% C (Carbon)', range: '0.50 - 0.60', tolerance: '±0.03 from Ladle' },

@@ -14,14 +14,14 @@ import "./FinalApplicationDeflectionPage.css";
  * No inline CSS, follows Augment coding rules.
  */
 
-const FinalApplicationDeflectionPage = ({ onBack }) => {
-  // Mock data (replace with API)
-  const LOTS = [
-    { lotNo: "LOT-001", heatNo: "HT-A1", quantity: 500, accpNo: 2, rejNo: 3, cummRejNo: 4 },
-    { lotNo: "LOT-002", heatNo: "HT-A2", quantity: 800, accpNo: 3, rejNo: 4, cummRejNo: 6 },
-    { lotNo: "LOT-003", heatNo: "HT-B1", quantity: 1200, accpNo: 5, rejNo: 6, cummRejNo: 8 }
-  ];
+// Mock data (moved outside component to prevent recreation on each render)
+const LOTS = [
+  { lotNo: "LOT-001", heatNo: "HT-A1", quantity: 500, accpNo: 2, rejNo: 3, cummRejNo: 4 },
+  { lotNo: "LOT-002", heatNo: "HT-A2", quantity: 800, accpNo: 3, rejNo: 4, cummRejNo: 6 },
+  { lotNo: "LOT-003", heatNo: "HT-B1", quantity: 1200, accpNo: 5, rejNo: 6, cummRejNo: 8 }
+];
 
+const FinalApplicationDeflectionPage = ({ onBack }) => {
   const [selectedLot, setSelectedLot] = useState(LOTS[0].lotNo);
   const [colorCode, setColorCode] = useState("");
   const [r1, setR1] = useState("");
@@ -30,7 +30,7 @@ const FinalApplicationDeflectionPage = ({ onBack }) => {
 
   const currentLot = useMemo(
     () => LOTS.find((l) => l.lotNo === selectedLot) || LOTS[0],
-    [selectedLot, LOTS]
+    [selectedLot]
   );
 
   const toInt = (v) => (!v || isNaN(v) ? 0 : parseInt(v));
