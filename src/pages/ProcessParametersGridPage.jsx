@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
 
-const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
+import React, { useState, useMemo, useEffect } from 'react';
+
+import ProcessLineToggle from '../components/ProcessLineToggle';
+
+
+const ProcessParametersGridPage = ({ onBack, lotNumbers = [], shift: selectedShift = 'A', selectedLines = [] }) => {
   // Use lot numbers from main module (auto populated from Main Module)
   const availableLotNumbers = lotNumbers.length > 0 ? lotNumbers : ['LOT-001', 'LOT-002', 'LOT-003'];
+
+  const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
 
   const [shearingData, setShearingData] = useState(
     Array(8).fill(null).map((_, i) => ({
@@ -104,14 +110,70 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
   // Product type for validation (can be changed based on selection)
   const [productType, setProductType] = useState('MK-III'); // Options: MK-III, MK-V, ERC-J
 
+  const shift = selectedShift; // A, B, C, G - provided by parent (Section B)
+
+  // Compute 8 one-hour labels based on shift
+  const SHIFT_STARTS = { A: { h: 6, m: 0 }, B: { h: 14, m: 0 }, C: { h: 22, m: 0 }, G: { h: 9, m: 0 } };
+  const pad = (n) => n.toString().padStart(2, '0');
+  const format = (h, m) => `${((h % 12) || 12)}:${pad(m)} ${h < 12 ? 'AM' : 'PM'}`;
+  const addHours = (h, m, dh) => ({ h: (h + dh) % 24, m });
+  const shiftLabel = (() => {
+    const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
+    const end = addHours(s.h, s.m, 8);
+    return `${shift} (${format(s.h, s.m)} - ${format(end.h, end.m)})`;
+  })();
+
+  const hourLabels = (() => {
+    const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
+    const labels = [];
+    for (let i = 0; i < 8; i++) {
+      const start = addHours(s.h, s.m, i);
+      const end = addHours(s.h, s.m, i + 1);
+      labels.push(`${format(start.h, start.m)} - ${format(end.h, end.m)}`);
+    }
+    return labels;
+  })();
+  const currentHourIndex = (() => {
+    const now = new Date();
+    const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
+    const base = new Date(now);
+    base.setHours(s.h, s.m, 0, 0);
+    // For C shift (22:00-06:00 next day), if now is after midnight but before 06:00, treat base as yesterday 22:00
+    if (shift === 'C' && now.getHours() < 6) {
+      base.setDate(base.getDate() - 1);
+    }
+    let diffMs = now.getTime() - base.getTime();
+    let idx = Math.floor(diffMs / (60 * 60 * 1000));
+    if (isNaN(idx) || idx < 0) idx = 0;
+    if (idx > 7) idx = 7;
+    return idx;
+  })();
+
   // Section collapse/expand states
-  const [shearingExpanded, setShearingExpanded] = useState(true);
-  const [turningExpanded, setTurningExpanded] = useState(true);
-  const [mpiExpanded, setMpiExpanded] = useState(true);
-  const [forgingExpanded, setForgingExpanded] = useState(true);
-  const [quenchingExpanded, setQuenchingExpanded] = useState(true);
-  const [temperingExpanded, setTemperingExpanded] = useState(true);
-  const [dimensionExpanded, setDimensionExpanded] = useState(true);
+  const [shearingExpanded] = useState(true);
+  const [turningExpanded] = useState(true);
+  const [mpiExpanded] = useState(true);
+  const [forgingExpanded] = useState(true);
+  const [quenchingExpanded] = useState(true);
+  const [temperingExpanded] = useState(true);
+  const [dimensionExpanded] = useState(true);
+
+
+  // Helper to select rows to render: all 8 hours or only the current hour (per-section)
+
+  // Per-section hour expand/collapse (current hour only vs all 8 hours)
+  const [showAllShearing, setShowAllShearing] = useState(false);
+  const [showAllTurning, setShowAllTurning] = useState(false);
+  const [showAllMpi, setShowAllMpi] = useState(false);
+  const [showAllForging, setShowAllForging] = useState(false);
+  const [showAllQuenching, setShowAllQuenching] = useState(false);
+  const [showAllTempering, setShowAllTempering] = useState(false);
+  const [showAllDimension, setShowAllDimension] = useState(false);
+
+  const visibleRows = (arr, showAll) => (
+    (showAll ? arr.map((row, idx) => ({ row, idx }))
+             : arr.map((row, idx) => ({ row, idx })).filter(({ idx }) => idx === currentHourIndex))
+  );
 
   const updateShearingData = (index, field, value) => {
     const updated = [...shearingData];
@@ -174,6 +236,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
     if (!value) return null;
     const num = parseFloat(value);
     if (num < 45 || num > 55) return { error: true, message: 'Must be 45-55 HRc' };
+
     return { error: false, message: '✓ Valid' };
   };
 
@@ -229,14 +292,21 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)', gap: 'var(--space-16)', flexWrap: 'wrap' }}>
         <div>
           <h1 className="page-title">Process Parameters - 8 Hour Grid</h1>
           <p className="page-subtitle">Process Material Inspection - Hourly production data entry</p>
         </div>
-        <button className="btn btn-outline" onClick={onBack}>
-          ← Back to Process Dashboard
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600, padding: '6px 10px', border: '1px solid var(--color-gray-300)', borderRadius: '8px', background: '#fff' }}>{shiftLabel}</span>
+          <button className="btn btn-outline" onClick={onBack}>
+            ← Back to Process Dashboard
+          </button>
+        </div>
+      {selectedLines && selectedLines.length > 0 && (
+        <ProcessLineToggle selectedLines={selectedLines} activeLine={activeLine} onChange={setActiveLine} />
+      )}
+
       </div>
 
       {/* Shearing Section */}
@@ -246,21 +316,26 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
             <h3 className="card-title">Shearing Section - 8 Hour Grid</h3>
             <p className="card-subtitle">Enter hourly shearing production data</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setShearingExpanded(!shearingExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
-          >
-            {shearingExpanded ? '−' : '+'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAllShearing(v => !v)}
+              title={showAllShearing ? 'Show current hour only' : 'Show all 8 hours'}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {showAllShearing ? '−' : '+'}
+            </button>
+
+          </div>
         </div>
-        {shearingExpanded && (
-        <div style={{ overflowX: 'auto' }}>
+        {shearingExpanded && (<>
+
+        <div className="data-table-container" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Time Range</th>
                 <th>No Production</th>
                 <th>Lot No.</th>
                 <th>Length of Cut Bar</th>
@@ -271,11 +346,11 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {shearingData.map((row, idx) => (
+              {visibleRows(shearingData, showAllShearing).map(({ row, idx }) => (
                 <tr key={row.hour}>
-                  <td><strong>Hour {row.hour}</strong></td>
-                  <td><input type="checkbox" checked={row.noProduction} onChange={e => updateShearingData(idx, 'noProduction', e.target.checked)} /></td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }} data-label="Time Range"><strong>{hourLabels[idx]}</strong></td>
+                  <td data-label="No Production"><input type="checkbox" checked={row.noProduction} onChange={e => updateShearingData(idx, 'noProduction', e.target.checked)} /></td>
+                  <td data-label="Lot No.">
                     <select
                       className="form-control"
                       value={row.lotNo}
@@ -289,17 +364,17 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                       ))}
                     </select>
                   </td>
-                  <td><input type="text" className="form-control" value={row.lengthCutBar} onChange={e => updateShearingData(idx, 'lengthCutBar', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="checkbox" checked={row.sharpEdges} onChange={e => updateShearingData(idx, 'sharpEdges', e.target.checked)} disabled={row.noProduction} /></td>
-                  <td><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateShearingData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateShearingData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateShearingData(idx, 'remarks', e.target.value)} /></td>
+                  <td data-label="Length of Cut Bar"><input type="text" className="form-control" value={row.lengthCutBar} onChange={e => updateShearingData(idx, 'lengthCutBar', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Sharp Edges"><input type="checkbox" checked={row.sharpEdges} onChange={e => updateShearingData(idx, 'sharpEdges', e.target.checked)} disabled={row.noProduction} /></td>
+                  <td data-label="Accepted Qty"><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateShearingData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Rejected Qty"><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateShearingData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Remarks"><input type="text" className="form-control" value={row.remarks} onChange={e => updateShearingData(idx, 'remarks', e.target.value)} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        )}
+        </>)}
       </div>
 
       {/* Turning Section */}
@@ -309,21 +384,25 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
             <h3 className="card-title">Turning Section - 8 Hour Grid</h3>
             <p className="card-subtitle">Enter hourly turning production data</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setTurningExpanded(!turningExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
-          >
-            {turningExpanded ? '−' : '+'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAllTurning(v => !v)}
+              title={showAllTurning ? 'Show current hour only' : 'Show all 8 hours'}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {showAllTurning ? '\u2212' : '+'}
+            </button>
+
+          </div>
         </div>
         {turningExpanded && (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="data-table-container" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Time Range</th>
                 <th>No Production</th>
                 <th>Lot No.</th>
                 <th>Straight Length</th>
@@ -335,11 +414,11 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {turningData.map((row, idx) => (
+              {visibleRows(turningData, showAllTurning).map(({ row, idx }) => (
                 <tr key={row.hour}>
-                  <td><strong>Hour {row.hour}</strong></td>
-                  <td><input type="checkbox" checked={row.noProduction} onChange={e => updateTurningData(idx, 'noProduction', e.target.checked)} /></td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }} data-label="Time Range"><strong>{hourLabels[idx]}</strong></td>
+                  <td data-label="No Production"><input type="checkbox" checked={row.noProduction} onChange={e => updateTurningData(idx, 'noProduction', e.target.checked)} /></td>
+                  <td data-label="Lot No.">
                     <select
                       className="form-control"
                       value={row.lotNo}
@@ -353,12 +432,12 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                       ))}
                     </select>
                   </td>
-                  <td><input type="text" className="form-control" value={row.straightLength} onChange={e => updateTurningData(idx, 'straightLength', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="text" className="form-control" value={row.taperLength} onChange={e => updateTurningData(idx, 'taperLength', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="text" className="form-control" value={row.dia} onChange={e => updateTurningData(idx, 'dia', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateTurningData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateTurningData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateTurningData(idx, 'remarks', e.target.value)} /></td>
+                  <td data-label="Straight Length"><input type="text" className="form-control" value={row.straightLength} onChange={e => updateTurningData(idx, 'straightLength', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Taper Length"><input type="text" className="form-control" value={row.taperLength} onChange={e => updateTurningData(idx, 'taperLength', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Diameter"><input type="text" className="form-control" value={row.dia} onChange={e => updateTurningData(idx, 'dia', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Accepted Qty"><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateTurningData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Rejected Qty"><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateTurningData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Remarks"><input type="text" className="form-control" value={row.remarks} onChange={e => updateTurningData(idx, 'remarks', e.target.value)} /></td>
                 </tr>
               ))}
             </tbody>
@@ -374,21 +453,25 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
             <h3 className="card-title">MPI Section - 8 Hour Grid</h3>
             <p className="card-subtitle">Enter hourly MPI (Magnetic Particle Inspection) production data</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setMpiExpanded(!mpiExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
-          >
-            {mpiExpanded ? '−' : '+'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAllMpi(v => !v)}
+              title={showAllMpi ? 'Show current hour only' : 'Show all 8 hours'}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {showAllMpi ? '\u2212' : '+'}
+            </button>
+
+          </div>
         </div>
         {mpiExpanded && (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="data-table-container" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Time Range</th>
                 <th>No Production</th>
                 <th>Lot No.</th>
                 <th>Test Results</th>
@@ -398,11 +481,11 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {mpiData.map((row, idx) => (
+              {visibleRows(mpiData, showAllMpi).map(({ row, idx }) => (
                 <tr key={row.hour}>
-                  <td><strong>Hour {row.hour}</strong></td>
-                  <td><input type="checkbox" checked={row.noProduction} onChange={e => updateMpiData(idx, 'noProduction', e.target.checked)} /></td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }} data-label="Time Range"><strong>{hourLabels[idx]}</strong></td>
+                  <td data-label="No Production"><input type="checkbox" checked={row.noProduction} onChange={e => updateMpiData(idx, 'noProduction', e.target.checked)} /></td>
+                  <td data-label="Lot No.">
                     <select
                       className="form-control"
                       value={row.lotNo}
@@ -416,7 +499,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                       ))}
                     </select>
                   </td>
-                  <td>
+                  <td data-label="Test Results">
                     <select
                       className="form-control"
                       value={row.testResults}
@@ -430,9 +513,9 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                       <option value="Partially OK">Partially OK</option>
                     </select>
                   </td>
-                  <td><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateMpiData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateMpiData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateMpiData(idx, 'remarks', e.target.value)} /></td>
+                  <td data-label="Accepted Qty"><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateMpiData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Rejected Qty"><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateMpiData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Remarks"><input type="text" className="form-control" value={row.remarks} onChange={e => updateMpiData(idx, 'remarks', e.target.value)} /></td>
                 </tr>
               ))}
             </tbody>
@@ -448,21 +531,25 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
             <h3 className="card-title">Forging Section - 8 Hour Grid</h3>
             <p className="card-subtitle">Enter hourly forging production data</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setForgingExpanded(!forgingExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
-          >
-            {forgingExpanded ? '−' : '+'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAllForging(v => !v)}
+              title={showAllForging ? 'Show current hour only' : 'Show all 8 hours'}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {showAllForging ? '\u2212' : '+'}
+            </button>
+
+          </div>
         </div>
         {forgingExpanded && (
-        <div style={{ overflowX: 'auto' }}>
+        <div className="data-table-container" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Time Range</th>
                 <th>No Production</th>
                 <th>Lot No.</th>
                 <th>Forging Temperature (°C)</th>
@@ -472,11 +559,11 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {forgingData.map((row, idx) => (
+              {visibleRows(forgingData, showAllForging).map(({ row, idx }) => (
                 <tr key={row.hour}>
-                  <td><strong>Hour {row.hour}</strong></td>
-                  <td><input type="checkbox" checked={row.noProduction} onChange={e => updateForgingData(idx, 'noProduction', e.target.checked)} /></td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }} data-label="Time Range"><strong>{hourLabels[idx]}</strong></td>
+                  <td data-label="No Production"><input type="checkbox" checked={row.noProduction} onChange={e => updateForgingData(idx, 'noProduction', e.target.checked)} /></td>
+                  <td data-label="Lot No.">
                     <select
                       className="form-control"
                       value={row.lotNo}
@@ -490,10 +577,10 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                       ))}
                     </select>
                   </td>
-                  <td><input type="number" className="form-control" placeholder="e.g., 950" value={row.forgingTemperature} onChange={e => updateForgingData(idx, 'forgingTemperature', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateForgingData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateForgingData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
-                  <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateForgingData(idx, 'remarks', e.target.value)} /></td>
+                  <td data-label="Forging Temperature (°C)"><input type="number" className="form-control" placeholder="e.g., 950" value={row.forgingTemperature} onChange={e => updateForgingData(idx, 'forgingTemperature', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Accepted Qty"><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateForgingData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Rejected Qty"><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateForgingData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
+                  <td data-label="Remarks"><input type="text" className="form-control" value={row.remarks} onChange={e => updateForgingData(idx, 'remarks', e.target.value)} /></td>
                 </tr>
               ))}
             </tbody>
@@ -509,25 +596,29 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
             <h3 className="card-title">Quenching Section - 8 Hour Grid</h3>
             <p className="card-subtitle">Enter hourly quenching production data (No "No Production" option - all hours required)</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setQuenchingExpanded(!quenchingExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
-          >
-            {quenchingExpanded ? '−' : '+'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAllQuenching(v => !v)}
+              title={showAllQuenching ? 'Show current hour only' : 'Show all 8 hours'}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {showAllQuenching ? '\u2212' : '+'}
+            </button>
+
+          </div>
         </div>
         {quenchingExpanded && (
         <>
         <div className="alert alert-info" style={{ margin: '0 0 var(--space-16) 0' }}>
           <strong>Validation Rules:</strong> Temperature must be &lt; 70°C | Duration must be &gt; 12 min | Hardness must be 45-55 HRc (2 ERC/Hour)
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="data-table-container" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Time Range</th>
                 <th>Lot No. *</th>
                 <th>Quenching Temp (°C) *<br/><small style={{fontWeight: 'normal', color: '#666'}}>Once/Hour, &lt;70°C</small></th>
                 <th>Quenching Duration (min) *<br/><small style={{fontWeight: 'normal', color: '#666'}}>&gt;12 min</small></th>
@@ -538,14 +629,14 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {quenchingData.map((row, idx) => {
+              {visibleRows(quenchingData, showAllQuenching).map(({ row, idx }) => {
                 const tempValidation = getQuenchingTempValidation(row.quenchingTemperature);
                 const durationValidation = getQuenchingDurationValidation(row.quenchingDuration);
                 const hardnessValidation = getQuenchingHardnessValidation(row.quenchingHardness);
                 return (
                   <tr key={row.hour}>
-                    <td><strong>Hour {row.hour}</strong></td>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }} data-label="Time Range"><strong>{hourLabels[idx]}</strong></td>
+                    <td data-label="Lot No. *">
                       <select
                         className="form-control"
                         value={row.lotNo}
@@ -559,7 +650,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         ))}
                       </select>
                     </td>
-                    <td>
+                    <td data-label="Quenching Temp (°C) *">
                       <input
                         type="number"
                         step="0.1"
@@ -573,7 +664,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         <small style={{ color: tempValidation.error ? '#ef4444' : '#22c55e', fontSize: '11px' }}>{tempValidation.message}</small>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Quenching Duration (min) *">
                       <input
                         type="number"
                         className="form-control"
@@ -586,7 +677,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         <small style={{ color: durationValidation.error ? '#ef4444' : '#22c55e', fontSize: '11px' }}>{durationValidation.message}</small>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Quenching Hardness (HRc) *">
                       <input
                         type="number"
                         step="0.1"
@@ -601,9 +692,9 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         <small style={{ color: hardnessValidation.error ? '#ef4444' : '#22c55e', fontSize: '11px' }}>{hardnessValidation.message}</small>
                       )}
                     </td>
-                    <td><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateQuenchingData(idx, 'acceptedQty', e.target.value)} /></td>
-                    <td><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateQuenchingData(idx, 'rejectedQty', e.target.value)} /></td>
-                    <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateQuenchingData(idx, 'remarks', e.target.value)} /></td>
+                    <td data-label="Accepted Qty"><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateQuenchingData(idx, 'acceptedQty', e.target.value)} /></td>
+                    <td data-label="Rejected Qty"><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateQuenchingData(idx, 'rejectedQty', e.target.value)} /></td>
+                    <td data-label="Remarks"><input type="text" className="form-control" value={row.remarks} onChange={e => updateQuenchingData(idx, 'remarks', e.target.value)} /></td>
                   </tr>
                 );
               })}
@@ -621,25 +712,29 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
             <h3 className="card-title">Tempering Section - 8 Hour Grid</h3>
             <p className="card-subtitle">Enter hourly tempering production data</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setTemperingExpanded(!temperingExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
-          >
-            {temperingExpanded ? '−' : '+'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowAllTempering(v => !v)}
+              title={showAllTempering ? 'Show current hour only' : 'Show all 8 hours'}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {showAllTempering ? '\u2212' : '+'}
+            </button>
+
+          </div>
         </div>
         {temperingExpanded && (
         <>
         <div className="alert alert-info" style={{ margin: '0 0 var(--space-16) 0' }}>
           <strong>Once/Shift Rule:</strong> Temperature & Duration only required in 1st hour. If taken in Hour 1, not required in other hours.
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="data-table-container" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Time Range</th>
                 <th>No Production</th>
                 <th>Lot No. *<br/><small style={{fontWeight: 'normal', color: '#666'}}>Once/Hour</small></th>
                 <th>Tempering Temp (°C)<br/><small style={{fontWeight: 'normal', color: '#666'}}>Once/Shift</small></th>
@@ -650,7 +745,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {temperingData.map((row, idx) => {
+              {visibleRows(temperingData, showAllTempering).map(({ row, idx }) => {
                 // Once/Shift rule: if Hour 1 has value, other hours don't need it
                 // These variables are kept for future validation logic
                 // eslint-disable-next-line no-unused-vars
@@ -662,15 +757,15 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
 
                 return (
                   <tr key={row.hour} style={{ opacity: row.noProduction ? 0.5 : 1 }}>
-                    <td><strong>Hour {row.hour}</strong></td>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }} data-label="Time Range"><strong>{hourLabels[idx]}</strong></td>
+                    <td data-label="No Production">
                       <input
                         type="checkbox"
                         checked={row.noProduction}
                         onChange={e => updateTemperingData(idx, 'noProduction', e.target.checked)}
                       />
                     </td>
-                    <td>
+                    <td data-label="Lot No. *">
                       <select
                         className="form-control"
                         value={row.lotNo}
@@ -685,7 +780,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         ))}
                       </select>
                     </td>
-                    <td>
+                    <td data-label="Tempering Temp (°C)">
                       <input
                         type="number"
                         step="0.1"
@@ -698,7 +793,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                       />
                       {showTempHint && <small style={{ color: '#22c55e', fontSize: '11px' }}>✓ Taken in Hour 1</small>}
                     </td>
-                    <td>
+                    <td data-label="Tempering Duration (min)">
                       <input
                         type="number"
                         className="form-control"
@@ -710,7 +805,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                       />
                       {showDurationHint && <small style={{ color: '#22c55e', fontSize: '11px' }}>✓ Taken in Hour 1</small>}
                     </td>
-                    <td>
+                    <td data-label="Accepted Qty *">
                       <input
                         type="number"
                         className="form-control"
@@ -721,8 +816,8 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         required={!row.noProduction}
                       />
                     </td>
-                    <td><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateTemperingData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
-                    <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateTemperingData(idx, 'remarks', e.target.value)} disabled={row.noProduction} /></td>
+                    <td data-label="Rejected Qty"><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateTemperingData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
+                    <td data-label="Remarks"><input type="text" className="form-control" value={row.remarks} onChange={e => updateTemperingData(idx, 'remarks', e.target.value)} disabled={row.noProduction} /></td>
                   </tr>
                 );
               })}
@@ -743,10 +838,11 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => setDimensionExpanded(!dimensionExpanded)}
+            onClick={() => setShowAllDimension(v => !v)}
+            title={showAllDimension ? 'Show current hour only' : 'Show all 8 hours'}
             style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
           >
-            {dimensionExpanded ? '−' : '+'}
+            {showAllDimension ? '−' : '+'}
           </button>
         </div>
         {dimensionExpanded && (
@@ -775,11 +871,11 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
           <strong>Validation Rules:</strong> Hardness: 40-44 HRc (Required) | Toe Load & Weight validations based on product type above
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="data-table-container" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Time Range</th>
                 <th>No Production</th>
                 <th>Lot No.<br/><small style={{fontWeight: 'normal', color: '#666'}}>Once/Hour</small></th>
                 <th>Dimensional Check<br/><small style={{fontWeight: 'normal', color: '#666'}}>Go/No-GO Gauges</small></th>
@@ -792,22 +888,22 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
               </tr>
             </thead>
             <tbody>
-              {dimensionData.map((row, idx) => {
+              {visibleRows(dimensionData, showAllDimension).map(({ row, idx }) => {
                 const hardnessValidation = getFinalHardnessValidation(row.finalHardness);
                 const toeLoadValidation = getToeLoadValidation(row.toeLoad, productType);
                 const weightValidation = getWeightValidation(row.weight, productType);
 
                 return (
                   <tr key={row.hour} style={{ opacity: row.noProduction ? 0.5 : 1 }}>
-                    <td><strong>Hour {row.hour}</strong></td>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }} data-label="Time Range"><strong>{hourLabels[idx]}</strong></td>
+                    <td data-label="No Production">
                       <input
                         type="checkbox"
                         checked={row.noProduction}
                         onChange={e => updateDimensionData(idx, 'noProduction', e.target.checked)}
                       />
                     </td>
-                    <td>
+                    <td data-label="Lot No.">
                       <select
                         className="form-control"
                         value={row.lotNo}
@@ -821,7 +917,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         ))}
                       </select>
                     </td>
-                    <td>
+                    <td data-label="Dimensional Check">
                       <select
                         className="form-control"
                         value={row.dimensionalCheck}
@@ -834,7 +930,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         <option value="Not OK">Not OK</option>
                       </select>
                     </td>
-                    <td>
+                    <td data-label="Final Hardness (HRc) *">
                       <input
                         type="number"
                         className="form-control"
@@ -851,7 +947,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         <small style={{ color: hardnessValidation.error ? '#ef4444' : '#22c55e', fontSize: '11px' }}>{hardnessValidation.message}</small>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Toe Load (KgF) *">
                       <input
                         type="number"
                         className="form-control"
@@ -868,7 +964,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         <small style={{ color: toeLoadValidation.error ? '#ef4444' : '#22c55e', fontSize: '11px' }}>{toeLoadValidation.message}</small>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Weight (gm) *">
                       <input
                         type="number"
                         step="0.1"
@@ -886,9 +982,9 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [] }) => {
                         <small style={{ color: weightValidation.error ? '#ef4444' : '#22c55e', fontSize: '11px' }}>{weightValidation.message}</small>
                       )}
                     </td>
-                    <td><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateDimensionData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
-                    <td><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateDimensionData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
-                    <td><input type="text" className="form-control" value={row.remarks} onChange={e => updateDimensionData(idx, 'remarks', e.target.value)} disabled={row.noProduction} /></td>
+                    <td data-label="Accepted Qty"><input type="number" className="form-control" value={row.acceptedQty} onChange={e => updateDimensionData(idx, 'acceptedQty', e.target.value)} disabled={row.noProduction} /></td>
+                    <td data-label="Rejected Qty"><input type="number" className="form-control" value={row.rejectedQty} onChange={e => updateDimensionData(idx, 'rejectedQty', e.target.value)} disabled={row.noProduction} /></td>
+                    <td data-label="Remarks"><input type="text" className="form-control" value={row.remarks} onChange={e => updateDimensionData(idx, 'remarks', e.target.value)} disabled={row.noProduction} /></td>
                   </tr>
                 );
               })}

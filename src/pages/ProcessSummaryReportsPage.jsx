@@ -1,14 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
+import ProcessLineToggle from '../components/ProcessLineToggle';
 import StatusBadge from '../components/StatusBadge';
 import FormField from '../components/FormField';
 
-const ProcessSummaryReportsPage = ({ onBack }) => {
+const ProcessSummaryReportsPage = ({ onBack, selectedLines = [] }) => {
+  const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
   // Mock data for summary
   const lotNumbers = ['LOT-001', 'LOT-002'];
   const heatNumbersMap = { 'LOT-001': 'H001', 'LOT-002': 'H002' };
 
   return (
     <div>
+      {/* Line selector bar */}
+      {selectedLines.length > 0 && (
+        <ProcessLineToggle selectedLines={selectedLines} activeLine={activeLine} onChange={setActiveLine} />
+      )}
+
+      <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
         <div>
           <h1 className="page-title">Summary / Reports</h1>
@@ -94,6 +102,8 @@ const ProcessSummaryReportsPage = ({ onBack }) => {
         </div>
       </div>
     </div>
+  </div>
+
   );
 };
 

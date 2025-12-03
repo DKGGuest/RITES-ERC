@@ -1,0 +1,214 @@
+/* Main layout */
+.wt-container {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Header */
+.wt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wt-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.wt-subtitle {
+  margin: 4px 0 0;
+  color: #6b7280;
+}
+
+/* Buttons */
+.wt-btn-outline,
+.wt-btn-primary {
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.wt-btn-outline {
+  background: white;
+  border: 1px solid #d1d5db;
+}
+
+.wt-btn-primary {
+  background: #0ea5e9;
+  border: 1px solid #0ea5e9;
+  color: white;
+}
+
+/* Cards */
+.wt-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.wt-card.warn {
+  border-color: #f59e0b;
+  background: #fff7ed;
+}
+
+.wt-card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.wt-card-sub {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* Grid Layout */
+.wt-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Fields */
+.wt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wt-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wt-label.required::after {
+  content: " *";
+  color: red;
+}
+
+/* Inputs */
+.wt-input {
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Table */
+.wt-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.wt-table th,
+.wt-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.wt-table th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+/* Status Badges */
+.wt-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-block;
+  text-transform: uppercase;
+}
+
+.wt-badge.pass {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.wt-badge.fail {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.wt-badge.pending {
+  background: #fefce8;
+  color: #f59e0b;
+}
+
+/* Stats */
+.wt-stats {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wt-stat-box {
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+  border-radius: 8px;
+  min-width: 120px;
+  text-align: center;
+}
+
+.wt-stat-box h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.wt-stat-box p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* Result */
+.wt-result {
+  border: 2px solid;
+  padding: 14px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 18px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+/* Buttons */
+.wt-action {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .wt-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .wt-action {
+    flex-direction: column-reverse;
+  }
+
+  .wt-btn-outline,
+  .wt-btn-primary {
+    width: 100%;
+  }
+}

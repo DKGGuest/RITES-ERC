@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MOCK_PO_DATA } from '../data/mockData';
 import { formatDate } from '../utils/helpers';
 import { getProductTypeDisplayName } from '../utils/helpers';
@@ -95,12 +95,13 @@ const responsiveFormStyles = `
 `;
 
 // Mock data for available inspection calls (for dropdown)
+// Mapped to PO Sr. No., Material IC(s) and Product Type to allow auto-fill in Section D
 const AVAILABLE_INSPECTION_CALLS = [
-  { callNo: 'IC-2025-001', poNo: 'PO-2025-1001' },
-  { callNo: 'IC-2025-002', poNo: 'PO-2025-1002' },
-  { callNo: 'IC-2025-003', poNo: 'PO-2025-1003' },
-  { callNo: 'IC-2025-004', poNo: 'PO-2025-1004' },
-  { callNo: 'IC-2025-005', poNo: 'PO-2025-1005' },
+  { callNo: 'CALL-2025-001', poNo: 'PO-2025-1001', materialICs: ['RM-IC-001', 'RM-IC-002'], productType: 'MK-III' },
+  { callNo: 'CALL-2025-002', poNo: 'PO-2025-1002', materialICs: ['RM-IC-003'], productType: 'MK-V' },
+  { callNo: 'CALL-2025-003', poNo: 'PO-2025-1003', materialICs: ['RM-IC-004'], productType: 'MK-III' },
+  { callNo: 'CALL-2025-004', poNo: 'PO-2025-1004', materialICs: ['RM-IC-002', 'RM-IC-005'], productType: 'MK-V' },
+  { callNo: 'CALL-2025-005', poNo: 'PO-2025-1005', materialICs: ['RM-IC-001'], productType: 'MK-III' },
 ];
 
 // Mock data for Raw Material IC Numbers from previous stage
@@ -115,12 +116,39 @@ const AVAILABLE_RAW_MATERIAL_ICS = [
 const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, showSectionA = true, showSectionB = true }) => {
   const poData = MOCK_PO_DATA[call.po_no] || {};
   const [sectionAExpanded, setSectionAExpanded] = useState(true);
-  const [sectionBExpanded, setSectionBExpanded] = useState(true);
-  const [sectionCExpanded, setSectionCExpanded] = useState(true);
-  const [sectionDExpanded, setSectionDExpanded] = useState(true);
+  const [sectionBExpanded, setSectionBExpanded] = useState(false);
+  const [sectionCExpanded, setSectionCExpanded] = useState(false);
+  const [sectionDExpanded, setSectionDExpanded] = useState(false);
 
   // Validation state for production lines
   const [productionLineErrors, setProductionLineErrors] = useState({});
+
+  // Auto-select current inspection call into first line and auto-fill dependent fields
+  useEffect(() => {
+    try {
+      if (!formData.productionLines || formData.productionLines.length === 0) return;
+      const first = formData.productionLines[0] || {};
+      const defaultCallNo = call?.call_no;
+      if (!defaultCallNo) return;
+      if (!first.icNumber) {
+        const selectedCall = AVAILABLE_INSPECTION_CALLS.find(c => c.callNo === defaultCallNo);
+        if (selectedCall) {
+          const updated = [...formData.productionLines];
+          updated[0] = {
+            ...first,
+            icNumber: defaultCallNo,
+            poNumber: selectedCall.poNo,
+            rawMaterialICs: Array.isArray(selectedCall.materialICs) ? selectedCall.materialICs : [],
+            productType: selectedCall.productType || ''
+          };
+          onFormDataChange({ productionLines: updated });
+        }
+      }
+    } catch (e) {
+      // no-op
+    }
+  }, [call, formData.productionLines, onFormDataChange]);
+
 
   const getOfferedQtyStatus = () => {
     if (formData.offeredQty < call.call_qty) return { type: 'error', message: 'Not allowed - Offered Qty cannot be less than Call Qty' };
@@ -146,11 +174,16 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     const updated = [...formData.productionLines];
     updated[index][field] = value;
 
-    // Auto-fill PO Number when Inspection Call Number is selected
+    // Auto-fill dependent fields when Inspection Call Number is selected
     if (field === 'icNumber' && value) {
       const selectedCall = AVAILABLE_INSPECTION_CALLS.find(c => c.callNo === value);
       if (selectedCall) {
+        // PO Sr. No. (read-only)
         updated[index].poNumber = selectedCall.poNo;
+        // Material IC(s) as provided during call request
+        updated[index].rawMaterialICs = Array.isArray(selectedCall.materialICs) ? selectedCall.materialICs : [];
+        // Product type (MK-III / MK-V) associated with the call
+        updated[index].productType = selectedCall.productType || '';
       }
     }
 
@@ -546,6 +579,32 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           <label htmlFor={`multipleLinesActive-${call.id}`} style={{ fontWeight: 'var(--font-weight-medium)' }}>Multiple production lines operating?</label>
         </div>
         {formData.multipleLinesActive && (
+          <div className="form-grid" style={{ marginBottom: 'var(--space-16)' }}>
+            <div className="form-group">
+              <label className="form-label">Number of Production Lines</label>
+              <select
+                className="form-input"
+                value={formData.productionLines.length}
+                onChange={(e) => {
+                  const count = Math.max(1, Math.min(5, Number(e.target.value) || 1));
+                  const existing = formData.productionLines || [];
+                  const next = Array.from({ length: count }, (_, i) => {
+                    const found = existing.find(l => l.lineNumber === i + 1);
+                    return found || { lineNumber: i + 1, icNumber: '', poNumber: '', rawMaterialICs: [], productType: '' };
+                  });
+                  onFormDataChange({ productionLines: next });
+                }}
+              >
+                {[1,2,3,4,5].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <small style={{ color: 'var(--color-text-secondary)' }}>Lines will be created as Line-1 … Line-N</small>
+            </div>
+          </div>
+        )}
+
+        {formData.multipleLinesActive && (
           <div>
             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-16)' }}>All data points must be collected for each line number separately.</p>
             <div style={{ overflowX: 'auto' }}>
@@ -555,6 +614,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                     <th>Line Number</th>
                     <th>Inspection Call Number <span style={{ color: '#ef4444' }}>*</span></th>
                     <th>PO Number</th>
+                    <th>Raw Material</th>
                     <th>Raw Material IC Number(s) <span style={{ color: '#ef4444' }}>*</span></th>
                     <th>Product Type <span style={{ color: '#ef4444' }}>*</span></th>
                     <th>Actions</th>
@@ -621,6 +681,19 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                         />
                       </td>
 
+                      {/* Raw Material - Auto-filled (disabled) */}
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={poData?.product_name || ''}
+                          disabled
+                          style={{ minWidth: '160px', backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
+                          placeholder="Auto-filled"
+                        />
+                      </td>
+
+
                       {/* Raw Material IC Number(s) - Required Multi-Select Dropdown */}
                       <td style={{ overflow: 'visible', position: 'relative' }}>
                         <div style={{ position: 'relative' }}>
@@ -633,6 +706,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                               updateProductionLine(idx, 'rawMaterialICs', selectedOptions);
                             }}
                             style={{
+
+
+
                               minWidth: '180px',
                               minHeight: '80px',
                               padding: '8px',

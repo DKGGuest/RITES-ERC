@@ -1,9 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import CalibrationModule from '../components/CalibrationModule';
+import ProcessLineToggle from '../components/ProcessLineToggle';
 
-const ProcessCalibrationDocumentsPage = ({ onBack }) => {
+const ProcessCalibrationDocumentsPage = ({ onBack, selectedLines = [] }) => {
+  const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
   return (
     <div>
+      {/* Line selector bar */}
+      {selectedLines.length > 0 && (
+        <ProcessLineToggle
+          selectedLines={selectedLines}
+          activeLine={activeLine}
+          onChange={setActiveLine}
+        />
+      )}
+
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
         <div>
           <h1 className="page-title">Calibration & Documents</h1>

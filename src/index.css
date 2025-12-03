@@ -2164,22 +2164,51 @@ input[type="number"] {
 
   .data-table tbody td {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: var(--space-8);
     padding: var(--space-8) 0;
     border: none;
+    text-align: right;
+    flex-wrap: wrap;
   }
 
   .data-table tbody td::before {
     content: attr(data-label);
+    display: inline-block;
     font-weight: var(--font-weight-medium);
     color: var(--color-text-secondary);
+    margin: 0;
     margin-right: var(--space-8);
+    white-space: nowrap;
+    text-align: left;
   }
 
+  /* Keep first cell (Time Range) inline */
   .data-table tbody td:first-child {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--space-8);
+  }
+
+  /* Keep checkbox rows inline */
+  .data-table tbody td:has(input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .data-table tbody td:has(input[type="checkbox"])::before {
+    margin: 0;
+  }
+
+  /* Make controls inline so label/value sit on one line */
+  .data-table tbody td input,
+  .data-table tbody td select,
+  .data-table tbody td textarea {
+    width: auto;
+    max-width: 60%;
   }
 }
 
@@ -2625,5 +2654,83 @@ input[type="number"] {
   .app-logo, .card-title, h1, h2, h3 {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+
+/* --- Mobile responsive tweaks for page headers and process line toggle --- */
+.page-header {
+  display: flex;
+  gap: var(--space-12);
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-16);
+}
+.page-header-actions {
+  display: flex;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+/* Make header compact on small screens */
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .page-header .btn {
+    width: 100%;
+  }
+}
+
+/* Process Line Toggle: wrap nicely and ensure tappable targets */
+.process-line-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  background: var(--color-bg-2);
+  border: 1px solid rgba(var(--color-warning-rgb, 168, 75, 47), 0.35);
+  border-radius: var(--radius-base);
+}
+.process-line-toggle button {
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+}
+.process-line-toggle button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+@media (max-width: 480px) {
+  .process-line-toggle button {
+    flex-basis: calc(50% - var(--space-8));
+  }
+}
+
+/* Tighten table spacing on mobile */
+@media (max-width: 640px) {
+  .data-table th,
+  .data-table td {
+    padding: var(--space-8) var(--space-12);
+  }
+  .table-controls {
+    gap: var(--space-8);
+  }
+}
+
+/* Slightly reduce card padding on mobile */
+@media (max-width: 640px) {
+  .card {
+    padding: var(--space-12);
+  }
+  .card__body {
+    padding: var(--space-12);
   }
 }

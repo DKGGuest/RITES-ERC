@@ -14,6 +14,16 @@ import ProcessStaticPeriodicCheckPage from './pages/ProcessStaticPeriodicCheckPa
 import ProcessOilTankCounterPage from './pages/ProcessOilTankCounterPage';
 import ProcessParametersGridPage from './pages/ProcessParametersGridPage';
 import ProcessSummaryReportsPage from './pages/ProcessSummaryReportsPage';
+// Final Product SubModule Pages
+import FinalCalibrationDocumentsPage from './pages/FinalCalibrationDocumentsPage';
+import FinalVisualDimensionalPage from './pages/FinalVisualDimensionalPage';
+import FinalChemicalAnalysisPage from './pages/FinalChemicalAnalysisPage';
+import FinalHardnessTestPage from './pages/FinalHardnessTestPage';
+import FinalInclusionRatingPage from './pages/FinalInclusionRatingPage';
+import FinalApplicationDeflectionPage from './pages/FinalApplicationDeflectionPage';
+import FinalToeLoadTestPage from './pages/FinalToeLoadTestPage';
+import FinalWeightTestPage from './pages/FinalWeightTestPage';
+import FinalReportsPage from './pages/FinalReportsPage';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('landing');
@@ -29,6 +39,13 @@ const App = () => {
   // Shared state for submodule pages
   const [rmHeats, setRmHeats] = useState([{ heatNo: '', weight: '' }]);
   const [rmProductModel, setRmProductModel] = useState('MK-III');
+
+
+	  // Shift selected in Inspection Initiation (Section B) for Process Parameters
+	  const [processShift, setProcessShift] = useState('A');
+
+  // Lines selected in Initiation (Section D) for Process modules
+  const [processSelectedLines, setProcessSelectedLines] = useState(['Line-1']);
 
   // Process Material shared state - lot numbers from main module
   // eslint-disable-next-line no-unused-vars
@@ -88,6 +105,10 @@ const App = () => {
 
   const handleBackToProcess = () => {
     setCurrentPage('process');
+  };
+
+  const handleBackToFinalProduct = () => {
+    setCurrentPage('final-product');
   };
 
   return (
@@ -203,6 +224,8 @@ const App = () => {
               call={selectedCall}
               onProceed={handleProceedToInspection}
               onBack={handleBackToLanding}
+              onShiftChange={setProcessShift}
+              onSelectedLinesChange={setProcessSelectedLines}
             />
           )}
           {currentPage === 'multi-initiation' && selectedCalls.length > 0 && (
@@ -224,10 +247,14 @@ const App = () => {
             <ProcessDashboard
               onBack={handleBackToLanding}
               onNavigateToSubModule={handleNavigateToSubModule}
+              selectedLines={processSelectedLines}
             />
           )}
           {currentPage === 'final-product' && (
-            <FinalProductDashboard onBack={handleBackToLanding} />
+            <FinalProductDashboard
+              onBack={handleBackToLanding}
+              onNavigateToSubModule={handleNavigateToSubModule}
+            />
           )}
 
           {/* Sub Module Pages - Completely Separate Pages */}
@@ -252,22 +279,53 @@ const App = () => {
 
           {/* Process Material Sub Module Pages */}
           {currentPage === 'process-calibration-documents' && (
-            <ProcessCalibrationDocumentsPage onBack={handleBackToProcess} />
+            <ProcessCalibrationDocumentsPage onBack={handleBackToProcess} selectedLines={processSelectedLines} />
           )}
           {currentPage === 'process-static-periodic-check' && (
-            <ProcessStaticPeriodicCheckPage onBack={handleBackToProcess} />
+            <ProcessStaticPeriodicCheckPage onBack={handleBackToProcess} selectedLines={processSelectedLines} />
           )}
           {currentPage === 'process-oil-tank-counter' && (
-            <ProcessOilTankCounterPage onBack={handleBackToProcess} />
+            <ProcessOilTankCounterPage onBack={handleBackToProcess} selectedLines={processSelectedLines} />
           )}
           {currentPage === 'process-parameters-grid' && (
             <ProcessParametersGridPage
               onBack={handleBackToProcess}
               lotNumbers={processLotNumbers}
+              shift={processShift}
+              selectedLines={processSelectedLines}
             />
           )}
           {currentPage === 'process-summary-reports' && (
-            <ProcessSummaryReportsPage onBack={handleBackToProcess} />
+            <ProcessSummaryReportsPage onBack={handleBackToProcess} selectedLines={processSelectedLines} />
+          )}
+
+          {/* Final Product Sub Module Pages */}
+          {currentPage === 'final-calibration-documents' && (
+            <FinalCalibrationDocumentsPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-visual-dimensional' && (
+            <FinalVisualDimensionalPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-chemical-analysis' && (
+            <FinalChemicalAnalysisPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-hardness-test' && (
+            <FinalHardnessTestPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-inclusion-rating' && (
+            <FinalInclusionRatingPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-application-deflection' && (
+            <FinalApplicationDeflectionPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-toe-load-test' && (
+            <FinalToeLoadTestPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-weight-test' && (
+            <FinalWeightTestPage onBack={handleBackToFinalProduct} />
+          )}
+          {currentPage === 'final-reports' && (
+            <FinalReportsPage onBack={handleBackToFinalProduct} />
           )}
         </main>
       </div>

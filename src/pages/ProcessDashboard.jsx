@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import StatusBadge from '../components/StatusBadge';
 import FormField from '../components/FormField';
 import { MOCK_PO_DATA } from '../data/mockData';
 import { formatDate } from '../utils/helpers';
@@ -202,61 +201,61 @@ const staticDataStyles = `
 
   /* Additional mobile responsiveness for header and other elements */
   @media (max-width: 768px) {
-    .process-header {
+    .process-dashboard .process-header {
       flex-direction: column;
       align-items: flex-start;
       gap: 16px;
     }
-    .process-header h1 {
+    .process-dashboard .process-header h1 {
       font-size: 24px;
       margin: 0;
     }
-    .process-header .btn {
+    .process-dashboard .process-header .btn {
       width: 100%;
       justify-content: center;
     }
-    .process-line-toggle {
+    .process-dashboard .process-line-toggle {
       width: 100%;
       flex-direction: column;
     }
-    .process-line-toggle button {
+    .process-dashboard .process-line-toggle button {
       width: 100%;
       padding: 12px;
       font-size: 14px;
     }
-    .process-context-info {
+    .process-dashboard .process-context-info {
       grid-template-columns: 1fr;
       gap: 12px;
     }
-    .breadcrumb {
+    .process-dashboard .breadcrumb {
       flex-wrap: wrap;
       font-size: 12px;
     }
-    .card {
+    .process-dashboard .card {
       padding: 16px;
     }
-    .card-header {
+    .process-dashboard .card-header {
       padding: 12px 0;
     }
-    .card-title {
+    .process-dashboard .card-title {
       font-size: 16px;
     }
-    .card-subtitle {
+    .process-dashboard .card-subtitle {
       font-size: 12px;
     }
-    .alert {
+    .process-dashboard .alert {
       padding: 12px;
       font-size: 13px;
     }
-    .input-grid {
+    .process-dashboard .input-grid {
       grid-template-columns: 1fr;
       gap: 12px;
     }
     /* Final Inspection Table - Card Layout for Mobile */
-    .final-inspection-table thead {
+    .process-dashboard .final-inspection-table thead {
       display: none;
     }
-    .final-inspection-table tbody tr {
+    .process-dashboard .final-inspection-table tbody tr {
       display: block;
       margin-bottom: 16px;
       border: 1px solid #e2e8f0;
@@ -264,84 +263,124 @@ const staticDataStyles = `
       padding: 12px;
       background: #fff;
     }
-    .final-inspection-table tbody tr.total-row {
+    .process-dashboard .final-inspection-table tbody tr.total-row {
       background: #0d9488;
       border-color: #0d9488;
     }
-    .final-inspection-table tbody td {
+    .process-dashboard .final-inspection-table tbody td {
       display: flex;
       justify-content: space-between;
       padding: 8px 0;
       border: none;
       border-bottom: 1px solid #f1f5f9;
     }
-    .final-inspection-table tbody td:last-child {
+    .process-dashboard .final-inspection-table tbody td:last-child {
       border-bottom: none;
     }
-    .final-inspection-table tbody td::before {
+    .process-dashboard .final-inspection-table tbody td::before {
       content: attr(data-label);
       font-weight: 600;
       color: #64748b;
       margin-right: 12px;
     }
-    .final-inspection-table tbody tr.total-row td::before {
+    .process-dashboard .final-inspection-table tbody tr.total-row td::before {
       color: rgba(255,255,255,0.8);
     }
-    .final-inspection-table tbody tr.total-row td {
+    .process-dashboard .final-inspection-table tbody tr.total-row td {
       border-bottom-color: rgba(255,255,255,0.2);
     }
   }
 
   @media (max-width: 480px) {
-    .process-header h1 {
+    .process-dashboard .process-header h1 {
       font-size: 18px;
     }
-    .process-line-toggle button {
+    .process-dashboard .process-line-toggle button {
       padding: 10px;
       font-size: 12px;
     }
-    .process-context-info {
+    .process-dashboard .process-context-info {
       padding: 12px;
       gap: 8px;
     }
-    .process-context-info > div {
+    .process-dashboard .process-context-info > div {
       padding: 8px;
     }
-    .process-context-info > div div:first-child {
+    .process-dashboard .process-context-info > div div:first-child {
       font-size: 16px;
     }
-    .card {
+    .process-dashboard .card {
       padding: 12px;
       margin-bottom: 16px;
     }
-    .card-title {
+    .process-dashboard .card-title {
       font-size: 14px;
     }
-    .process-submodule-session {
+    .process-dashboard .process-submodule-session {
       padding: 12px;
     }
-    .process-submodule-session-title {
+    .process-dashboard .process-submodule-session-title {
       font-size: 16px;
     }
-    .btn {
+    .process-dashboard .btn {
       padding: 10px 16px;
       font-size: 13px;
     }
-    .data-table {
+    .process-dashboard .data-table {
       font-size: 12px;
     }
-    .data-table th, .data-table td {
+    .process-dashboard .data-table th, .process-dashboard .data-table td {
       padding: 8px 6px;
     }
-    .form-control {
+    .process-dashboard .form-control {
       padding: 10px 12px;
       font-size: 14px;
     }
-    textarea.form-control {
+    .process-dashboard textarea.form-control {
       min-height: 80px;
     }
   }
+
+  /* Lot ↔ Heat mapping grid: desktop 5 columns, mobile 2 columns */
+  .lot-heat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+  }
+  .lot-heat-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .lot-heat-label {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 2px;
+  }
+  .lot-heat-value {
+    font-weight: 600;
+    color: #0f172a;
+  }
+  /* Compact card overrides for this page */
+  .compact-card { padding: 12px; }
+  .compact-card .card-header { margin-bottom: 8px; padding: 0; }
+  .compact-card .card-title { font-size: 16px; }
+  .compact-card .card-subtitle { font-size: 12px; margin-top: 4px; }
+  .compact-card .alert { padding: 8px; font-size: 12px; }
+
+  @media (max-width: 768px) {
+    .lot-heat-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+  }
+
 `;
+
 
 // Mock data for each manufacturing line
 const LINE_DATA = {
@@ -374,15 +413,21 @@ const LINE_DATA = {
   }
 };
 
-const ProcessDashboard = ({ onBack, onNavigateToSubModule }) => {
+const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] }) => {
   // Get PO data for header
   const poData = MOCK_PO_DATA["PO-2025-1001"];
-  const [selectedLine, setSelectedLine] = useState('Line-1');
+  const initialLine = (selectedLines && selectedLines[0]) || 'Line-1';
+  const [selectedLine, setSelectedLine] = useState(initialLine);
 
   // State that changes based on selected line
-  const [lotNumbers, setLotNumbers] = useState(LINE_DATA['Line-1'].lotNumbers);
-  const [newLotNo, setNewLotNo] = useState('');
-  const [heatNumbersMap, setHeatNumbersMap] = useState(LINE_DATA['Line-1'].heatNumbersMap);
+  const [lotNumbers, setLotNumbers] = useState(LINE_DATA[initialLine]?.lotNumbers || []);
+  const [heatNumbersMap, setHeatNumbersMap] = useState(LINE_DATA[initialLine]?.heatNumbersMap || {});
+
+  // Modal state for adding Lot Number via popup
+  const [showAddLotModal, setShowAddLotModal] = useState(false);
+  const [modalLotNo, setModalLotNo] = useState('');
+  const openAddLotModal = () => { setModalLotNo(''); setShowAddLotModal(true); };
+  const closeAddLotModal = () => setShowAddLotModal(false);
 
   // Final Inspection Results - Remarks (manual entry, required)
   const [finalInspectionRemarks, setFinalInspectionRemarks] = useState('');
@@ -433,27 +478,37 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule }) => {
     if (lineData) {
       setLotNumbers(lineData.lotNumbers);
       setHeatNumbersMap(lineData.heatNumbersMap);
-      setNewLotNo('');
     }
   };
 
-  const addLotNumber = () => {
-    if (newLotNo && !lotNumbers.includes(newLotNo)) {
-      setLotNumbers([...lotNumbers, newLotNo]);
-      setNewLotNo('');
+  const addLotNumber = (lotNo) => {
+    const next = (lotNo || modalLotNo).trim();
+    if (!next) return;
+    if (!lotNumbers.includes(next)) {
+      setLotNumbers([...lotNumbers, next]);
     }
+    setModalLotNo('');
+    setShowAddLotModal(false);
+  };
+
+  const removeLotNumber = (lotNo) => {
+    setLotNumbers(prev => prev.filter(l => l !== lotNo));
+    setHeatNumbersMap(prev => {
+      const { [lotNo]: removed, ...rest } = prev; // eslint-disable-line no-unused-vars
+      return rest;
+    });
   };
 
   const updateHeatNumber = (lotNo, heatNo) => {
     setHeatNumbersMap({ ...heatNumbersMap, [lotNo]: heatNo });
   };
 
-  const manufacturingLines = ['Line-1', 'Line-2', 'Line-3'];
+  const manufacturingLines = (selectedLines && selectedLines.length > 0) ? selectedLines : ['Line-1'];
 
   // removed unused hourly data and validators to satisfy lint rules
 
   return (
-    <div>
+    <div className="process-dashboard">
       <style>{staticDataStyles}</style>
 
       <div className="breadcrumb">
@@ -547,76 +602,108 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule }) => {
       </div>
 
       {/* Pre-Inspection Data Entry - Always visible above submodule session */}
-      <div className="card" style={{ marginBottom: 'var(--space-24)' }}>
+      <div className="card compact-card" style={{ marginBottom: 'var(--space-16)' }}>
         <div className="card-header">
           <h3 className="card-title">Pre-Inspection Data Entry - {selectedLine}</h3>
           <p className="card-subtitle">3 readings/hour</p>
         </div>
-        <div style={{ marginBottom: 'var(--space-24)' }}>
-          <h4 style={{ marginBottom: 'var(--space-16)' }}>Lot Number Entry</h4>
-          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-12)' }}><strong>Multiple Lot Numbers can be added.</strong> Add all lot numbers for this inspection.</p>
-          <div style={{ marginBottom: 'var(--space-16)' }}>
-            <div className="input-grid">
-              <FormField>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Enter Lot No. (e.g., LOT-002)"
-                  value={newLotNo}
-                  onChange={(e) => setNewLotNo(e.target.value)}
-                />
-              </FormField>
-              <div style={{ alignSelf: 'end' }}>
-                <button className="btn btn-primary" onClick={addLotNumber}>+ Add Lot Number</button>
-              </div>
-            </div>
+        <div style={{ marginBottom: 'var(--space-16)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-12)' }}>
+            <h4 style={{ margin: 0 }}>Lot Number Entry</h4>
+            <button
+              className="btn btn-primary"
+              onClick={openAddLotModal}
+              aria-label="Add Lot Number"
+              title="Add Lot Number"
+            >
+              + Add
+            </button>
           </div>
+          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-12)' }}>
+            <strong>Multiple Lot Numbers can be added.</strong> Add all lot numbers for this inspection.
+          </p>
           <div style={{ display: 'flex', gap: 'var(--space-8)', flexWrap: 'wrap' }}>
+            {lotNumbers.length === 0 && (
+              <span className="status-badge alert">No lot numbers added</span>
+            )}
             {lotNumbers.map(lot => (
-              <span key={lot} className="status-badge valid">{lot}</span>
+              <span key={lot} className="status-badge valid" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                {lot}
+                <button
+                  onClick={() => removeLotNumber(lot)}
+                  aria-label={`Remove ${lot}`}
+                  title="Remove"
+                  style={{
+                    marginLeft: 6,
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--color-error)',
+                    fontWeight: 700,
+                    lineHeight: '18px',
+                    padding: 0
+                  }}
+                >
+                  ×
+                </button>
+              </span>
             ))}
           </div>
         </div>
-        <div style={{ marginTop: 'var(--space-24)' }}>
-          <h4 style={{ marginBottom: 'var(--space-16)' }}>Heat Number Selection</h4>
+        <div style={{ marginTop: 'var(--space-12)' }}>
+          <h4 style={{ marginBottom: 'var(--space-8)' }}>Heat Number Selection</h4>
           <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-warning)', marginBottom: 'var(--space-12)', fontWeight: 'var(--font-weight-medium)' }}>⚠ <strong>CONSTRAINT:</strong> Heat No. has to be selected for Each Lot No.</p>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Lot Number</th>
-                  <th>Heat Number (from previous stage/RM IC)</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lotNumbers.map(lot => (
-                  <tr key={lot}>
-                    <td><strong>{lot}</strong></td>
-                    <td>
-                      <select
-                        className="form-control"
-                        value={heatNumbersMap[lot] || ''}
-                        onChange={(e) => updateHeatNumber(lot, e.target.value)}
-                      >
-                        <option value="">Select Heat Number</option>
-                        <option value="H001">H001</option>
-                        <option value="H002">H002</option>
-                        <option value="H003">H003</option>
-                        <option value="H004">H004</option>
-                        <option value="H005">H005</option>
-                      </select>
-                    </td>
-                    <td>
-                      {heatNumbersMap[lot] ? <StatusBadge status="Valid" /> : <span style={{ color: 'var(--color-error)', fontWeight: 'var(--font-weight-medium)' }}>Required</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="lot-heat-grid">
+            {lotNumbers.map(lot => (
+              <div key={lot} className="lot-heat-item" style={{ position: 'relative' }}>
+                <button
+                  onClick={() => removeLotNumber(lot)}
+                  aria-label={`Remove ${lot}`}
+                  title="Remove lot"
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    border: '1px solid #fecaca',
+                    background: '#fff',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    lineHeight: '22px'
+                  }}
+                >
+                  ×
+                </button>
+                <div className="lot-heat-lot">
+                  <div className="lot-heat-label">Lot Number</div>
+                  <div className="lot-heat-value">{lot}</div>
+                </div>
+                <div className="lot-heat-heat">
+                  <div className="lot-heat-label">Heat Number (from previous stage/RM IC)</div>
+                  <select
+
+                    className="form-control"
+                    value={heatNumbersMap[lot] || ''}
+                    onChange={(e) => updateHeatNumber(lot, e.target.value)}
+                  >
+                    <option value="">Select Heat Number</option>
+                    <option value="H001">H001</option>
+                    <option value="H002">H002</option>
+                    <option value="H003">H003</option>
+                    <option value="H004">H004</option>
+                    <option value="H005">H005</option>
+                  </select>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="alert alert-info" style={{ marginTop: 'var(--space-24)' }}>
+        <div className="alert alert-info" style={{ marginTop: 'var(--space-12)' }}>
           ℹ️ <strong>Info:</strong> 3 readings per hour are required for all process parameters
         </div>
       </div>
@@ -827,6 +914,39 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule }) => {
       <div style={{ marginTop: 'var(--space-24)' }}>
         <button className="btn btn-secondary" onClick={onBack}>Return to Landing Page</button>
       </div>
+
+      {showAddLotModal && (
+        <div className="modal-overlay" onClick={closeAddLotModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Add Lot Number</div>
+
+              <button className="btn btn-outline" onClick={closeAddLotModal} aria-label="Close">×</button>
+            </div>
+            <div className="modal-body">
+              <FormField label="Lot Number">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="e.g., LOT-002"
+                  value={modalLotNo}
+                  onChange={(e) => setModalLotNo(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addLotNumber(); } }}
+                />
+              </FormField>
+              {modalLotNo && lotNumbers.includes(modalLotNo) && (
+                <div className="alert alert-warning" style={{ marginTop: 'var(--space-12)' }}>
+                  This lot number is already added
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={closeAddLotModal}>Cancel</button>
+              <button className="btn btn-primary" onClick={() => addLotNumber()} disabled={!modalLotNo || lotNumbers.includes(modalLotNo)}>Add</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,0 +1,174 @@
+/* Responsive + modular + clean CSS for Application & Deflection Test */
+
+:root {
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --radius-8: 8px;
+
+  --color-border: #e2e8f0;
+  --color-muted: #64748b;
+  --color-bg: #f8fafc;
+}
+
+.ad-container {
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* Header */
+.ad-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+
+.ad-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ad-subtitle {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* Card */
+.ad-card {
+  background: white;
+  border: 1px solid var(--color-border);
+  padding: var(--space-16);
+  border-radius: var(--radius-8);
+}
+
+.ad-card-header {
+  margin-bottom: var(--space-12);
+}
+
+.ad-card-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ad-card-subtitle {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* Form Grid */
+.ad-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-16);
+}
+
+.ad-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ad-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ad-label.required::after {
+  content: "*";
+  color: #ef4444;
+  margin-left: 4px;
+}
+
+/* Inputs */
+.ad-input {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.ad-textarea {
+  resize: vertical;
+}
+
+.ad-input:disabled {
+  background: #f1f5f9;
+  color: var(--color-muted);
+}
+
+/* Buttons */
+.ad-btn {
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.ad-btn-outline {
+  background: white;
+  border-color: var(--color-border);
+}
+
+.ad-btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+/* Stats section */
+.ad-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--space-12);
+  margin-top: var(--space-16);
+}
+
+.ad-stat {
+  background: white;
+  border: 1px solid var(--color-border);
+  padding: var(--space-12);
+  border-radius: var(--radius-8);
+  text-align: center;
+}
+
+.ad-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.ad-stat-label {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* Result Box */
+.ad-result-box {
+  padding: 6px 10px;
+  border: 2px solid;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+/* Actions */
+.ad-actions {
+  display: flex;
+  gap: var(--space-12);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .ad-actions button {
+    width: 100%;
+  }
+  .ad-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

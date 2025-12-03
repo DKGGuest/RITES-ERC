@@ -27,7 +27,7 @@ const responsiveStyles = `
   }
 `;
 
-const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
+const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSelectedLinesChange }) => {
   const [shiftOfInspection, setShiftOfInspection] = useState('');
   const [offeredQty, setOfferedQty] = useState(call.call_qty);
   const [cmApproval, setCmApproval] = useState(false);
@@ -51,9 +51,18 @@ const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
     }
   }, []);
 
-  // Check if all required sections are verified
-  const allSectionsVerified = sectionAVerified && sectionBVerified && sectionCVerified &&
-    (call.product_type.includes('Process') ? sectionDVerified : true);
+  // When Section B shift changes, inform parent so Process Parameters grid uses it
+  useEffect(() => {
+    if (onShiftChange && shiftOfInspection) {
+      try { onShiftChange(shiftOfInspection); } catch (e) { /* no-op */ }
+    }
+  }, [shiftOfInspection, onShiftChange]);
+
+
+  // Check if all required sections are verified (only those that are shown)
+  const isSectionCRequired = (call.product_type === 'Raw Material' || call.product_type.includes('Process'));
+  const isSectionDRequired = call.product_type.includes('Process');
+  const allSectionsVerified = sectionAVerified && sectionBVerified && (!isSectionCRequired || sectionCVerified) && (!isSectionDRequired || sectionDVerified);
 
   const canProceed = shiftOfInspection && (offeredQty === call.call_qty || (offeredQty > call.call_qty && cmApproval)) && allSectionsVerified;
 
@@ -84,6 +93,15 @@ const InspectionInitiationPage = ({ call, onProceed, onBack }) => {
     if (updates.sectionCVerified !== undefined) setSectionCVerified(updates.sectionCVerified);
     if (updates.sectionDVerified !== undefined) setSectionDVerified(updates.sectionDVerified);
   };
+
+  // Bubble up selected lines for Process modules
+  useEffect(() => {
+    try {
+      const lines = (productionLines || []).map(l => `Line-${l.lineNumber}`);
+      if (onSelectedLinesChange && lines.length > 0) onSelectedLinesChange(lines);
+    } catch (e) { /* no-op */ }
+  }, [productionLines, onSelectedLinesChange]);
+
 
   return (
     <div>

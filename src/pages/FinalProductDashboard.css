@@ -1,0 +1,221 @@
+/* ----------------------------------------------
+   FINAL PRODUCT DASHBOARD — CLEAN CSS
+   ---------------------------------------------- */
+
+.fp-container {
+  padding: 20px;
+}
+
+/* Breadcrumb */
+.fp-breadcrumb {
+  font-size: 13px;
+  margin-bottom: 16px;
+  color: #475569;
+}
+.fp-link {
+  color: #0ea5e9;
+  cursor: pointer;
+}
+
+/* Title */
+.fp-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+/* Cards */
+.fp-card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+.fp-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* Grid */
+.fp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+/* Inputs */
+.fp-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.fp-input:disabled {
+  background: #f1f5f9;
+}
+.fp-input.small {
+  width: 110px;
+}
+.fp-input.medium {
+  width: 180px;
+}
+
+.fp-success {
+  background: #dcfce7 !important;
+}
+.fp-danger {
+  background: #fee2e2 !important;
+}
+
+.fp-note {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Submodule Section */
+.fp-submodule-section {
+  padding: 20px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+.fp-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.fp-submodule-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.fp-submodule-btn {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  transition: 0.2s ease;
+  align-items: center;
+  text-align: center;
+}
+.fp-submodule-btn:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.15);
+}
+.fp-submodule-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+.fp-submodule-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+.fp-submodule-desc {
+  font-size: 10px;
+  color: #64748b;
+}
+
+/* Packing Box */
+.fp-box {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+.fp-box.holo {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+.fp-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Hologram */
+.fp-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+.fp-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.fp-holo-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.fp-btn-primary {
+  background: #0ea5e9;
+  border: none;
+  padding: 6px 12px;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.fp-btn-primary.small {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+.fp-btn-danger {
+  background: #ef4444;
+  border: none;
+  padding: 6px 10px;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Actions */
+.fp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.fp-textarea {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  width: 100%;
+}
+
+.fp-return {
+  margin-top: 12px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .fp-title {
+    font-size: 20px;
+  }
+  .fp-grid {
+    grid-template-columns: 1fr;
+  }
+  .fp-submodule-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .fp-submodule-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fp-submodule-desc {
+    display: none;
+  }
+}
