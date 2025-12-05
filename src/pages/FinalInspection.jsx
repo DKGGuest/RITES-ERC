@@ -14,6 +14,14 @@ const FinalInspection = ({ call, onBack }) => {
   // Static header data (auto-fetched)
   const poData = (MOCK_PO_DATA && call?.po_no && MOCK_PO_DATA[call.po_no]) || {};
 
+  /* Auto-expand next section when current section is verified */
+  const handleSectionAVerify = (checked) => {
+    setSectionAVerified(checked);
+    if (checked) {
+      setSectionBExpanded(true);
+    }
+  };
+
   return (
     <div>
       <div className="breadcrumb">
@@ -90,7 +98,7 @@ const FinalInspection = ({ call, onBack }) => {
             {/* Section A Verification */}
             <div className="form-group" style={{ gridColumn: '1 / -1', marginTop: 'var(--space-16)', padding: 'var(--space-16)', background: 'var(--color-gray-100)', borderRadius: 'var(--border-radius)', border: '1px solid var(--color-gray-300)' }}>
               <div className="checkbox-item">
-                <input id="final-section-a-verify" type="checkbox" checked={sectionAVerified} onChange={(e) => setSectionAVerified(e.target.checked)} />
+                <input id="final-section-a-verify" type="checkbox" checked={sectionAVerified} onChange={(e) => handleSectionAVerify(e.target.checked)} />
                 <label htmlFor="final-section-a-verify" style={{ fontWeight: 'var(--font-weight-medium)', marginLeft: '8px' }}>
                   I verify that Section A details are correct
                 </label>

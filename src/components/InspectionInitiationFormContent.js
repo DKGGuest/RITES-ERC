@@ -158,6 +158,38 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
 
   const offeredQtyStatus = getOfferedQtyStatus();
 
+  /* Auto-expand next section when current section is verified */
+  const handleSectionAVerify = (checked) => {
+    onFormDataChange({ sectionAVerified: checked });
+    if (checked && showSectionB) {
+      setSectionBExpanded(true);
+    }
+  };
+
+  const handleSectionBVerify = (checked) => {
+    onFormDataChange({ sectionBVerified: checked });
+    if (checked) {
+      const isSectionCRequired = call.product_type === 'Raw Material' || call.product_type.includes('Process');
+      if (isSectionCRequired) {
+        setSectionCExpanded(true);
+      }
+    }
+  };
+
+  const handleSectionCVerify = (checked) => {
+    onFormDataChange({ sectionCVerified: checked });
+    if (checked) {
+      const isSectionDRequired = call.product_type.includes('Process');
+      if (isSectionDRequired) {
+        setSectionDExpanded(true);
+      }
+    }
+  };
+
+  const handleSectionDVerify = (checked) => {
+    onFormDataChange({ sectionDVerified: checked });
+  };
+
   const addProductionLine = () => {
     onFormDataChange({
       productionLines: [...formData.productionLines, {
@@ -312,7 +344,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 type="checkbox"
                 id={`sectionA-verify-${call.id}`}
                 checked={formData.sectionAVerified || false}
-                onChange={(e) => onFormDataChange({ sectionAVerified: e.target.checked })}
+                onChange={(e) => handleSectionAVerify(e.target.checked)}
               />
               <label htmlFor={`sectionA-verify-${call.id}`} style={{ fontWeight: 'var(--font-weight-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
                 {formData.sectionAVerified && <span style={{ color: 'var(--color-success)', fontSize: '18px' }}>✓</span>}
@@ -471,7 +503,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 type="checkbox"
                 id={`sectionB-verify-${call.id}`}
                 checked={formData.sectionBVerified || false}
-                onChange={(e) => onFormDataChange({ sectionBVerified: e.target.checked })}
+                onChange={(e) => handleSectionBVerify(e.target.checked)}
               />
               <label htmlFor={`sectionB-verify-${call.id}`} style={{ fontWeight: 'var(--font-weight-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
                 {formData.sectionBVerified && <span style={{ color: 'var(--color-success)', fontSize: '18px' }}>✓</span>}
@@ -540,7 +572,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                   type="checkbox"
                   id={`sectionC-verify-${call.id}`}
                   checked={formData.sectionCVerified || false}
-                  onChange={(e) => onFormDataChange({ sectionCVerified: e.target.checked })}
+                  onChange={(e) => handleSectionCVerify(e.target.checked)}
                 />
                 <label htmlFor={`sectionC-verify-${call.id}`} style={{ fontWeight: 'var(--font-weight-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
                   {formData.sectionCVerified && <span style={{ color: 'var(--color-success)', fontSize: '18px' }}>✓</span>}
@@ -772,7 +804,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               type="checkbox"
               id={`sectionD-verify-${call.id}`}
               checked={formData.sectionDVerified || false}
-              onChange={(e) => onFormDataChange({ sectionDVerified: e.target.checked })}
+              onChange={(e) => handleSectionDVerify(e.target.checked)}
             />
             <label htmlFor={`sectionD-verify-${call.id}`} style={{ fontWeight: 'var(--font-weight-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
               {formData.sectionDVerified && <span style={{ color: 'var(--color-success)', fontSize: '18px' }}>✓</span>}
