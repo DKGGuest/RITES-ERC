@@ -932,7 +932,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [], shift: selectedShi
                       <input
                         type="number"
                         className="form-control"
-                        placeholder="40-44"
+                        placeholder=""
                         value={row.finalHardness}
                         onChange={e => updateDimensionData(idx, 'finalHardness', e.target.value)}
                         disabled={row.noProduction}

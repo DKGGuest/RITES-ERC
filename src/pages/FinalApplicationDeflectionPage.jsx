@@ -1,232 +1,274 @@
 import { useMemo, useState } from "react";
+import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
+import ExcelImport from '../components/ExcelImport';
+import { getDimensionWeightAQL } from '../utils/is2500Calculations';
 import "./FinalApplicationDeflectionPage.css";
 
-/**
- * Application & Deflection Test - Refactored Version
- *
- * Clean structure:
- * 1. Lot Details
- * 2. R1, Conditional R2
- * 3. Auto Result + Total Rejection
- * 4. Remarks + Actions
- *
- * Fully responsive (desktop → mobile)
- * No inline CSS, follows Augment coding rules.
- */
-
-// Mock data (moved outside component to prevent recreation on each render)
+/* Mock lots - replace with API */
 const LOTS = [
-  { lotNo: "LOT-001", heatNo: "HT-A1", quantity: 500, accpNo: 2, rejNo: 3, cummRejNo: 4 },
-  { lotNo: "LOT-002", heatNo: "HT-A2", quantity: 800, accpNo: 3, rejNo: 4, cummRejNo: 6 },
-  { lotNo: "LOT-003", heatNo: "HT-B1", quantity: 1200, accpNo: 5, rejNo: 6, cummRejNo: 8 }
+  { lotNo: "LOT-001", heatNo: "HT-2025-A1", quantity: 500 },
+  { lotNo: "LOT-002", heatNo: "HT-2025-A2", quantity: 800 },
+  { lotNo: "LOT-003", heatNo: "HT-2025-B1", quantity: 1200 }
 ];
 
-const FinalApplicationDeflectionPage = ({ onBack }) => {
-  const [selectedLot, setSelectedLot] = useState(LOTS[0].lotNo);
-  const [colorCode, setColorCode] = useState("");
-  const [r1, setR1] = useState("");
-  const [r2, setR2] = useState("");
-  const [remarks, setRemarks] = useState("");
+const PAGE_SIZE = 10;
 
-  const currentLot = useMemo(
-    () => LOTS.find((l) => l.lotNo === selectedLot) || LOTS[0],
-    [selectedLot]
-  );
+const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
+  /* Build lot data with IS 2500 Table 2 - Dimension & Weight (AQL 2.5) */
+  const lotsData = useMemo(() => LOTS.map(lot => {
+    const aql = getDimensionWeightAQL(lot.quantity);
+    return {
+      ...lot,
+      sampleSize: aql.n1,
+      sampleSize2nd: aql.n2,
+      accpNo: aql.ac1,
+      rejNo: aql.re1,
+      cummRejNo: aql.cummRej,
+      useSingleSampling: aql.useSingleSampling
+    };
+  }), []);
 
-  const toInt = (v) => (!v || isNaN(v) ? 0 : parseInt(v));
+  /* State for all lots */
+  const [lotStates, setLotStates] = useState(() => {
+    const initial = {};
+    lotsData.forEach(lot => {
+      initial[lot.lotNo] = {
+        deflection1st: Array(lot.sampleSize).fill(''),
+        deflection2nd: Array(lot.sampleSize2nd).fill(''),
+        remarks: '',
+        show2ndTriggered: false
+      };
+    });
+    return initial;
+  });
 
-  // Conditions for R2 to appear
-  const showR2 = useMemo(() => {
-    const r1n = toInt(r1);
-    return r1 !== "" && r1n > currentLot.accpNo && r1n < currentLot.rejNo;
-  }, [r1, currentLot]);
+  /* Pagination states */
+  const [page1st, setPage1st] = useState({});
+  const [page2nd, setPage2nd] = useState({});
 
-  const totalRejected = useMemo(
-    () => toInt(r1) + (showR2 ? toInt(r2) : 0),
-    [r1, r2, showR2]
-  );
-
-  // Final Result Logic
-  const result = useMemo(() => {
-    const r1n = toInt(r1);
-    const tr = totalRejected;
-
-    if (r1 === "") return { status: "PENDING", color: "#f59e0b", icon: "⏳" };
-    if (r1n <= currentLot.accpNo) return { status: "OK", color: "#22c55e", icon: "✓" };
-    if (r1n > currentLot.accpNo && r1n < currentLot.rejNo && tr < currentLot.cummRejNo)
-      return { status: "OK", color: "#22c55e", icon: "✓" };
-    return { status: "NOT OK", color: "#ef4444", icon: "✗" };
-  }, [r1, totalRejected, currentLot]);
-
-  // Basic validation before save
-  const validate = () => {
-    if (!colorCode.trim()) return "Color Code is required.";
-    if (r1 === "") return "R1 is required.";
-    if (showR2 && r2 === "") return "R2 is required.";
-    return null;
+  /* Handle deflection input change */
+  const handleDeflectionChange = (lotNo, index, value, isSecond) => {
+    setLotStates(prev => {
+      const lotState = { ...prev[lotNo] };
+      if (isSecond) {
+        const arr = [...lotState.deflection2nd];
+        arr[index] = value;
+        lotState.deflection2nd = arr;
+      } else {
+        const arr = [...lotState.deflection1st];
+        arr[index] = value;
+        lotState.deflection1st = arr;
+      }
+      return { ...prev, [lotNo]: lotState };
+    });
   };
 
-  const handleSave = () => {
-    const err = validate();
-    if (err) return alert(err);
+  /* Handle remarks change */
+  const handleRemarksChange = (lotNo, value) => {
+    setLotStates(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], remarks: value }
+    }));
+  };
 
-    const payload = {
-      lotNo: selectedLot,
-      heatNo: currentLot.heatNo,
-      quantity: currentLot.quantity,
-      colorCode,
-      r1: toInt(r1),
-      r2: showR2 ? toInt(r2) : 0,
-      totalRejected,
-      result: result.status,
-      remarks
-    };
+  /* Handle Excel import for deflection values */
+  const handleExcelImport = (lotNo, values, isSecond) => {
+    setLotStates(prev => {
+      const lotState = { ...prev[lotNo] };
+      if (isSecond) {
+        lotState.deflection2nd = values;
+      } else {
+        lotState.deflection1st = values;
+      }
+      return { ...prev, [lotNo]: lotState };
+    });
+  };
 
-    alert("Saved!\n\n" + JSON.stringify(payload, null, 2));
-    onBack();
+  /* Calculate summary for a lot - PASS if deflection is within acceptable range (example: > 0) */
+  const getSummary = (lot) => {
+    const state = lotStates[lot.lotNo];
+    const r1 = state.deflection1st.filter(v => {
+      const num = parseFloat(v);
+      return v !== '' && !isNaN(num) && num <= 0;
+    }).length;
+
+    const r2 = state.deflection2nd.filter(v => {
+      const num = parseFloat(v);
+      return v !== '' && !isNaN(num) && num <= 0;
+    }).length;
+
+    const total = r1 + r2;
+    const needSecond = r1 > lot.accpNo && r1 < lot.rejNo;
+
+    if (needSecond && !state.show2ndTriggered) {
+      setLotStates(prev => ({
+        ...prev,
+        [lot.lotNo]: { ...prev[lot.lotNo], show2ndTriggered: true }
+      }));
+    }
+
+    const showSecond = state.show2ndTriggered || needSecond;
+
+    let result = 'PENDING';
+    let color = '#f59e0b';
+    const hasInput = state.deflection1st.some(v => v !== '');
+
+    if (hasInput) {
+      if (r1 <= lot.accpNo) {
+        result = 'OK'; color = '#16a34a';
+      } else if (r1 >= lot.rejNo) {
+        result = 'NOT OK'; color = '#dc2626';
+      } else if (showSecond) {
+        if (total < lot.cummRejNo) {
+          result = 'OK'; color = '#16a34a';
+        } else if (total >= lot.cummRejNo) {
+          result = 'NOT OK'; color = '#dc2626';
+        }
+      }
+    }
+
+    return { r1, r2, total, showSecond, result, color };
   };
 
   return (
     <div className="ad-container">
-
       {/* HEADER */}
       <div className="ad-header">
         <div>
           <h1 className="ad-title">Application & Deflection Test</h1>
-          <p className="ad-subtitle">Final Product Inspection - Load Deflection</p>
+          <p className="ad-subtitle">Final Product Inspection — Load Deflection (IS 2500 Table 2 - AQL 2.5)</p>
         </div>
         <button className="ad-btn ad-btn-outline" onClick={onBack}>← Back</button>
       </div>
 
-      {/* LOT DETAILS */}
-      <div className="ad-card">
-        <div className="ad-card-header">
-          <h3 className="ad-card-title">📦 Lot Information</h3>
-          <p className="ad-card-subtitle">Auto-populated from Process IC</p>
-        </div>
+      {/* Submodule Navigation */}
+      <FinalSubmoduleNav currentSubmodule="final-application-deflection" onNavigate={onNavigateSubmodule} />
 
-        <div className="ad-grid">
-          <div className="ad-field">
-            <label className="ad-label required">Lot No.</label>
-            <select
-              className="ad-input"
-              value={selectedLot}
-              onChange={(e) => setSelectedLot(e.target.value)}
-            >
-              {LOTS.map((l) => (
-                <option key={l.lotNo}>{l.lotNo}</option>
-              ))}
-            </select>
-          </div>
+      {/* ALL LOTS */}
+      {lotsData.map(lot => {
+        const state = lotStates[lot.lotNo];
+        const summary = getSummary(lot);
+        const currentPage1 = page1st[lot.lotNo] || 0;
+        const currentPage2 = page2nd[lot.lotNo] || 0;
 
-          <div className="ad-field">
-            <label className="ad-label">Heat No.</label>
-            <input className="ad-input" disabled value={currentLot.heatNo} />
-          </div>
-
-          <div className="ad-field">
-            <label className="ad-label">Quantity</label>
-            <input className="ad-input" disabled value={currentLot.quantity} />
-          </div>
-
-          <div className="ad-field">
-            <label className="ad-label required">Color Code</label>
-            <input
-              className="ad-input"
-              value={colorCode}
-              onChange={(e) => setColorCode(e.target.value)}
-              placeholder="Enter color code"
-            />
-          </div>
-
-          <div className="ad-field">
-            <label className="ad-label">AQL Limits</label>
-            <input
-              className="ad-input"
-              disabled
-              value={`Accp: ${currentLot.accpNo} | Rej: ${currentLot.rejNo} | Cumm: ${currentLot.cummRejNo}`}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* SAMPLING SECTION */}
-      <div className="ad-card">
-        <div className="ad-card-header">
-          <h3 className="ad-card-title">Sampling Result</h3>
-          <p className="ad-card-subtitle">Enter rejection counts</p>
-        </div>
-
-        <div className="ad-grid">
-          <div className="ad-field">
-            <label className="ad-label required">Pieces Failed in 1st Sampling (R1)</label>
-            <input
-              type="number"
-              className="ad-input"
-              value={r1}
-              onChange={(e) => setR1(e.target.value)}
-            />
-          </div>
-
-          <div className="ad-field">
-            <label className="ad-label">Pieces Failed in 2nd Sampling (R2)</label>
-            <input
-              type="number"
-              className="ad-input"
-              value={r2}
-              disabled={!showR2}
-              onChange={(e) => setR2(e.target.value)}
-              placeholder={!showR2 ? "Shown only if R1 triggers" : ""}
-            />
-          </div>
-        </div>
-
-        {/* STATS */}
-        <div className="ad-stats">
-          <div className="ad-stat">
-            <div className="ad-stat-value">{toInt(r1)}</div>
-            <span className="ad-stat-label">R1</span>
-          </div>
-
-          <div className="ad-stat">
-            <div className="ad-stat-value">{showR2 ? toInt(r2) : "-"}</div>
-            <span className="ad-stat-label">R2</span>
-          </div>
-
-          <div className="ad-stat">
-            <div className="ad-stat-value">{totalRejected}</div>
-            <span className="ad-stat-label">Total Rejected</span>
-          </div>
-
-          <div className="ad-stat">
-            <div
-              className="ad-result-box"
-              style={{ borderColor: result.color, color: result.color }}
-            >
-              {result.icon} {result.status}
+        return (
+          <div key={lot.lotNo} className="ad-card">
+            {/* Lot Header */}
+            <div className="ad-lot-header">
+              <div className="ad-lot-info">
+                <span className="ad-lot-badge">📦 Lot: <strong>{lot.lotNo}</strong></span>
+                <span className="ad-lot-meta">Heat: {lot.heatNo}</span>
+                <span className="ad-lot-meta">Qty: {lot.quantity}</span>
+              </div>
+              <div className="ad-lot-sample">
+                Sample Size (IS 2500): <strong>{lot.sampleSize}</strong>
+              </div>
             </div>
-            <span className="ad-stat-label">Result</span>
+
+            {/* 1st Sampling */}
+            <div className="ad-sampling-block">
+              <div className="ad-sampling-header">
+                <div className="ad-sampling-title">1st Sampling – Deflection (mm)</div>
+                <ExcelImport
+                  templateName={`${lot.lotNo}_Deflection_1st`}
+                  sampleSize={lot.sampleSize}
+                  valueLabel="Deflection (mm)"
+                  onImport={(values) => handleExcelImport(lot.lotNo, values, false)}
+                />
+              </div>
+              <div className="ad-input-grid">
+                {state.deflection1st.slice(currentPage1 * PAGE_SIZE, (currentPage1 + 1) * PAGE_SIZE).map((val, idx) => {
+                  const actualIdx = currentPage1 * PAGE_SIZE + idx;
+                  const num = parseFloat(val);
+                  const status = val === '' ? '' : (isNaN(num) ? '' : (num > 0 ? 'pass' : 'fail'));
+                  return (
+                    <div key={actualIdx} className="ad-input-wrapper">
+                      <span className="ad-input-label">{actualIdx + 1}</span>
+                      <input type="number" step="0.1" className={`ad-input ad-input-sm ${status}`} value={val} onChange={(e) => handleDeflectionChange(lot.lotNo, actualIdx, e.target.value, false)} />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="ad-summary-row">
+                <div className="ad-summary-left">
+                  <div className="ad-summary-item">Rejected (R1): <strong className="ad-r1">{summary.r1}</strong></div>
+                  <div className="ad-summary-item">Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong></div>
+                </div>
+                {lot.sampleSize > PAGE_SIZE && (
+                  <div className="ad-pagination">
+                    <button className="ad-page-btn" disabled={currentPage1 === 0} onClick={() => setPage1st(p => ({ ...p, [lot.lotNo]: currentPage1 - 1 }))}>‹ Prev</button>
+                    <span className="ad-page-info">{currentPage1 * PAGE_SIZE + 1}–{Math.min((currentPage1 + 1) * PAGE_SIZE, lot.sampleSize)} of {lot.sampleSize}</span>
+                    <button className="ad-page-btn" disabled={(currentPage1 + 1) * PAGE_SIZE >= lot.sampleSize} onClick={() => setPage1st(p => ({ ...p, [lot.lotNo]: currentPage1 + 1 }))}>Next ›</button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2nd Sampling */}
+            {summary.showSecond && (
+              <div className="ad-sampling-block ad-sampling-second">
+                <div className="ad-sampling-header">
+                  <div className="ad-sampling-title">2nd Sampling – Deflection (mm)</div>
+                  <ExcelImport
+                    templateName={`${lot.lotNo}_Deflection_2nd`}
+                    sampleSize={lot.sampleSize2nd}
+                    valueLabel="Deflection (mm)"
+                    onImport={(values) => handleExcelImport(lot.lotNo, values, true)}
+                  />
+                </div>
+                <div className="ad-input-grid">
+                  {state.deflection2nd.slice(currentPage2 * PAGE_SIZE, (currentPage2 + 1) * PAGE_SIZE).map((val, idx) => {
+                    const actualIdx = currentPage2 * PAGE_SIZE + idx;
+                    const num = parseFloat(val);
+                    const status = val === '' ? '' : (isNaN(num) ? '' : (num > 0 ? 'pass' : 'fail'));
+                    return (
+                      <div key={actualIdx} className="ad-input-wrapper">
+                        <span className="ad-input-label">{actualIdx + 1}</span>
+                        <input type="number" step="0.1" className={`ad-input ad-input-sm ${status}`} value={val} onChange={(e) => handleDeflectionChange(lot.lotNo, actualIdx, e.target.value, true)} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="ad-summary-row">
+                  <div className="ad-summary-left">
+                    <div className="ad-summary-item">Rejected (R2): <strong className="ad-r2">{summary.r2}</strong></div>
+                    <div className="ad-summary-item">Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'ad-fail' : 'ad-ok'}>{summary.total}</strong></div>
+                  </div>
+                  {lot.sampleSize2nd > PAGE_SIZE && (
+                    <div className="ad-pagination">
+                      <button className="ad-page-btn" disabled={currentPage2 === 0} onClick={() => setPage2nd(p => ({ ...p, [lot.lotNo]: currentPage2 - 1 }))}>‹ Prev</button>
+                      <span className="ad-page-info">{currentPage2 * PAGE_SIZE + 1}–{Math.min((currentPage2 + 1) * PAGE_SIZE, lot.sampleSize2nd)} of {lot.sampleSize2nd}</span>
+                      <button className="ad-page-btn" disabled={(currentPage2 + 1) * PAGE_SIZE >= lot.sampleSize2nd} onClick={() => setPage2nd(p => ({ ...p, [lot.lotNo]: currentPage2 + 1 }))}>Next ›</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Result & Remarks */}
+            <div className="ad-final-row">
+              <div className="ad-final-result">
+                <label className="ad-label">Result of Application & Deflection Test</label>
+                <div className="ad-result-box" style={{ borderColor: summary.color, color: summary.color }}>{summary.result}</div>
+                {/* <div className="ad-result-note">
+                  <span className="ad-note-ok">✓ OK if R1 ≤ Accp No.</span><br />
+                  <span className="ad-note-ok">✓ OK if Accp No. &lt; R1 &lt; Rej No. AND (R1 + R2) &lt; Cumm. Rej. No.</span><br />
+                  <span className="ad-note-fail">✗ NOT OK if R1 ≥ Rej No. OR (R1 + R2) ≥ Cumm. Rej. No.</span>
+                </div> */}
+              </div>
+              <div className="ad-remarks">
+                <label className="ad-label">Remarks</label>
+                <textarea className="ad-input ad-textarea" rows="3" value={state.remarks} onChange={(e) => handleRemarksChange(lot.lotNo, e.target.value)} placeholder="Enter remarks..." />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })}
 
-      {/* REMARKS */}
-      <div className="ad-card">
-        <div className="ad-field full">
-          <label className="ad-label required">Remarks</label>
-          <textarea
-            className="ad-input ad-textarea"
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            placeholder="Enter remarks..."
-          />
-        </div>
-      </div>
-
-      {/* ACTION BUTTONS */}
+      {/* Page Actions */}
       <div className="ad-actions">
         <button className="ad-btn ad-btn-outline" onClick={onBack}>Cancel</button>
-        <button className="ad-btn ad-btn-primary" onClick={handleSave}>Save & Continue</button>
+        <button className="ad-btn ad-btn-primary" onClick={() => alert('Saved!')}>Save & Continue</button>
       </div>
     </div>
   );

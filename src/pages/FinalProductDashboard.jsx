@@ -1,43 +1,120 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import FormField from "../components/FormField";
 import { MOCK_PO_DATA } from "../data/mockData";
 import { formatDate } from "../utils/helpers";
 import "./FinalProductDashboard.css";
 
 export default function FinalProductDashboard({ onBack, onNavigateToSubModule }) {
-  /* -------------------- STATE -------------------- */
-  const [lotSize, setLotSize] = useState(1000);
-  const [selectedLot, setSelectedLot] = useState("LOT-001");
-
-  const [hdpeBags, setHdpeBags] = useState(false);
-  const [cleanedCoating, setCleanedCoating] = useState(false);
-  const [bagsNonStdPacking, setBagsNonStdPacking] = useState("");
-  const [ercNonStdBag, setErcNonStdBag] = useState("");
-  const [noteErcTesting, setNoteErcTesting] = useState("");
-  const [finalRemarks, setFinalRemarks] = useState("");
-
-  const [hologramType, setHologramType] = useState("range");
-  const [hologramRanges, setHologramRanges] = useState([{ from: "", to: "" }]);
-  const [singleHolograms, setSingleHolograms] = useState([""]);
-
+  const [bagsOffered, setBagsOffered] = useState("");
   const poData = MOCK_PO_DATA["PO-2025-1001"];
 
-  /* -------------------- AQL LOGIC -------------------- */
-  const calculateAQL = (lot) => {
-    if (lot <= 500) return { sampleSize: 50, bags: 5, acc: 2, rej: 3 };
-    if (lot <= 1200) return { sampleSize: 80, bags: 8, acc: 3, rej: 4 };
-    if (lot <= 3200) return { sampleSize: 125, bags: 13, acc: 5, rej: 6 };
-    return { sampleSize: 200, bags: 20, acc: 7, rej: 8 };
-  };
-  const aql = calculateAQL(lotSize);
+  /* -------------------- IS 2500 AQL LOGIC -------------------- */
 
-  /* -------------------- MOCK LOT DATA -------------------- */
-  const lotsData = {
-    "LOT-001": { qtyOffered: 500, qtyAccepted: 495, qtyRejected: 5, stdPackingNo: 50 },
-    "LOT-002": { qtyOffered: 800, qtyAccepted: 790, qtyRejected: 10, stdPackingNo: 50 }
+  /* Table 2 - Double Sampling for Dimension & Weight AQL 2.5
+   * Returns 1st SAMPLE (n1) based on Lot Size Range
+   * For lots 2-150: Double sampling not provided → use single sampling
+   */
+  const calculateSampleSize = (lotSz) => {
+    if (lotSz <= 0) return 0;
+    /* 2-150: Double sampling not provided, use single sampling (Table 1) */
+    if (lotSz <= 8) return 2;
+    if (lotSz <= 15) return 3;
+    if (lotSz <= 25) return 5;
+    if (lotSz <= 50) return 8;
+    if (lotSz <= 90) return 13;
+    if (lotSz <= 150) return 20;
+    /* 151+ : Use Table 2 - 1st SAMPLE (n1) */
+    if (lotSz <= 280) return 20;    /* 151-280 → n1=20 */
+    if (lotSz <= 500) return 32;    /* 281-500 → n1=32 */
+    if (lotSz <= 1200) return 50;   /* 501-1200 → n1=50 */
+    if (lotSz <= 3200) return 80;   /* 1201-3200 → n1=80 */
+    if (lotSz <= 10000) return 125; /* 3201-10000 → n1=125 */
+    if (lotSz <= 35000) return 200; /* 10001-35000 → n1=200 */
+    if (lotSz <= 150000) return 315;/* 35001-150000 → n1=315 */
+    if (lotSz <= 500000) return 500;/* 150001-500000 → n1=500 */
+    return 500;
   };
-  const lot = lotsData[selectedLot];
-  const bagsWithStd = Math.ceil(lot.qtyAccepted / lot.stdPackingNo);
+
+  /* Table 1 - Sample Size for Bags for Sampling calculation */
+  const calculateBagsForSampling = (totalSampleSize) => {
+    if (totalSampleSize <= 0) return 0;
+    if (totalSampleSize <= 8) return 2;
+    if (totalSampleSize <= 15) return 3;
+    if (totalSampleSize <= 25) return 5;
+    if (totalSampleSize <= 50) return 8;
+    if (totalSampleSize <= 90) return 13;
+    if (totalSampleSize <= 150) return 20;
+    if (totalSampleSize <= 280) return 32;
+    if (totalSampleSize <= 500) return 50;
+    if (totalSampleSize <= 1200) return 80;
+    if (totalSampleSize <= 3200) return 125;
+    if (totalSampleSize <= 10000) return 200;
+    if (totalSampleSize <= 35000) return 315;
+    if (totalSampleSize <= 150000) return 500;
+    if (totalSampleSize <= 500000) return 800;
+    return 1250;
+  };
+
+  /* -------------------- LOTS DATA (Auto-fetched from Vendor Call) -------------------- */
+  const lotsFromVendorCall = [
+    { lotNo: "LOT-001", heatNo: "HT-2025-001", lotSize: 500 },
+    { lotNo: "LOT-002", heatNo: "HT-2025-002", lotSize: 800 },
+    { lotNo: "LOT-003", heatNo: "HT-2025-003", lotSize: 1200 }
+  ];
+
+  /* Calculate Sample Size for each lot based on Lot Size (IS 2500 Table 2) */
+  const lotsWithSampling = lotsFromVendorCall.map((lot) => {
+    const sampleSize = calculateSampleSize(lot.lotSize);
+    return { ...lot, sampleSize };
+  });
+
+  /* Calculate totals */
+  const totalQtyOffered = lotsWithSampling.reduce((sum, l) => sum + (l.lotSize || 0), 0);
+  const totalSampleSize = lotsWithSampling.reduce((sum, l) => sum + (l.sampleSize || 0), 0);
+  const bagsForSampling = calculateBagsForSampling(totalSampleSize);
+
+  /* -------------------- FINAL INSPECTION RESULTS DATA -------------------- */
+  /*
+    Mock test results per lot - In real app, this will be fetched from all test modules
+    If any test is rejected, the whole lot is rejected
+  */
+  const testResultsPerLot = useMemo(() => ({
+    "LOT-001": {
+      visualDim: "OK", hardness: "OK", inclusion: "OK", deflection: "OK",
+      toeLoad: "OK", weight: "OK", chemical: "OK"
+    },
+    "LOT-002": {
+      visualDim: "OK", hardness: "OK", inclusion: "NOT OK", deflection: "OK",
+      toeLoad: "OK", weight: "OK", chemical: "OK"
+    },
+    "LOT-003": {
+      visualDim: "OK", hardness: "OK", inclusion: "OK", deflection: "OK",
+      toeLoad: "OK", weight: "OK", chemical: "OK"
+    }
+  }), []);
+
+  /* State for each lot's final inspection data */
+  const [lotInspectionData, setLotInspectionData] = useState(() => {
+    const initial = {};
+    lotsFromVendorCall.forEach(lot => {
+      initial[lot.lotNo] = {
+        stdPackingNo: 50,
+        bagsStdPacking: '',
+        nonStdBagsCount: 0,
+        nonStdBagsQty: [],
+        holograms: [{ type: 'range', from: '', to: '' }],
+        remarks: ''
+      };
+    });
+    return initial;
+  });
+
+  /* Check if lot is rejected (any test NOT OK) */
+  const isLotRejected = (lotNo) => {
+    const tests = testResultsPerLot[lotNo];
+    if (!tests) return false;
+    return Object.values(tests).some(v => v === 'NOT OK');
+  };
 
   /* -------------------- SUBMODULE LIST -------------------- */
   const SUBMODULES = [
@@ -52,65 +129,72 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     { key: "final-reports", icon: "📊", title: "Reports", desc: "Summary & reports" }
   ];
 
-  /* -------------------- PRE-INSPECTION FORM FIELDS -------------------- */
-  const preFields = [
-    { key: "lot", label: "Lot No.", type: "select", value: selectedLot, options: ["LOT-001", "LOT-002"], onChange: setSelectedLot, required: true },
-    { key: "heat", label: "Heat No.", value: "HT-2025-001", disabled: true, note: "Auto-filled" },
-    { key: "lotSize", label: "Size of Each Lot", value: lotSize, type: "number", required: true, onChange: (v) => setLotSize(+v) },
-    { key: "qtyOff", label: "Total Qty Offered", value: lotSize, disabled: true },
-    { key: "vendorQty", label: "Total Qty (Vendor Call)", value: poData.total_qty || 1200, disabled: true },
-    { key: "bagsOff", label: "No. of Bags Offered", type: "number", required: true },
-    { key: "sample", label: "Sample Size", value: aql.sampleSize, disabled: true },
-    { key: "bagsSample", label: "Bags for Sampling", value: aql.bags, disabled: true },
-    { key: "acc", label: "Acceptance Number", value: aql.acc, disabled: true },
-    { key: "rej", label: "Rejection Number", value: aql.rej, disabled: true },
-    { key: "cumm", label: "Cumulative Rejection Number", value: 0, disabled: true }
-  ];
-
-  /* -------------------- HELPERS -------------------- */
-  const renderField = (f) => (
-    <FormField key={f.key} label={f.label} required={f.required}>
-      {f.type === "select" ? (
-        <select className="fp-input" value={f.value} onChange={(e) => f.onChange(e.target.value)}>
-          {f.options.map((o) => <option key={o}>{o}</option>)}
-        </select>
-      ) : (
-        <input
-          type={f.type || "text"}
-          className="fp-input"
-          value={f.value || ""}
-          disabled={f.disabled}
-          placeholder={f.placeholder}
-          onChange={(e) => f.onChange && f.onChange(e.target.value)}
-        />
-      )}
-      {f.note && <p className="fp-note">{f.note}</p>}
-    </FormField>
-  );
-
-  const addRange = () => setHologramRanges([...hologramRanges, { from: "", to: "" }]);
-  const removeRange = (i) => setHologramRanges(hologramRanges.filter((_, idx) => idx !== i));
-  const updateRange = (i, field, val) => {
-    const copy = [...hologramRanges];
-    copy[i][field] = val;
-    setHologramRanges(copy);
+  /* -------------------- LOT DATA UPDATE HANDLERS -------------------- */
+  const updateLotData = (lotNo, field, value) => {
+    setLotInspectionData(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], [field]: value }
+    }));
   };
 
-  const addSingle = () => setSingleHolograms([...singleHolograms, ""]);
-  const removeSingle = (i) => setSingleHolograms(singleHolograms.filter((_, idx) => idx !== i));
-  const updateSingle = (i, val) => {
-    const copy = [...singleHolograms];
-    copy[i] = val;
-    setSingleHolograms(copy);
+  const updateNonStdBagsCount = (lotNo, count) => {
+    const num = parseInt(count) || 0;
+    setLotInspectionData(prev => ({
+      ...prev,
+      [lotNo]: {
+        ...prev[lotNo],
+        nonStdBagsCount: num,
+        nonStdBagsQty: Array(num).fill('').slice(0, num)
+      }
+    }));
+  };
+
+  const updateNonStdBagQty = (lotNo, idx, value) => {
+    setLotInspectionData(prev => {
+      const arr = [...prev[lotNo].nonStdBagsQty];
+      arr[idx] = value;
+      return { ...prev, [lotNo]: { ...prev[lotNo], nonStdBagsQty: arr } };
+    });
+  };
+
+  /* -------------------- HOLOGRAM HANDLERS -------------------- */
+  const addHologram = (lotNo, type) => {
+    setLotInspectionData(prev => ({
+      ...prev,
+      [lotNo]: {
+        ...prev[lotNo],
+        holograms: [...prev[lotNo].holograms, type === 'range' ? { type: 'range', from: '', to: '' } : { type: 'single', value: '' }]
+      }
+    }));
+  };
+
+  const removeHologram = (lotNo, idx) => {
+    setLotInspectionData(prev => ({
+      ...prev,
+      [lotNo]: {
+        ...prev[lotNo],
+        holograms: prev[lotNo].holograms.filter((_, i) => i !== idx)
+      }
+    }));
+  };
+
+  const updateHologram = (lotNo, idx, field, value) => {
+    setLotInspectionData(prev => {
+      const arr = [...prev[lotNo].holograms];
+      arr[idx] = { ...arr[idx], [field]: value };
+      return { ...prev, [lotNo]: { ...prev[lotNo], holograms: arr } };
+    });
   };
 
   /* -------------------- MAIN JSX -------------------- */
   return (
     <div className="fp-container">
-      
       {/* BREADCRUMB */}
       <div className="fp-breadcrumb">
-        <span className="fp-link" onClick={onBack}>Landing Page</span> / Inspection Initiation / <b>ERC Final Product</b>
+        <span className="fp-link" onClick={onBack}>
+          Landing Page
+        </span>{" "}
+        / Inspection Initiation / <b>ERC Final Product</b>
       </div>
 
       <h1 className="fp-title">ERC Final Product Inspection</h1>
@@ -120,10 +204,18 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         <h2 className="fp-card-title">Inspection Details</h2>
         <div className="fp-grid">
           <FormField label="PO / Sub PO Number">
-            <input className="fp-input" value={poData.sub_po_no || poData.po_no} disabled />
+            <input
+              className="fp-input"
+              value={poData.sub_po_no || poData.po_no}
+              disabled
+            />
           </FormField>
           <FormField label="PO Date">
-            <input className="fp-input" value={formatDate(poData.sub_po_date || poData.po_date)} disabled />
+            <input
+              className="fp-input"
+              value={formatDate(poData.sub_po_date || poData.po_date)}
+              disabled
+            />
           </FormField>
           <FormField label="Contractor">
             <input className="fp-input" value={poData.contractor} disabled />
@@ -134,11 +226,62 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         </div>
       </div>
 
-      {/* PRE-INSPECTION FIELDS */}
+      {/* PRE-INSPECTION DATA ENTRY */}
       <div className="fp-card">
         <h2 className="fp-card-title">Pre-Inspection Data Entry</h2>
-        <div className="fp-grid">
-          {preFields.map(renderField)}
+        {/* <p className="fp-card-subtitle">
+          Lots auto-fetched from Vendor Call (Lot No., Heat No. &amp; Lot Size
+          from Process IC). Sample size and AQL limits are auto calculated as
+          per IS 2500.
+        </p> */}
+
+        {/* Lot-wise info table - Acc/Rej/Cumm will be in respective submodules */}
+        <div className="fp-lots-table-wrapper">
+          <table className="fp-lots-table">
+            <thead>
+              <tr>
+                <th>Lot No.</th>
+                <th>Heat No.</th>
+                <th>Lot Size</th>
+                <th>Sample Size</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lotsWithSampling.map((lotRow) => (
+                <tr key={lotRow.lotNo}>
+                  <td className="fp-lot-cell">{lotRow.lotNo}</td>
+                  <td className="fp-lot-cell">{lotRow.heatNo}</td>
+                  <td className="fp-lot-cell">{lotRow.lotSize}</td>
+                  <td className="fp-lot-cell">{lotRow.sampleSize}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary Row */}
+        <div className="fp-summary-row fp-summary-4col">
+          <FormField label="Total Qty Offered">
+            <input className="fp-input" value={totalQtyOffered || "-"} disabled />
+          </FormField>
+
+          <FormField label="Total Sample Size">
+            <input className="fp-input" value={totalSampleSize || "-"} disabled />
+          </FormField>
+
+          <FormField label="No. of Bags Offered" required>
+            <input
+              type="number"
+              className="fp-input"
+              value={bagsOffered}
+              onChange={(e) => setBagsOffered(e.target.value)}
+              placeholder="Enter bags count"
+            />
+          </FormField>
+
+          <FormField label="Bags for Sampling">
+            <input className="fp-input" value={bagsForSampling || "-"} disabled />
+          </FormField>
         </div>
       </div>
 
@@ -147,7 +290,11 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         <h2 className="fp-section-title">Sub Modules</h2>
         <div className="fp-submodule-grid">
           {SUBMODULES.map((m) => (
-            <button key={m.key} className="fp-submodule-btn" onClick={() => onNavigateToSubModule(m.key)}>
+            <button
+              key={m.key}
+              className="fp-submodule-btn"
+              onClick={() => onNavigateToSubModule(m.key)}
+            >
               <span className="fp-submodule-icon">{m.icon}</span>
               <span className="fp-submodule-title">{m.title}</span>
               <span className="fp-submodule-desc">{m.desc}</span>
@@ -156,120 +303,204 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         </div>
       </div>
 
-      {/* FINAL INSPECTION RESULTS */}
+      {/* FINAL INSPECTION RESULTS - Each Lot Displayed Separately */}
       <div className="fp-card">
         <h2 className="fp-card-title">Final Inspection Results</h2>
+        {/* <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
+          Each lot displayed separately — If any test is rejected, the whole lot is rejected
+        </p> */}
 
-        <div className="fp-grid">
-          <FormField label="Lot No.">
-            <select className="fp-input" value={selectedLot} onChange={(e) => setSelectedLot(e.target.value)}>
-              <option>LOT-001</option>
-              <option>LOT-002</option>
-            </select>
-          </FormField>
+        {lotsWithSampling.map(lot => {
+          const data = lotInspectionData[lot.lotNo];
+          const rejected = isLotRejected(lot.lotNo);
+          const tests = testResultsPerLot[lot.lotNo];
+          const bagsStdCount = Math.ceil(lot.lotSize / data.stdPackingNo);
 
-          <FormField label="Qty Offered">
-            <input className="fp-input" value={lot.qtyOffered} disabled />
-          </FormField>
-
-          <FormField label="Qty Accepted">
-            <input className="fp-input fp-success" value={lot.qtyAccepted} disabled />
-          </FormField>
-
-          <FormField label="Qty Rejected">
-            <input className="fp-input fp-danger" value={lot.qtyRejected} disabled />
-          </FormField>
-        </div>
-
-        {/* Packing Verification */}
-        <div className="fp-box">
-          <h3>Packing Verification</h3>
-          <label className="fp-checkbox">
-            <input type="checkbox" checked={hdpeBags} onChange={(e) => setHdpeBags(e.target.checked)} />
-            Packed in double HDPE bags *
-          </label>
-          <label className="fp-checkbox">
-            <input type="checkbox" checked={cleanedCoating} onChange={(e) => setCleanedCoating(e.target.checked)} />
-            Cleaned & protected with coating *
-          </label>
-        </div>
-
-        {/* Packing Numbers */}
-        <div className="fp-grid">
-          <FormField label="Standard Packing No.">
-            <input className="fp-input" value={lot.stdPackingNo} disabled />
-          </FormField>
-          <FormField label="Bags with Std. Packing">
-            <input className="fp-input" value={bagsWithStd} disabled />
-          </FormField>
-          <FormField label="Bags (Non-Std)" required>
-            <input className="fp-input" value={bagsNonStdPacking} onChange={(e) => setBagsNonStdPacking(e.target.value)} />
-          </FormField>
-          <FormField label="ERC in each Non-Std Bag" required>
-            <input className="fp-input" value={ercNonStdBag} onChange={(e) => setErcNonStdBag(e.target.value)} />
-          </FormField>
-        </div>
-
-        {/* NOTE ON ERC TESTING */}
-        <FormField label="Note on ERC used for Testing" required>
-          <input className="fp-input" value={noteErcTesting} onChange={(e) => setNoteErcTesting(e.target.value)} />
-        </FormField>
-
-        {/* HOLOGRAM SECTION */}
-        <div className="fp-box holo">
-          <h3>Hologram Details</h3>
-
-          <div className="fp-row">
-            <label className="fp-radio">
-              <input type="radio" checked={hologramType === "range"} onChange={() => setHologramType("range")} />
-              Range (From - To)
-            </label>
-            <label className="fp-radio">
-              <input type="radio" checked={hologramType === "single"} onChange={() => setHologramType("single")} />
-              Single Hologram No.
-            </label>
-          </div>
-
-          {hologramType === "range" && (
-            <>
-              {hologramRanges.map((r, idx) => (
-                <div key={idx} className="fp-holo-row">
-                  <input className="fp-input small" placeholder="From" value={r.from} onChange={(e) => updateRange(idx, "from", e.target.value)} />
-                  <span>to</span>
-                  <input className="fp-input small" placeholder="To" value={r.to} onChange={(e) => updateRange(idx, "to", e.target.value)} />
-                  {hologramRanges.length > 1 && (
-                    <button className="fp-btn-danger" onClick={() => removeRange(idx)}>✕</button>
-                  )}
+          return (
+            <div
+              key={lot.lotNo}
+              className="fp-lot-result-block"
+              style={{
+                background: rejected ? '#fef2f2' : '#f0fdf4',
+                border: `1px solid ${rejected ? '#fecaca' : '#bbf7d0'}`,
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px'
+              }}
+            >
+              {/* Lot Header with Status */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                  📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize}
                 </div>
-              ))}
-              <button className="fp-btn-primary small" onClick={addRange}>+ Add Range</button>
-            </>
-          )}
+                <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '4px',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  background: rejected ? '#fee2e2' : '#dcfce7',
+                  color: rejected ? '#991b1b' : '#166534'
+                }}>
+                  {rejected ? '✗ LOT REJECTED' : '✓ LOT ACCEPTED'}
+                </span>
+              </div>
 
-          {hologramType === "single" && (
-            <>
-              {singleHolograms.map((s, idx) => (
-                <div key={idx} className="fp-holo-row">
-                  <input className="fp-input medium" placeholder="Hologram No." value={s} onChange={(e) => updateSingle(idx, e.target.value)} />
-                  {singleHolograms.length > 1 && (
-                    <button className="fp-btn-danger" onClick={() => removeSingle(idx)}>✕</button>
-                  )}
+              {/* Test Results Summary */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                {Object.entries(tests).map(([test, status]) => (
+                  <span key={test} style={{
+                    padding: '2px 8px',
+                    borderRadius: '3px',
+                    fontSize: '10px',
+                    background: status === 'OK' ? '#dcfce7' : '#fee2e2',
+                    color: status === 'OK' ? '#166534' : '#991b1b'
+                  }}>
+                    {test}: {status}
+                  </span>
+                ))}
+              </div>
+
+              {/* Packing Info Grid */}
+              <div className="fp-grid" style={{ marginBottom: '12px' }}>
+                <FormField label="Std. Packing No.">
+                  <input className="fp-input" value={data.stdPackingNo} disabled style={{ fontSize: '12px', padding: '6px' }} />
+                </FormField>
+                <FormField label="Bags with Std. Packing">
+                  <input
+                    className="fp-input"
+                    type="number"
+                    value={data.bagsStdPacking || bagsStdCount}
+                    onChange={(e) => updateLotData(lot.lotNo, 'bagsStdPacking', e.target.value)}
+                    style={{ fontSize: '12px', padding: '6px' }}
+                  />
+                </FormField>
+                <FormField label="Non-Std Bags Count">
+                  <input
+                    className="fp-input"
+                    type="number"
+                    min="0"
+                    value={data.nonStdBagsCount}
+                    onChange={(e) => updateNonStdBagsCount(lot.lotNo, e.target.value)}
+                    style={{ fontSize: '12px', padding: '6px' }}
+                  />
+                </FormField>
+              </div>
+
+              {/* Non-Std Bags Qty Inputs */}
+              {data.nonStdBagsCount > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                    Qty in Each Non-Std Bag ({data.nonStdBagsCount} bags)
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {Array.from({ length: data.nonStdBagsCount }).map((_, idx) => (
+                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{ fontSize: '9px', color: '#64748b' }}>Bag {idx + 1}</span>
+                        <input
+                          type="number"
+                          className="fp-input"
+                          value={data.nonStdBagsQty[idx] || ''}
+                          onChange={(e) => updateNonStdBagQty(lot.lotNo, idx, e.target.value)}
+                          style={{ width: '60px', fontSize: '11px', padding: '4px', textAlign: 'center' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-              <button className="fp-btn-primary small" onClick={addSingle}>+ Add Hologram</button>
-            </>
-          )}
-        </div>
+              )}
 
-        {/* REMARKS */}
-        <FormField label="Remarks" required>
-          <textarea className="fp-textarea" rows={3} value={finalRemarks} onChange={(e) => setFinalRemarks(e.target.value)} />
-        </FormField>
+              {/* Hologram Section */}
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>
+                    Hologram Details
+                  </label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      className="fp-btn-sm"
+                      onClick={() => addHologram(lot.lotNo, 'range')}
+                    >
+                      + Range
+                    </button>
+                    <button
+                      type="button"
+                      className="fp-btn-sm"
+                      onClick={() => addHologram(lot.lotNo, 'single')}
+                    >
+                      + Single
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {data.holograms.map((holo, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '10px', color: '#64748b', width: '50px' }}>
+                        {holo.type === 'range' ? 'Range:' : 'Single:'}
+                      </span>
+                      {holo.type === 'range' ? (
+                        <>
+                          <input
+                            className="fp-input"
+                            placeholder="From"
+                            value={holo.from || ''}
+                            onChange={(e) => updateHologram(lot.lotNo, idx, 'from', e.target.value)}
+                            style={{ width: '80px', fontSize: '11px', padding: '4px' }}
+                          />
+                          <span style={{ fontSize: '10px' }}>to</span>
+                          <input
+                            className="fp-input"
+                            placeholder="To"
+                            value={holo.to || ''}
+                            onChange={(e) => updateHologram(lot.lotNo, idx, 'to', e.target.value)}
+                            style={{ width: '80px', fontSize: '11px', padding: '4px' }}
+                          />
+                        </>
+                      ) : (
+                        <input
+                          className="fp-input"
+                          placeholder="Hologram No."
+                          value={holo.value || ''}
+                          onChange={(e) => updateHologram(lot.lotNo, idx, 'value', e.target.value)}
+                          style={{ width: '120px', fontSize: '11px', padding: '4px' }}
+                        />
+                      )}
+                      {data.holograms.length > 1 && (
+                        <button
+                          type="button"
+                          className="fp-btn-danger-sm"
+                          onClick={() => removeHologram(lot.lotNo, idx)}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  Remarks
+                </label>
+                <textarea
+                  rows="1"
+                  className="fp-textarea"
+                  value={data.remarks}
+                  onChange={(e) => updateLotData(lot.lotNo, 'remarks', e.target.value)}
+                  placeholder="Enter remarks..."
+                  style={{ fontSize: '11px', padding: '6px' }}
+                />
+              </div>
+            </div>
+          );
+        })}
 
         {/* ACTION BUTTONS */}
         <div className="fp-actions">
           <button className="btn btn-outline">Save Draft</button>
-          <button className="btn btn-primary">Submit & Generate IC</button>
+          <button className="btn btn-primary">Submit &amp; Generate IC</button>
         </div>
       </div>
 

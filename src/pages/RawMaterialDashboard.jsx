@@ -1,301 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { MOCK_PO_DATA } from '../data/mockData';
 import { formatDate } from '../utils/helpers';
 import StatusBadge from '../components/StatusBadge';
 import HeatNumberDetails from '../components/HeatNumberDetails';
 import MobileResponsiveSelect from '../components/MobileResponsiveSelect';
-
-// Responsive styles for Raw Material Dashboard
-const responsiveStyles = `
-  /* 3-column grid layout for desktop */
-  .rm-form-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    margin-bottom: 20px;
-  }
-
-  .rm-form-group {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .rm-form-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 8px;
-  }
-
-  .rm-form-label.required::after {
-    content: ' *';
-    color: #ef4444;
-  }
-
-  .rm-form-input {
-    width: 100%;
-    min-height: 44px;
-    padding: 10px 14px;
-    font-size: 14px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    background-color: #ffffff;
-    box-sizing: border-box;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .rm-form-input:focus {
-    outline: none;
-    border-color: #16a34a;
-    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
-  }
-
-  .rm-form-input:disabled {
-    background-color: #f3f4f6;
-    cursor: not-allowed;
-  }
-
-  .rm-form-hint {
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 4px;
-  }
-
-  .rm-page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
-  .rm-page-header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1f2937;
-    margin: 0;
-  }
-
-  .rm-back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 500;
-    color: #374151;
-    background-color: #f3f4f6;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: 44px;
-  }
-
-  .rm-back-button:hover {
-    background-color: #e5e7eb;
-  }
-
- 
-      width: 100%;
-      justify-content: center;
-    }
-
-    .rm-card-header {
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .rm-card-title {
-      font-size: 16px !important;
-    }
-
-    .rm-action-buttons {
-      flex-direction: column !important;
-      gap: 12px !important;
-    }
-
-    .rm-action-buttons button {
-      width: 100% !important;
-      justify-content: center;
-    }
-
-    /* Make tables scrollable */
-    .data-table-container {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-  }
-
-  /* Small mobile */
-  @media (max-width: 480px) {
-    .rm-form-input {
-      font-size: 16px;
-      min-height: 52px;
-      padding: 14px 16px;
-    }
-
-    .rm-form-label {
-      font-size: 13px;
-    }
-
-    .rm-page-header h1 {
-      font-size: 18px;
-    }
-  }
-
-  /* Sub Module Session Styles */
-  .submodule-session {
-    padding: 24px;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    margin-top: 24px;
-  }
-
-  .submodule-session-header {
-    text-align: center;
-    margin-bottom: 24px;
-  }
-
-  .submodule-session-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0 0 8px 0;
-  }
-
-  .submodule-session-subtitle {
-    font-size: 14px;
-    color: #64748b;
-    margin: 0;
-  }
-
-  .submodule-buttons {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-  }
-
-  .submodule-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 24px 16px;
-    background: #ffffff;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    min-height: 120px;
-  }
-
-  .submodule-btn:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-    transform: translateY(-2px);
-  }
-
-  .submodule-btn-icon {
-    font-size: 32px;
-    margin-bottom: 12px;
-  }
-
-  .submodule-btn-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1e293b;
-    text-align: center;
-    margin: 0;
-  }
-
-  .submodule-btn-desc {
-    font-size: 12px;
-    color: #64748b;
-    text-align: center;
-    margin-top: 4px;
-  }
-
-  /* Submodule Page Styles */
-  .submodule-page-header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 2px solid #e2e8f0;
-  }
-
-  .submodule-back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    color: #3b82f6;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .submodule-back-btn:hover {
-    background: #dbeafe;
-    border-color: #93c5fd;
-  }
-
-  .submodule-page-title {
-    font-size: 22px;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0;
-  }
-
-  @media (max-width: 768px) {
-    .submodule-buttons {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-
-    .submodule-btn {
-      padding: 20px 16px;
-      min-height: 100px;
-    }
-
-    .submodule-btn-icon {
-      font-size: 28px;
-    }
-
-    .submodule-btn-title {
-      font-size: 15px;
-    }
-
-    .submodule-page-header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .submodule-back-btn {
-      width: 100%;
-      justify-content: center;
-    }
-
-    .submodule-page-title {
-      font-size: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) and (min-width: 769px) {
-    .submodule-buttons {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-    }
-  }
-`;
+import './RawMaterialDashboard.css';
 
 const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, onProductModelChange }) => {
 
@@ -363,9 +72,6 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
 
   return (
     <div className="rm-dashboard-container">
-      {/* Inject responsive styles */}
-      <style>{responsiveStyles}</style>
-
       <div className="breadcrumb">
         <div className="breadcrumb-item" onClick={onBack} style={{ cursor: 'pointer' }}>Landing Page</div>
         <span className="breadcrumb-separator">/</span>
@@ -498,10 +204,15 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
             <p className="submodule-btn-title">Calibration & Documents</p>
             <p className="submodule-btn-desc">Verify instrument calibration</p>
           </button>
-          <button className="submodule-btn" onClick={() => onNavigateToSubModule('visual-material-testing')}>
-            <span className="submodule-btn-icon">🔬</span>
-            <p className="submodule-btn-title">Visual & Material Testing</p>
-            <p className="submodule-btn-desc">Inspect samples & test materials</p>
+          <button className="submodule-btn" onClick={() => onNavigateToSubModule('visual-inspection')}>
+            <span className="submodule-btn-icon">�️</span>
+            <p className="submodule-btn-title">Visual Inspection</p>
+            <p className="submodule-btn-desc">Visual check & defects</p>
+          </button>
+          <button className="submodule-btn" onClick={() => onNavigateToSubModule('dimensional-check')}>
+            <span className="submodule-btn-icon">📐</span>
+            <p className="submodule-btn-title">Dimensional Check</p>
+            <p className="submodule-btn-desc">Material testing & dimensions</p>
           </button>
           <button className="submodule-btn" onClick={() => onNavigateToSubModule('summary-reports')}>
             <span className="submodule-btn-icon">📊</span>

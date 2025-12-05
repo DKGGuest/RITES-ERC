@@ -1,442 +1,412 @@
 import { useState, useMemo } from 'react';
+import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
+import ExcelImport from '../components/ExcelImport';
+import { getHardnessToeLoadAQL, calculateBagsForSampling } from '../utils/is2500Calculations';
 
-// Mock lot data (moved outside component)
-const availableLots = [
-  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500, sampleSize: 50, accpNo: 2, rejNo: 3, cummRejNo: 4 },
-  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800, sampleSize: 80, accpNo: 3, rejNo: 4, cummRejNo: 6 },
-  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200, sampleSize: 125, accpNo: 5, rejNo: 6, cummRejNo: 8 }
+/* Lots Data - Auto-fetched from Pre-Inspection (Vendor Call) */
+const lotsFromPreInspection = [
+  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', lotSize: 500 },
+  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', lotSize: 800 },
+  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', lotSize: 1200 }
 ];
 
-const FinalHardnessTestPage = ({ onBack }) => {
-  const [selectedLot, setSelectedLot] = useState(availableLots[0].lotNo);
-  const [colorCode, setColorCode] = useState('');
-  const [remarks, setRemarks] = useState('');
+const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
+  /* Calculate AQL values for each lot based on Table 2 - Hardness & Toe Load */
+  const availableLots = useMemo(() => {
+    return lotsFromPreInspection.map((lot) => {
+      const aql = getHardnessToeLoadAQL(lot.lotSize);
+      return {
+        lotNo: lot.lotNo,
+        heatNo: lot.heatNo,
+        quantity: lot.lotSize,
+        sampleSize: aql.n1,
+        accpNo: aql.ac1,
+        rejNo: aql.re1,
+        sample2Size: aql.n2,
+        cummRejNo: aql.cummRej,
+        singleSampling: aql.useSingleSampling || false
+      };
+    });
+  }, []);
 
-  // Hardness values for 1st sampling (array of values)
-  const [hardnessValues1st, setHardnessValues1st] = useState(Array(10).fill(''));
-  // Hardness values for 2nd sampling
-  const [hardnessValues2nd, setHardnessValues2nd] = useState(Array(10).fill(''));
-
-  const currentLot = useMemo(() =>
-    availableLots.find(l => l.lotNo === selectedLot) || availableLots[0],
-    [selectedLot]
+  /* Calculate Total Sample Size and Bags for Sampling */
+  const totalSampleSize = availableLots.reduce((sum, l) => sum + l.sampleSize, 0);
+  const bagsForSampling = calculateBagsForSampling(totalSampleSize);
+  const [lotData, setLotData] = useState(
+    availableLots.reduce((acc, lot) => ({
+      ...acc,
+      [lot.lotNo]: {
+        hardness1st: Array(lot.sampleSize).fill(''),
+        hardness2nd: Array(lot.sampleSize).fill(''),
+        remarks: ''
+      }
+    }), {})
   );
 
-  // Count rejected pieces in 1st sampling (hardness outside 40-44 range)
-  const rejected1st = useMemo(() => {
-    return hardnessValues1st.filter(v => {
-      if (!v || v === '') return false;
-      const val = parseFloat(v);
-      return val < 40 || val > 44;
-    }).length;
-  }, [hardnessValues1st]);
-
-  // Check if 2nd sampling needed
-  const show2ndSampling = useMemo(() => {
-    return rejected1st > currentLot.accpNo && rejected1st < currentLot.rejNo;
-  }, [rejected1st, currentLot]);
-
-  // Count rejected in 2nd sampling
-  const rejected2nd = useMemo(() => {
-    return hardnessValues2nd.filter(v => {
-      if (!v || v === '') return false;
-      const val = parseFloat(v);
-      return val < 40 || val > 44;
-    }).length;
-  }, [hardnessValues2nd]);
-
-  const totalRejected = show2ndSampling ? rejected1st + rejected2nd : rejected1st;
-
-  // Calculate result
-  const result = useMemo(() => {
-    const r1 = rejected1st;
-    const r1r2 = totalRejected;
-    if (r1 <= currentLot.accpNo) return { status: 'OK', color: '#22c55e', icon: '✓' };
-    if (r1 > currentLot.accpNo && r1 < currentLot.rejNo && r1r2 < currentLot.cummRejNo) {
-      return { status: 'OK', color: '#22c55e', icon: '✓' };
-    }
-    if (r1 >= currentLot.rejNo || r1r2 >= currentLot.cummRejNo) {
-      return { status: 'NOT OK', color: '#ef4444', icon: '✗' };
-    }
-    return { status: 'PENDING', color: '#f59e0b', icon: '⏳' };
-  }, [rejected1st, totalRejected, currentLot]);
-
-  const handleHardnessChange = (index, value, is2nd = false) => {
-    if (is2nd) {
-      setHardnessValues2nd(prev => { const arr = [...prev]; arr[index] = value; return arr; });
-    } else {
-      setHardnessValues1st(prev => { const arr = [...prev]; arr[index] = value; return arr; });
-    }
+  const getValueStatus = v => {
+    if (!v) return '';
+    const val = parseFloat(v);
+    return val >= 40 && val <= 44 ? 'pass' : 'fail';
   };
 
-  const getValueStatus = (value) => {
-    if (!value || value === '') return 'empty';
-    const val = parseFloat(value);
-    return (val >= 40 && val <= 44) ? 'pass' : 'fail';
+  const handleHardnessChange = (lotNo, idx, value, is2nd = false) => {
+    setLotData(prev => {
+      const updated = { ...prev[lotNo] };
+      const arr = is2nd ? [...updated.hardness2nd] : [...updated.hardness1st];
+      arr[idx] = value;
+      if (is2nd) updated.hardness2nd = arr;
+      else updated.hardness1st = arr;
+      return { ...prev, [lotNo]: updated };
+    });
   };
 
-  const pageStyles = `
-    .ht-form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 20px;
+  const handleRemarkChange = (lotNo, val) => {
+    setLotData(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], remarks: val }
+    }));
+  };
+
+  /* Handle Excel import for hardness values */
+  const handleExcelImport = (lotNo, values, isSecond) => {
+    setLotData(prev => ({
+      ...prev,
+      [lotNo]: {
+        ...prev[lotNo],
+        [isSecond ? 'hardness2nd' : 'hardness1st']: values
+      }
+    }));
+  };
+
+  const styles = `
+    .lot-section {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
-    .ht-field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .ht-label {
-      font-size: 12px;
+    .lot-header {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 8px 12px;
       font-weight: 600;
-      color: #475569;
+      color: #1e293b;
+      margin-bottom: 12px;
     }
-    .ht-label.required::after {
-      content: ' *';
-      color: #ef4444;
-    }
-    .ht-input {
-      padding: 10px 12px;
+    .limit-box {
+      background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 6px;
-      font-size: 14px;
+      padding: 6px 10px;
+      font-size: 13px;
+      color: #475569;
+      margin-bottom: 12px;
     }
-    .ht-input:focus {
-      outline: none;
-      border-color: #0ea5e9;
-    }
-    .ht-input:disabled {
-      background: #f1f5f9;
-      color: #64748b;
-    }
-    .ht-values-grid {
+    .values-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 8px;
     }
-    .ht-value-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .ht-value-label {
-      font-size: 10px;
-      color: #64748b;
-      font-weight: 500;
-    }
-    .ht-value-input {
-      padding: 8px 10px;
+    .value-input {
+      text-align: center;
+      width: 100%;
+      padding: 6px;
       border: 1px solid #e2e8f0;
       border-radius: 6px;
       font-size: 13px;
-      text-align: center;
+      transition: 0.2s ease;
     }
-    .ht-value-input:focus {
-      outline: none;
-      border-color: #0ea5e9;
-    }
-    .ht-value-input.pass {
+    .value-input.pass {
       border-color: #22c55e;
       background: #f0fdf4;
     }
-    .ht-value-input.fail {
+    .value-input.fail {
       border-color: #ef4444;
       background: #fef2f2;
     }
-    .ht-section {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-    .ht-section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #1e293b;
-      margin: 0 0 12px 0;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .ht-2nd-sampling {
-      background: #fef3c7;
-      border: 1px solid #f59e0b;
+    .yellow-box {
+      background: #fef9c3;
+      border: 1px solid #fde047;
       border-radius: 8px;
-      padding: 16px;
+      padding: 12px;
+      margin-top: 14px;
+    }
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
       margin-top: 16px;
     }
-    .ht-2nd-note {
-      font-size: 11px;
-      color: #92400e;
-      margin-bottom: 12px;
-    }
-    .ht-upload-section {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 12px;
-      padding: 12px;
-      background: #f0f9ff;
-      border: 1px dashed #0ea5e9;
-      border-radius: 8px;
-    }
-    .ht-upload-btn {
-      padding: 8px 16px;
-      background: #0ea5e9;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .ht-upload-text {
-      font-size: 11px;
-      color: #0369a1;
-    }
-    .ht-result-box {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-    }
-    .ht-stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .ht-stat-card {
-      background: white;
+    .stat {
+      flex: 1;
+      min-width: 120px;
+      text-align: center;
+      background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
-      padding: 12px;
-      text-align: center;
+      padding: 10px;
+      transition: 0.2s ease;
     }
-    .ht-stat-value {
-      font-size: 24px;
+    .stat:hover {
+      transform: scale(1.02);
+    }
+    .stat-value {
+      font-size: 18px;
       font-weight: 700;
-      color: #1e293b;
     }
-    .ht-stat-label {
+    .stat-label {
       font-size: 11px;
       color: #64748b;
-      margin-top: 4px;
-    }
-    @media (max-width: 768px) {
-      .ht-form-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-      .ht-values-grid {
-        grid-template-columns: repeat(5, 1fr);
-      }
-      .page-header {
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        gap: 12px;
-      }
-      .page-header .btn {
-        width: 100%;
-      }
-    }
-    @media (max-width: 480px) {
-      .ht-form-grid {
-        grid-template-columns: 1fr;
-      }
-      .ht-values-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
     }
   `;
 
   return (
     <div>
-      <style>{pageStyles}</style>
+      <style>{styles}</style>
 
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
+      {/* Header */}
+      <div
+        className="page-header"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}
+      >
         <div>
-          <h1 className="page-title">Hardness Test</h1>
-          <p className="page-subtitle">Final Product Inspection - Separate section for each lot</p>
+          <h1>Hardness Test</h1>
+          <p>Final Product Inspection - IS 2500 Table 2 (Double Sampling for Hardness & Toe Load)</p>
         </div>
         <button className="btn btn-outline" onClick={onBack}>
-          ← Back to Dashboard
+          ← Back
         </button>
       </div>
 
-      {/* Lot Selection */}
-      <div className="card" style={{ marginBottom: 'var(--space-16)' }}>
-        <div className="card-header">
-          <h3 className="card-title">📦 Lot Information</h3>
-          <p className="card-subtitle">Select lot - Data auto-fetched from Process IC</p>
-        </div>
-        <div className="ht-form-grid">
-          <div className="ht-field">
-            <label className="ht-label required">Lot No.</label>
-            <select className="ht-input" value={selectedLot} onChange={e => setSelectedLot(e.target.value)}>
-              {availableLots.map(lot => (
-                <option key={lot.lotNo} value={lot.lotNo}>{lot.lotNo}</option>
-              ))}
-            </select>
-          </div>
-          <div className="ht-field">
-            <label className="ht-label">Heat No.</label>
-            <input type="text" className="ht-input" value={currentLot.heatNo} disabled />
-          </div>
-          <div className="ht-field">
-            <label className="ht-label">Quantity of Lot</label>
-            <input type="number" className="ht-input" value={currentLot.quantity} disabled />
-          </div>
-          <div className="ht-field">
-            <label className="ht-label">Sample Size (IS 2500)</label>
-            <input type="number" className="ht-input" value={currentLot.sampleSize} disabled />
-          </div>
-          <div className="ht-field">
-            <label className="ht-label required">Color Code</label>
-            <input type="text" className="ht-input" value={colorCode} onChange={e => setColorCode(e.target.value)} placeholder="Enter color code" />
-          </div>
-          <div className="ht-field">
-            <label className="ht-label">AQL Limits</label>
-            <input type="text" className="ht-input" value={`Accp: ${currentLot.accpNo} | Rej: ${currentLot.rejNo} | Cumm: ${currentLot.cummRejNo}`} disabled />
-          </div>
-        </div>
+      {/* Sampling Summary */}
+      <div style={{
+        background: '#f0f9ff',
+        border: '1px solid #0ea5e9',
+        borderRadius: '8px',
+        padding: '12px 16px',
+        marginBottom: '16px',
+        display: 'flex',
+        gap: '24px',
+        flexWrap: 'wrap',
+        fontSize: '14px'
+      }}>
+        <span><strong>Total Sample Size:</strong> {totalSampleSize}</span>
+        <span><strong>Bags for Sampling:</strong> {bagsForSampling}</span>
       </div>
 
-      {/* Hardness Specification */}
-      <div className="card" style={{ marginBottom: 'var(--space-16)' }}>
-        <div className="card-header">
-          <h3 className="card-title">💎 Hardness Test - 1st Sampling</h3>
-          <p className="card-subtitle">Acceptable Range: 40-44 HRC</p>
-        </div>
+      <FinalSubmoduleNav
+        currentSubmodule="final-hardness-test"
+        onNavigate={onNavigateSubmodule}
+      />
 
-        <div className="ht-section">
-          <h4 className="ht-section-title">Enter Hardness Values (HRC)</h4>
-          <div className="ht-values-grid">
-            {hardnessValues1st.map((val, idx) => (
-              <div key={idx} className="ht-value-item">
-                <label className="ht-value-label">Sample {idx + 1}</label>
+      {availableLots.map(lot => {
+        const data = lotData[lot.lotNo];
+        const rejected1st = data.hardness1st.filter(v => v && (v < 40 || v > 44)).length;
+        /* Show 2nd sampling when rejected >= Re1 (not >) */
+        const show2ndSampling = !lot.singleSampling && rejected1st >= lot.rejNo;
+        const rejected2nd = data.hardness2nd.filter(v => v && (v < 40 || v > 44)).length;
+        const totalRejected = rejected1st + rejected2nd;
+
+        /* Result logic based on IS 2500 Double Sampling */
+        let result;
+        if (rejected1st <= lot.accpNo) {
+          result = { status: 'OK', color: '#22c55e' };
+        } else if (rejected1st > lot.accpNo && rejected1st < lot.rejNo) {
+          /* Need 2nd sampling - check cumulative */
+          if (totalRejected <= lot.cummRejNo) {
+            result = { status: 'OK', color: '#22c55e' };
+          } else {
+            result = { status: 'NOT OK', color: '#ef4444' };
+          }
+        } else if (rejected1st >= lot.rejNo) {
+          /* After 2nd sampling, check cumulative */
+          if (show2ndSampling && totalRejected <= lot.cummRejNo) {
+            result = { status: 'OK', color: '#22c55e' };
+          } else if (show2ndSampling && totalRejected > lot.cummRejNo) {
+            result = { status: 'NOT OK', color: '#ef4444' };
+          } else {
+            result = { status: 'Pending', color: '#f59e0b' };
+          }
+        } else {
+          result = { status: 'Pending', color: '#f59e0b' };
+        }
+
+        return (
+          <div key={lot.lotNo} className="lot-section">
+            <div className="lot-header">
+              📦 Lot: {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.quantity} | Sample Size: {lot.sampleSize}
+            </div>
+
+            <div className="limit-box">
+              Ac1: <strong>{lot.accpNo}</strong> | Re1:{' '}
+              <strong>{lot.rejNo}</strong> | Cumm. Rej No:{' '}
+              <strong>{lot.cummRejNo}</strong>
+              {lot.singleSampling && <span style={{ marginLeft: '12px', color: '#f59e0b' }}>(Single Sampling)</span>}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+              <div>
+                <h4 style={{ marginBottom: '4px' }}>💎 Hardness Test (1st Sampling - n1: {lot.sampleSize})</h4>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+                  Acceptable Range: 40 - 44 HRC
+                </p>
+              </div>
+              <ExcelImport
+                templateName={`${lot.lotNo}_Hardness_1st`}
+                sampleSize={lot.sampleSize}
+                valueLabel="Hardness (HRC)"
+                onImport={(values) => handleExcelImport(lot.lotNo, values, false)}
+              />
+            </div>
+
+            <div className="values-grid">
+              {data.hardness1st.map((val, i) => (
                 <input
+                  key={i}
                   type="number"
                   step="0.1"
-                  className={`ht-value-input ${getValueStatus(val)}`}
+                  className={`value-input ${getValueStatus(val)}`}
                   value={val}
-                  onChange={e => handleHardnessChange(idx, e.target.value)}
-                  placeholder="40-44"
+                  onChange={e => handleHardnessChange(lot.lotNo, i, e.target.value)}
+                  placeholder=""
                 />
-              </div>
-            ))}
-          </div>
-          <div className="ht-upload-section">
-            <button className="ht-upload-btn">📤 Upload Excel/CSV</button>
-            <span className="ht-upload-text">Option to upload all values through pre-defined template</span>
-          </div>
-        </div>
-
-        <div className="ht-stats-grid">
-          <div className="ht-stat-card">
-            <div className="ht-stat-value">{hardnessValues1st.filter(v => v !== '').length}</div>
-            <div className="ht-stat-label">Samples Tested</div>
-          </div>
-          <div className="ht-stat-card">
-            <div className="ht-stat-value" style={{ color: '#22c55e' }}>{hardnessValues1st.filter(v => getValueStatus(v) === 'pass').length}</div>
-            <div className="ht-stat-label">Passed</div>
-          </div>
-          <div className="ht-stat-card">
-            <div className="ht-stat-value" style={{ color: '#ef4444' }}>{rejected1st}</div>
-            <div className="ht-stat-label">Rejected (R1)</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 2nd Sampling - Conditional */}
-      {show2ndSampling && (
-        <div className="card" style={{ marginBottom: 'var(--space-16)' }}>
-          <div className="card-header" style={{ background: '#fef3c7' }}>
-            <h3 className="card-title">⚠️ 2nd Sampling Required</h3>
-            <p className="card-subtitle">R1 ({rejected1st}) is greater than Acceptance No. ({currentLot.accpNo}) but less than Rejection No. ({currentLot.rejNo})</p>
-          </div>
-
-          <div className="ht-2nd-sampling">
-            <p className="ht-2nd-note">Enter hardness values for 2nd sampling batch</p>
-            <div className="ht-values-grid">
-              {hardnessValues2nd.map((val, idx) => (
-                <div key={idx} className="ht-value-item">
-                  <label className="ht-value-label">Sample {idx + 1}</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className={`ht-value-input ${getValueStatus(val)}`}
-                    value={val}
-                    onChange={e => handleHardnessChange(idx, e.target.value, true)}
-                    placeholder="40-44"
-                  />
-                </div>
               ))}
             </div>
-            <div className="ht-upload-section" style={{ background: '#fef9c3' }}>
-              <button className="ht-upload-btn">📤 Upload Excel/CSV</button>
-              <span className="ht-upload-text">Option to upload 2nd sampling values</span>
+
+            {show2ndSampling && (
+              <div className="yellow-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: '13px', margin: 0 }}>
+                    ⚠️ 2nd Sampling Required (R1 = {rejected1st} ≥ Re1 {lot.rejNo}) - n2: {lot.sample2Size}
+                  </h4>
+                  <ExcelImport
+                    templateName={`${lot.lotNo}_Hardness_2nd`}
+                    sampleSize={lot.sample2Size}
+                    valueLabel="Hardness (HRC)"
+                    onImport={(values) => handleExcelImport(lot.lotNo, values, true)}
+                  />
+                </div>
+                <div className="values-grid">
+                  {data.hardness2nd.map((val, i) => (
+                    <input
+                      key={i}
+                      type="number"
+                      step="0.1"
+                      className={`value-input ${getValueStatus(val)}`}
+                      value={val}
+                      onChange={e =>
+                        handleHardnessChange(lot.lotNo, i, e.target.value, true)
+                      }
+                      placeholder=""
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Stats Section */}
+            <div className="stats">
+              <div className="stat">
+                <div className="stat-value">{rejected1st}</div>
+                <div className="stat-label">Rejected (R1)</div>
+              </div>
+
+              {show2ndSampling && (
+                <div className="stat">
+                  <div className="stat-value">{rejected2nd}</div>
+                  <div className="stat-label">Rejected (R2)</div>
+                </div>
+              )}
+
+              <div className="stat">
+                <div className="stat-value">{totalRejected}</div>
+                <div className="stat-label">Total Rejected (R1+R2)</div>
+              </div>
+
+              <div
+                className="stat"
+                style={{
+                  borderColor: result.color,
+                  color: result.color,
+                  background: result.color + '10'
+                }}
+              >
+                <div
+                  className="stat-value"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {result.status === 'OK' && <span>✅</span>}
+                  {result.status === 'NOT OK' && <span>❌</span>}
+                  {result.status === 'Pending' && <span>⏳</span>}
+                  {result.status}
+                </div>
+                <div className="stat-label">Result</div>
+              </div>
+            </div>
+
+            {/* Remarks */}
+            <div style={{ marginTop: '12px' }}>
+              <label
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#475569'
+                }}
+              >
+                Remarks
+              </label>
+              <textarea
+                rows="2"
+                style={{
+                  width: '100%',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '8px',
+                  fontSize: '13px',
+                  marginTop: '4px'
+                }}
+                value={data.remarks}
+                onChange={e => handleRemarkChange(lot.lotNo, e.target.value)}
+                placeholder="Enter remarks..."
+              />
             </div>
           </div>
+        );
+      })}
 
-          <div className="ht-stats-grid" style={{ marginTop: '16px' }}>
-            <div className="ht-stat-card">
-              <div className="ht-stat-value" style={{ color: '#ef4444' }}>{rejected2nd}</div>
-              <div className="ht-stat-label">Rejected in 2nd (R2)</div>
-            </div>
-            <div className="ht-stat-card">
-              <div className="ht-stat-value" style={{ color: '#ef4444' }}>{totalRejected}</div>
-              <div className="ht-stat-label">Total Rejected (R1+R2)</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Result */}
-      <div className="card" style={{ marginBottom: 'var(--space-16)' }}>
-        <div className="card-header">
-          <h3 className="card-title">📊 Result of Hardness Test</h3>
-          <p className="card-subtitle">Auto-calculated based on rejection criteria</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <div className="ht-result-box" style={{
-            background: result.color + '20',
-            color: result.color,
-            border: `2px solid ${result.color}`
-          }}>
-            {result.icon} {result.status}
-          </div>
-        </div>
-        <div style={{ fontSize: '12px', color: '#64748b', background: '#f1f5f9', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-          <strong>Result Logic:</strong><br/>
-          • <code style={{ background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>OK</code> if R1 ≤ Accp No.<br/>
-          • <code style={{ background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>OK</code> if R1 &gt; Accp & R1 &lt; Rej & R1+R2 &lt; Cumm Rej<br/>
-          • <code style={{ background: '#fee2e2', padding: '2px 6px', borderRadius: '4px' }}>NOT OK</code> if R1 ≥ Rej or R1+R2 ≥ Cumm Rej
-        </div>
-        <div className="ht-field">
-          <label className="ht-label required">Remarks</label>
-          <textarea
-            className="ht-input"
-            rows="3"
-            value={remarks}
-            onChange={e => setRemarks(e.target.value)}
-            placeholder="Enter remarks..."
-            style={{ resize: 'vertical' }}
-          />
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div style={{ marginTop: 'var(--space-24)', display: 'flex', gap: 'var(--space-16)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-        <button className="btn btn-outline" onClick={onBack}>Cancel</button>
-        <button className="btn btn-primary" onClick={() => { alert('Hardness Test data saved!'); onBack(); }}>Save & Continue</button>
+      {/* Bottom Buttons */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          marginTop: '20px',
+          gap: '10px'
+        }}
+      >
+        <button className="btn btn-outline" onClick={onBack}>
+          Cancel
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={() => alert('Hardness Test data saved!')}
+        >
+          Save & Continue
+        </button>
       </div>
     </div>
   );
 };
 
 export default FinalHardnessTestPage;
-

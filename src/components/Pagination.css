@@ -1,0 +1,27 @@
+.pg-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.pg-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.pg-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pg-info {
+  white-space: nowrap;
+}

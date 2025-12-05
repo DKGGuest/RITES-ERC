@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import CalibrationModule from '../components/CalibrationModule';
+import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 
-const FinalCalibrationDocumentsPage = ({ onBack }) => {
+const FinalCalibrationDocumentsPage = ({ onBack, onNavigateSubmodule }) => {
   // Document verification states
   const [verifications, setVerifications] = useState({
     rdsoApproval: { verified: false, remarks: '', validityDate: '' },
@@ -172,6 +173,12 @@ const FinalCalibrationDocumentsPage = ({ onBack }) => {
           ← Back to Final Product Dashboard
         </button>
       </div>
+
+      {/* Submodule Navigation */}
+      <FinalSubmoduleNav
+        currentSubmodule="final-calibration-documents"
+        onNavigate={onNavigateSubmodule}
+      />
 
       {/* Document Verification Section */}
       <div className="card" style={{ marginBottom: 'var(--space-24)' }}>

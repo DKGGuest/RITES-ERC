@@ -116,6 +116,76 @@ select.fp-input {
   margin-top: 4px;
 }
 
+.fp-card-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 16px;
+  margin-top: -8px;
+}
+
+/* Lots Table */
+.fp-lots-table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.fp-lots-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.fp-lots-table th {
+  background: #f8fafc;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.fp-lots-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1e293b;
+}
+
+.fp-lots-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.fp-lot-cell {
+  font-weight: 500;
+}
+
+.fp-lot-input-cell {
+  padding: 8px 12px;
+}
+
+.fp-lot-size-input {
+  width: 120px;
+  text-align: center;
+}
+
+.fp-sample-size {
+  font-weight: 600;
+  color: #0369a1;
+}
+
+/* Summary Row */
+.fp-summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.fp-summary-row.fp-summary-4col {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 /* Submodule Section */
 .fp-submodule-section {
   padding: 20px;
@@ -271,6 +341,44 @@ select.fp-input {
   background: #dc2626;
 }
 
+/* Small Buttons for Lot Result Section */
+.fp-btn-sm {
+  background: #0ea5e9;
+  border: none;
+  padding: 4px 10px;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.fp-btn-sm:hover {
+  background: #0284c7;
+}
+.fp-btn-danger-sm {
+  background: #ef4444;
+  border: none;
+  padding: 3px 8px;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.fp-btn-danger-sm:hover {
+  background: #dc2626;
+}
+
+/* Lot Result Block */
+.fp-lot-result-block {
+  transition: box-shadow 0.2s;
+}
+.fp-lot-result-block:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
 /* Actions */
 .fp-actions {
   display: flex;
@@ -307,6 +415,12 @@ select.fp-input {
   }
   .fp-submodule-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  .fp-summary-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .fp-summary-row.fp-summary-4col {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
@@ -367,6 +481,21 @@ select.fp-input {
   .fp-actions .btn {
     width: 100%;
     text-align: center;
+  }
+  .fp-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .fp-summary-row.fp-summary-4col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fp-lots-table th,
+  .fp-lots-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  .fp-lot-size-input {
+    width: 100px;
   }
 }
 
@@ -459,5 +588,17 @@ select.fp-input {
   .fp-btn-danger {
     padding: 6px 10px;
     font-size: 12px;
+  }
+  .fp-summary-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .fp-lots-table th,
+  .fp-lots-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .fp-lot-size-input {
+    width: 80px;
   }
 }

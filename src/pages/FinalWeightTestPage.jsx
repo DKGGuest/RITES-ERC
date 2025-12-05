@@ -1,288 +1,280 @@
 // src/pages/FinalWeightTestPage.jsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
+import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
+import ExcelImport from '../components/ExcelImport';
+import { getDimensionWeightAQL } from '../utils/is2500Calculations';
 import "./FinalWeightTestPage.css";
 
 /* Mock lots - replace with API */
 const LOTS = [
-  { lotNo: "LOT-001", heatNo: "HT-2025-A1", quantity: 500, sampleSize: 5, accpNo: 2, rejNo: 3, cummRejNo: 4, springType: "MK-III" },
-  { lotNo: "LOT-002", heatNo: "HT-2025-A2", quantity: 800, sampleSize: 5, accpNo: 3, rejNo: 4, cummRejNo: 6, springType: "MK-V" },
-  { lotNo: "LOT-003", heatNo: "HT-2025-B1", quantity: 1200, sampleSize: 5, accpNo: 5, rejNo: 6, cummRejNo: 8, springType: "ERC-J" }
+  { lotNo: "LOT-001", heatNo: "HT-2025-A1", quantity: 500, springType: "MK-III" },
+  { lotNo: "LOT-002", heatNo: "HT-2025-A2", quantity: 800, springType: "MK-V" },
+  { lotNo: "LOT-003", heatNo: "HT-2025-B1", quantity: 1200, springType: "ERC-J" }
 ];
 
 /* Weight Tolerance Table from Excel */
-const TOLERANCE = {
-  "MK-III": 904,
-  "MK-V": 1068,
-  "ERC-J": 904
-};
+const TOLERANCE = { "MK-III": 904, "MK-V": 1068, "ERC-J": 904 };
 
-export default function FinalWeightTestPage({ onBack }) {
-  const [selectedLotNo, setSelectedLotNo] = useState(LOTS[0].lotNo);
-  const [colorCode, setColorCode] = useState("");
-  const [remarks, setRemarks] = useState("");
+const PAGE_SIZE = 10;
 
-  const currentLot = useMemo(
-    () => LOTS.find((l) => l.lotNo === selectedLotNo) ?? LOTS[0],
-    [selectedLotNo]
-  );
+export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
+  /* Build lot data with IS 2500 Table 2 calculations */
+  const lotsData = useMemo(() => LOTS.map(lot => {
+    const aql = getDimensionWeightAQL(lot.quantity);
+    return {
+      ...lot,
+      sampleSize: aql.n1,
+      sampleSize2nd: aql.n2,
+      accpNo: aql.ac1,
+      rejNo: aql.re1,
+      cummRejNo: aql.cummRej,
+      useSingleSampling: aql.useSingleSampling,
+      minWeight: TOLERANCE[lot.springType] || 904
+    };
+  }), []);
 
-  const [samples1, setSamples1] = useState([]);
-  const [samples2, setSamples2] = useState([]);
+  /* State for all lots */
+  const [lotStates, setLotStates] = useState(() => {
+    const initial = {};
+    lotsData.forEach(lot => {
+      initial[lot.lotNo] = {
+        weight1st: Array(lot.sampleSize).fill(''),
+        weight2nd: Array(lot.sampleSize2nd).fill(''),
+        remarks: '',
+        show2ndTriggered: false
+      };
+    });
+    return initial;
+  });
 
-  /* Reset samples when lot changes */
-  useEffect(() => {
-    setSamples1(Array.from({ length: currentLot.sampleSize }, () => ({ value: "", status: "PENDING" })));
-    setSamples2(Array.from({ length: currentLot.sampleSize }, () => ({ value: "", status: "PENDING" })));
-  }, [currentLot]);
+  /* Pagination states */
+  const [page1st, setPage1st] = useState({});
+  const [page2nd, setPage2nd] = useState({});
 
-  const minWeight = TOLERANCE[currentLot.springType];
-
-  const updateSample = (setSamplesFn, samples, idx, newValue) => {
-    const arr = [...samples];
-    arr[idx].value = newValue;
-
-    const num = parseFloat(newValue);
-    if (isNaN(num)) {
-      arr[idx].status = "PENDING";
-    } else {
-      arr[idx].status = num >= minWeight ? "PASS" : "FAIL";
-    }
-
-    setSamplesFn(arr);
+  /* Handle weight input change */
+  const handleWeightChange = (lotNo, index, value, isSecond) => {
+    setLotStates(prev => {
+      const lotState = { ...prev[lotNo] };
+      if (isSecond) {
+        const arr = [...lotState.weight2nd];
+        arr[index] = value;
+        lotState.weight2nd = arr;
+      } else {
+        const arr = [...lotState.weight1st];
+        arr[index] = value;
+        lotState.weight1st = arr;
+      }
+      return { ...prev, [lotNo]: lotState };
+    });
   };
 
-  const rejected1 = useMemo(
-    () => samples1.filter((s) => s.status === "FAIL").length,
-    [samples1]
-  );
+  /* Handle remarks change */
+  const handleRemarksChange = (lotNo, value) => {
+    setLotStates(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], remarks: value }
+    }));
+  };
 
-  const showSecondSampling = rejected1 > currentLot.accpNo && rejected1 < currentLot.rejNo;
+  /* Handle Excel import for weight values */
+  const handleExcelImport = (lotNo, values, isSecond) => {
+    setLotStates(prev => ({
+      ...prev,
+      [lotNo]: {
+        ...prev[lotNo],
+        [isSecond ? 'weight2nd' : 'weight1st']: values
+      }
+    }));
+  };
 
-  const rejected2 = useMemo(
-    () => samples2.filter((s) => s.status === "FAIL").length,
-    [samples2]
-  );
+  /* Calculate summary for a lot */
+  const getSummary = (lot) => {
+    const state = lotStates[lot.lotNo];
+    const r1 = state.weight1st.filter(v => {
+      const num = parseFloat(v);
+      return !isNaN(num) && num < lot.minWeight;
+    }).length;
 
-  const totalRejected = showSecondSampling ? rejected1 + rejected2 : rejected1;
+    const r2 = state.weight2nd.filter(v => {
+      const num = parseFloat(v);
+      return !isNaN(num) && num < lot.minWeight;
+    }).length;
 
-  const finalResult = useMemo(() => {
-    if (samples1.every((s) => s.value === "")) {
-      return { status: "PENDING", color: "#f59e0b", icon: "⏳" };
+    const total = r1 + r2;
+    const needSecond = r1 > lot.accpNo && r1 < lot.rejNo;
+
+    // Once 2nd sampling is triggered, keep it visible
+    if (needSecond && !state.show2ndTriggered) {
+      setLotStates(prev => ({
+        ...prev,
+        [lot.lotNo]: { ...prev[lot.lotNo], show2ndTriggered: true }
+      }));
     }
 
-    if (rejected1 <= currentLot.accpNo) {
-      return { status: "OK", color: "#22c55e", icon: "✓" };
+    const showSecond = state.show2ndTriggered || needSecond;
+
+    // Determine result
+    let result = 'PENDING';
+    let color = '#f59e0b';
+    const hasInput = state.weight1st.some(v => v !== '');
+
+    if (hasInput) {
+      if (r1 <= lot.accpNo) {
+        result = 'OK'; color = '#16a34a';
+      } else if (r1 >= lot.rejNo) {
+        result = 'NOT OK'; color = '#dc2626';
+      } else if (showSecond) {
+        if (total < lot.cummRejNo) {
+          result = 'OK'; color = '#16a34a';
+        } else if (total >= lot.cummRejNo) {
+          result = 'NOT OK'; color = '#dc2626';
+        }
+      }
     }
 
-    if (
-      rejected1 > currentLot.accpNo &&
-      rejected1 < currentLot.rejNo &&
-      totalRejected < currentLot.cummRejNo
-    ) {
-      return { status: "OK", color: "#22c55e", icon: "✓" };
-    }
-
-    if (rejected1 >= currentLot.rejNo || totalRejected >= currentLot.cummRejNo) {
-      return { status: "NOT OK", color: "#ef4444", icon: "✗" };
-    }
-
-    return { status: "PENDING", color: "#f59e0b", icon: "⏳" };
-  }, [rejected1, totalRejected, samples1, currentLot.accpNo, currentLot.rejNo, currentLot.cummRejNo]);
-
-  const handleSave = () => {
-    if (!colorCode.trim()) return alert("Color Code is required.");
-    if (!remarks.trim()) return alert("Remarks required.");
-
-    const payload = {
-      lotNo: currentLot.lotNo,
-      heatNo: currentLot.heatNo,
-      springType: currentLot.springType,
-      samples1,
-      samples2: showSecondSampling ? samples2 : [],
-      rejected1,
-      rejected2,
-      totalRejected,
-      result: finalResult.status,
-      remarks
-    };
-
-    alert("Saved:\n\n" + JSON.stringify(payload, null, 2));
-    onBack();
+    return { r1, r2, total, showSecond, result, color };
   };
 
   return (
     <div className="wt-container">
-
       {/* HEADER */}
       <div className="wt-header">
         <div>
           <h1 className="wt-title">Weight Test</h1>
-          <p className="wt-subtitle">Final Product Inspection — Weight Measurement</p>
+          <p className="wt-subtitle">Final Product Inspection — Weight Measurement (IS 2500 Table 2 - AQL 2.5)</p>
         </div>
         <button className="wt-btn-outline" onClick={onBack}>← Back</button>
       </div>
 
-      {/* LOT INFORMATION */}
-      <div className="wt-card">
-        <div className="wt-card-header">
-          <h3>📦 Lot Information</h3>
-          <p className="wt-card-sub">Auto-Fetched from Process IC</p>
-        </div>
+      {/* Submodule Navigation */}
+      <FinalSubmoduleNav currentSubmodule="final-weight-test" onNavigate={onNavigateSubmodule} />
 
-        <div className="wt-grid">
-          <div className="wt-field">
-            <label className="wt-label required">Lot No</label>
-            <select className="wt-input" value={selectedLotNo} onChange={(e) => setSelectedLotNo(e.target.value)}>
-              {LOTS.map((lot) => (
-                <option key={lot.lotNo} value={lot.lotNo}>{lot.lotNo}</option>
-              ))}
-            </select>
-          </div>
+      {/* ALL LOTS */}
+      {lotsData.map(lot => {
+        const state = lotStates[lot.lotNo];
+        const summary = getSummary(lot);
+        const currentPage1 = page1st[lot.lotNo] || 0;
+        const currentPage2 = page2nd[lot.lotNo] || 0;
 
-          <div className="wt-field">
-            <label className="wt-label">Heat No</label>
-            <input className="wt-input" disabled value={currentLot.heatNo} />
-          </div>
+        return (
+          <div key={lot.lotNo} className="wt-card">
+            {/* Lot Header */}
+            <div className="wt-lot-header">
+              <div className="wt-lot-info">
+                <span className="wt-lot-badge">📦 Lot: <strong>{lot.lotNo}</strong></span>
+                <span className="wt-lot-meta">Heat: {lot.heatNo}</span>
+                <span className="wt-lot-meta">Qty: {lot.quantity}</span>
+                <span className="wt-lot-meta">Type: {lot.springType}</span>
+              </div>
+              <div className="wt-lot-sample">
+                Sample Size (IS 2500): <strong>{lot.sampleSize}</strong> | Min Weight: <strong>{lot.minWeight}g</strong>
+              </div>
+            </div>
 
-          <div className="wt-field">
-            <label className="wt-label">Sample Size</label>
-            <input className="wt-input" disabled value={currentLot.sampleSize} />
-          </div>
+            {/* 1st Sampling */}
+            <div className="wt-sampling-block">
+              <div className="wt-sampling-header">
+                <div className="wt-sampling-title">1st Sampling – Weight (g)</div>
+                <ExcelImport
+                  templateName={`${lot.lotNo}_Weight_1st`}
+                  sampleSize={lot.sampleSize}
+                  valueLabel="Weight (g)"
+                  onImport={(values) => handleExcelImport(lot.lotNo, values, false)}
+                />
+              </div>
+              <div className="wt-input-grid">
+                {state.weight1st.slice(currentPage1 * PAGE_SIZE, (currentPage1 + 1) * PAGE_SIZE).map((val, idx) => {
+                  const actualIdx = currentPage1 * PAGE_SIZE + idx;
+                  const num = parseFloat(val);
+                  const status = val === '' ? '' : (isNaN(num) ? '' : (num >= lot.minWeight ? 'pass' : 'fail'));
+                  return (
+                    <div key={actualIdx} className="wt-input-wrapper">
+                      <span className="wt-input-label">{actualIdx + 1}</span>
+                      <input type="number" step="0.1" className={`wt-input wt-input-sm ${status}`} value={val} onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, false)} />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="wt-summary-row">
+                <div className="wt-summary-left">
+                  <div className="wt-summary-item">Rejected (R1): <strong className="wt-r1">{summary.r1}</strong></div>
+                  <div className="wt-summary-item">Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong></div>
+                </div>
+                {lot.sampleSize > PAGE_SIZE && (
+                  <div className="wt-pagination">
+                    <button className="wt-page-btn" disabled={currentPage1 === 0} onClick={() => setPage1st(p => ({ ...p, [lot.lotNo]: currentPage1 - 1 }))}>‹ Prev</button>
+                    <span className="wt-page-info">{currentPage1 * PAGE_SIZE + 1}–{Math.min((currentPage1 + 1) * PAGE_SIZE, lot.sampleSize)} of {lot.sampleSize}</span>
+                    <button className="wt-page-btn" disabled={(currentPage1 + 1) * PAGE_SIZE >= lot.sampleSize} onClick={() => setPage1st(p => ({ ...p, [lot.lotNo]: currentPage1 + 1 }))}>Next ›</button>
+                  </div>
+                )}
+              </div>
+            </div>
 
-          <div className="wt-field">
-            <label className="wt-label required">Color Code</label>
-            <input className="wt-input" value={colorCode} onChange={(e) => setColorCode(e.target.value)} />
-          </div>
-
-          <div className="wt-field">
-            <label className="wt-label">Spring Type</label>
-            <input className="wt-input" disabled value={currentLot.springType} />
-          </div>
-
-          <div className="wt-field">
-            <label className="wt-label">Min Weight (g)</label>
-            <input className="wt-input" disabled value={minWeight + " g"} />
-          </div>
-        </div>
-      </div>
-
-      {/* 1st SAMPLING */}
-      <div className="wt-card">
-        <div className="wt-card-header">
-          <h3>1st Sampling</h3>
-          <p className="wt-card-sub">Enter weight measurement (g)</p>
-        </div>
-
-        <table className="wt-table">
-          <thead>
-            <tr>
-              <th>Sample</th>
-              <th>Weight (g)</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {samples1.map((s, idx) => (
-              <tr key={idx}>
-                <td>{idx + 1}</td>
-                <td>
-                  <input
-                    className="wt-input"
-                    value={s.value}
-                    onChange={(e) => updateSample(setSamples1, samples1, idx, e.target.value)}
-                    placeholder="Enter weight"
+            {/* 2nd Sampling */}
+            {summary.showSecond && (
+              <div className="wt-sampling-block wt-sampling-second">
+                <div className="wt-sampling-header">
+                  <div className="wt-sampling-title">2nd Sampling – Weight (g)</div>
+                  <ExcelImport
+                    templateName={`${lot.lotNo}_Weight_2nd`}
+                    sampleSize={lot.sampleSize2nd}
+                    valueLabel="Weight (g)"
+                    onImport={(values) => handleExcelImport(lot.lotNo, values, true)}
                   />
-                </td>
-                <td>
-                  <span className={`wt-badge ${s.status.toLowerCase()}`}>
-                    {s.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+                <div className="wt-input-grid">
+                  {state.weight2nd.slice(currentPage2 * PAGE_SIZE, (currentPage2 + 1) * PAGE_SIZE).map((val, idx) => {
+                    const actualIdx = currentPage2 * PAGE_SIZE + idx;
+                    const num = parseFloat(val);
+                    const status = val === '' ? '' : (isNaN(num) ? '' : (num >= lot.minWeight ? 'pass' : 'fail'));
+                    return (
+                      <div key={actualIdx} className="wt-input-wrapper">
+                        <span className="wt-input-label">{actualIdx + 1}</span>
+                        <input type="number" step="0.1" className={`wt-input wt-input-sm ${status}`} value={val} onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, true)} />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="wt-summary-row">
+                  <div className="wt-summary-left">
+                    <div className="wt-summary-item">Rejected (R2): <strong className="wt-r2">{summary.r2}</strong></div>
+                    <div className="wt-summary-item">Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'wt-fail' : 'wt-ok'}>{summary.total}</strong></div>
+                  </div>
+                  {lot.sampleSize2nd > PAGE_SIZE && (
+                    <div className="wt-pagination">
+                      <button className="wt-page-btn" disabled={currentPage2 === 0} onClick={() => setPage2nd(p => ({ ...p, [lot.lotNo]: currentPage2 - 1 }))}>‹ Prev</button>
+                      <span className="wt-page-info">{currentPage2 * PAGE_SIZE + 1}–{Math.min((currentPage2 + 1) * PAGE_SIZE, lot.sampleSize2nd)} of {lot.sampleSize2nd}</span>
+                      <button className="wt-page-btn" disabled={(currentPage2 + 1) * PAGE_SIZE >= lot.sampleSize2nd} onClick={() => setPage2nd(p => ({ ...p, [lot.lotNo]: currentPage2 + 1 }))}>Next ›</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-        <div className="wt-stats">
-          <div className="wt-stat-box">
-            <h3>{rejected1}</h3>
-            <p>Rejected (R1)</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 2nd SAMPLING */}
-      {showSecondSampling && (
-        <div className="wt-card warn">
-          <div className="wt-card-header">
-            <h3>⚠️ 2nd Sampling Required</h3>
-            <p className="wt-card-sub">R1 = {rejected1}, allowed range ({currentLot.accpNo} - {currentLot.rejNo})</p>
-          </div>
-
-          <table className="wt-table">
-            <thead>
-              <tr>
-                <th>Sample</th>
-                <th>Weight (g)</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {samples2.map((s, idx) => (
-                <tr key={idx}>
-                  <td>{idx + 1}</td>
-                  <td>
-                    <input
-                      className="wt-input"
-                      value={s.value}
-                      onChange={(e) => updateSample(setSamples2, samples2, idx, e.target.value)}
-                      placeholder="Enter weight"
-                    />
-                  </td>
-                  <td>
-                    <span className={`wt-badge ${s.status.toLowerCase()}`}>
-                      {s.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="wt-stats">
-            <div className="wt-stat-box">
-              <h3>{rejected2}</h3>
-              <p>Rejected (R2)</p>
-            </div>
-            <div className="wt-stat-box">
-              <h3>{totalRejected}</h3>
-              <p>Total Rejected</p>
+            {/* Result & Remarks */}
+            <div className="wt-final-row">
+              <div className="wt-final-result">
+                <label className="wt-label">Result of Weight Test</label>
+                <div className="wt-result-box" style={{ borderColor: summary.color, color: summary.color }}>{summary.result}</div>
+                {/* <div className="wt-result-note">
+                  <span className="wt-note-ok">✓ OK if R1 ≤ Accp No.</span><br />
+                  <span className="wt-note-ok">✓ OK if Accp No. &lt; R1 &lt; Rej No. AND (R1 + R2) &lt; Cumm. Rej. No.</span><br />
+                  <span className="wt-note-fail">✗ NOT OK if R1 ≥ Rej No. OR (R1 + R2) ≥ Cumm. Rej. No.</span>
+                </div> */}
+              </div>
+              <div className="wt-remarks">
+                <label className="wt-label">Remarks</label>
+                <textarea className="wt-input wt-textarea" rows="3" value={state.remarks} onChange={(e) => handleRemarksChange(lot.lotNo, e.target.value)} placeholder="Enter remarks..." />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })}
 
-      {/* RESULT */}
-      <div className="wt-card">
-        <div className="wt-result" style={{ borderColor: finalResult.color, color: finalResult.color }}>
-          {finalResult.icon} {finalResult.status}
-        </div>
-
-        <div className="wt-field">
-          <label className="wt-label">Remarks</label>
-          <textarea
-            rows="3"
-            className="wt-input"
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            placeholder="Enter remarks..."
-          />
-        </div>
-
-        <div className="wt-action">
-          <button className="wt-btn-outline" onClick={onBack}>Cancel</button>
-          <button className="wt-btn-primary" onClick={handleSave}>Save & Continue</button>
-        </div>
+      {/* Page Actions */}
+      <div className="wt-action">
+        <button className="wt-btn-outline" onClick={onBack}>Cancel</button>
+        <button className="wt-btn-primary" onClick={() => alert('Saved!')}>Save & Continue</button>
       </div>
     </div>
   );

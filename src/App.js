@@ -6,7 +6,8 @@ import RawMaterialDashboard from './pages/RawMaterialDashboard';
 import ProcessDashboard from './pages/ProcessDashboard';
 import FinalProductDashboard from './pages/FinalProductDashboard';
 import CalibrationDocumentsPage from './pages/CalibrationDocumentsPage';
-import VisualMaterialTestingPage from './pages/VisualMaterialTestingPage';
+import VisualInspectionPage from './pages/VisualInspectionPage';
+import RawMaterialDimensionalPage from './pages/RawMaterialDimensionalPage';
 import SummaryReportsPage from './pages/SummaryReportsPage';
 // Process Material SubModule Pages
 import ProcessCalibrationDocumentsPage from './pages/ProcessCalibrationDocumentsPage';
@@ -264,8 +265,14 @@ const App = () => {
               heats={rmHeats}
             />
           )}
-          {currentPage === 'visual-material-testing' && (
-            <VisualMaterialTestingPage
+          {currentPage === 'visual-inspection' && (
+            <VisualInspectionPage
+              onBack={handleBackToRawMaterial}
+              heats={rmHeats}
+            />
+          )}
+          {currentPage === 'dimensional-check' && (
+            <RawMaterialDimensionalPage
               onBack={handleBackToRawMaterial}
               heats={rmHeats}
               productModel={rmProductModel}
@@ -301,31 +308,31 @@ const App = () => {
 
           {/* Final Product Sub Module Pages */}
           {currentPage === 'final-calibration-documents' && (
-            <FinalCalibrationDocumentsPage onBack={handleBackToFinalProduct} />
+            <FinalCalibrationDocumentsPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-visual-dimensional' && (
-            <FinalVisualDimensionalPage onBack={handleBackToFinalProduct} />
+            <FinalVisualDimensionalPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-chemical-analysis' && (
-            <FinalChemicalAnalysisPage onBack={handleBackToFinalProduct} />
+            <FinalChemicalAnalysisPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-hardness-test' && (
-            <FinalHardnessTestPage onBack={handleBackToFinalProduct} />
+            <FinalHardnessTestPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-inclusion-rating' && (
-            <FinalInclusionRatingPage onBack={handleBackToFinalProduct} />
+            <FinalInclusionRatingPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-application-deflection' && (
-            <FinalApplicationDeflectionPage onBack={handleBackToFinalProduct} />
+            <FinalApplicationDeflectionPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-toe-load-test' && (
-            <FinalToeLoadTestPage onBack={handleBackToFinalProduct} />
+            <FinalToeLoadTestPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-weight-test' && (
-            <FinalWeightTestPage onBack={handleBackToFinalProduct} />
+            <FinalWeightTestPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
           {currentPage === 'final-reports' && (
-            <FinalReportsPage onBack={handleBackToFinalProduct} />
+            <FinalReportsPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
         </main>
       </div>

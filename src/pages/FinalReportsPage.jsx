@@ -1,7 +1,7 @@
-import React from "react";
+import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import "./FinalReportsPage.css";
 
-export default function FinalReportsPage({ onBack }) {
+export default function FinalReportsPage({ onBack, onNavigateSubmodule }) {
   const reportSummary = [
     {
       module: "Calibration & Documents",
@@ -88,6 +88,12 @@ export default function FinalReportsPage({ onBack }) {
         </div>
         <button className="rep-btn-outline" onClick={onBack}>← Back</button>
       </div>
+
+      {/* Submodule Navigation */}
+      <FinalSubmoduleNav
+        currentSubmodule="final-reports"
+        onNavigate={onNavigateSubmodule}
+      />
 
       {/* SUMMARY TABLE */}
       <div className="rep-card">
