@@ -5,7 +5,7 @@ import Pagination from "../components/Pagination";
 import "./FinalHardnessTestPage.css";
 import {
   getHardnessToeLoadAQL,
-  calculateBagsForSampling,
+  // calculateBagsForSampling,
 } from "../utils/is2500Calculations";
 
 /* Auto-fetched lots */
