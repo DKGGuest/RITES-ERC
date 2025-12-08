@@ -284,6 +284,54 @@
   min-height: 60px;
 }
 
+/* Popup */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.popup-box {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  width: 320px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.popup-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.popup-btn {
+  padding: 7px 14px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+.popup-btn.primary {
+  background: #0f766e;
+  color: white;
+}
+
+/* Value input styling */
+.value-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+}
+.value-input.pass { background: #dcfce7; border-color: #22c55e; }
+.value-input.fail { background: #fee2e2; border-color: #ef4444; }
+
 @media (max-width: 1024px) {
   .tlp-input-grid { grid-template-columns: repeat(8, 1fr); }
 }

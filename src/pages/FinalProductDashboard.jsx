@@ -5,7 +5,6 @@ import { formatDate } from "../utils/helpers";
 import "./FinalProductDashboard.css";
 
 export default function FinalProductDashboard({ onBack, onNavigateToSubModule }) {
-  const [bagsOffered, setBagsOffered] = useState("");
   const poData = MOCK_PO_DATA["PO-2025-1001"];
 
   /* -------------------- IS 2500 AQL LOGIC -------------------- */
@@ -73,6 +72,9 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   const totalSampleSize = lotsWithSampling.reduce((sum, l) => sum + (l.sampleSize || 0), 0);
   const bagsForSampling = calculateBagsForSampling(totalSampleSize);
 
+  /* No. of Bags Offered - Auto-fetched from Vendor Call */
+  const bagsOffered = lotsFromVendorCall.length > 0 ? lotsFromVendorCall.reduce((sum, lot) => sum + Math.ceil(lot.lotSize / 50), 0) : 0;
+
   /* -------------------- FINAL INSPECTION RESULTS DATA -------------------- */
   /*
     Mock test results per lot - In real app, this will be fetched from all test modules
@@ -103,7 +105,8 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         nonStdBagsCount: 0,
         nonStdBagsQty: [],
         holograms: [{ type: 'range', from: '', to: '' }],
-        remarks: ''
+        remarks: '',
+        ercUsedForTesting: ''
       };
     });
     return initial;
@@ -115,6 +118,10 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     if (!tests) return false;
     return Object.values(tests).some(v => v === 'NOT OK');
   };
+
+  /* Packing verification checkboxes */
+  const [packedInHDPE, setPackedInHDPE] = useState(false);
+  const [cleanedWithCoating, setCleanedWithCoating] = useState(false);
 
   /* -------------------- SUBMODULE LIST -------------------- */
   const SUBMODULES = [
@@ -269,13 +276,12 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
             <input className="fp-input" value={totalSampleSize || "-"} disabled />
           </FormField>
 
-          <FormField label="No. of Bags Offered" required>
+          <FormField label="No. of Bags Offered">
             <input
               type="number"
               className="fp-input"
-              value={bagsOffered}
-              onChange={(e) => setBagsOffered(e.target.value)}
-              placeholder="Enter bags count"
+              value={bagsOffered || "-"}
+              disabled
             />
           </FormField>
 
@@ -303,12 +309,32 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         </div>
       </div>
 
+      {/* PACKING VERIFICATION CHECKBOXES */}
+      <div className="fp-card">
+        <h2 className="fp-card-title">Packing Verification</h2>
+        <div className="fp-checkbox-group">
+          <label className="fp-checkbox-item">
+            <input
+              type="checkbox"
+              checked={packedInHDPE}
+              onChange={(e) => setPackedInHDPE(e.target.checked)}
+            />
+            <span>Packed in double HDPE Bags</span>
+          </label>
+          <label className="fp-checkbox-item">
+            <input
+              type="checkbox"
+              checked={cleanedWithCoating}
+              onChange={(e) => setCleanedWithCoating(e.target.checked)}
+            />
+            <span>Cleaned & protected with coating</span>
+          </label>
+        </div>
+      </div>
+
       {/* FINAL INSPECTION RESULTS - Each Lot Displayed Separately */}
       <div className="fp-card">
         <h2 className="fp-card-title">Final Inspection Results</h2>
-        {/* <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
-          Each lot displayed separately — If any test is rejected, the whole lot is rejected
-        </p> */}
 
         {lotsWithSampling.map(lot => {
           const data = lotInspectionData[lot.lotNo];
@@ -362,6 +388,17 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
 
               {/* Packing Info Grid */}
               <div className="fp-grid" style={{ marginBottom: '12px' }}>
+                <FormField label="No. of ERC used for Testing">
+                  <input
+                    className="fp-input"
+                    type="number"
+                    min="0"
+                    value={data.ercUsedForTesting}
+                    onChange={(e) => updateLotData(lot.lotNo, 'ercUsedForTesting', e.target.value)}
+                    placeholder="Enter count"
+                    style={{ fontSize: '12px', padding: '6px' }}
+                  />
+                </FormField>
                 <FormField label="Std. Packing No.">
                   <input className="fp-input" value={data.stdPackingNo} disabled style={{ fontSize: '12px', padding: '6px' }} />
                 </FormField>
@@ -496,6 +533,57 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
             </div>
           );
         })}
+        
+      {/* CUMULATIVE RESULTS SECTION */}
+      <div className="fp-card">
+        <h2 className="fp-card-title">Cumulative Results</h2>
+        <div className="fp-cumulative-grid">
+          <FormField label="1. Quantity on Order (PO Qty)">
+            <input className="fp-input" value={poData.po_qty || 10000} disabled />
+          </FormField>
+          <FormField label="2. Cumm. Qty Offered Previously">
+            <input className="fp-input" value={poData.cummQtyOfferedPreviously || 2500} disabled />
+          </FormField>
+          <FormField label="3. Cumm. Qty Passed Previously">
+            <input className="fp-input" value={poData.cummQtyPassedPreviously || 2400} disabled />
+          </FormField>
+          <FormField label="4. Qty Now Offered">
+            <input className="fp-input" value={totalQtyOffered} disabled />
+          </FormField>
+          <FormField label="5. Qty Now Passed">
+            <input
+              className="fp-input"
+              value={(() => {
+                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
+                return totalQtyOffered - ercUsed - qtyRejected;
+              })()}
+              disabled
+            />
+          </FormField>
+          <FormField label="6. Qty Now Rejected">
+            <input
+              className="fp-input"
+              value={lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0)}
+              disabled
+            />
+          </FormField>
+          <FormField label="7. Qty Still Due">
+            <input
+              className="fp-input"
+              value={(() => {
+                const poQty = poData.po_qty || 10000;
+                const cummPassed = poData.cummQtyPassedPreviously || 2400;
+                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
+                const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
+                return poQty - cummPassed - qtyNowPassed;
+              })()}
+              disabled
+            />
+          </FormField>
+        </div>
+      </div>
 
         {/* ACTION BUTTONS */}
         <div className="fp-actions">
@@ -503,6 +591,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
           <button className="btn btn-primary">Submit &amp; Generate IC</button>
         </div>
       </div>
+
 
       {/* RETURN */}
       <button className="btn btn-secondary fp-return" onClick={onBack}>

@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import ExcelImport from '../components/ExcelImport';
+import Pagination from '../components/Pagination';
 import { getHardnessToeLoadAQL } from '../utils/is2500Calculations';
 import './FinalToeLoadTestPage.css';
 
@@ -24,9 +25,6 @@ const TOLERANCES = {
   'MK-V': { min: 1200, max: 1500 },
   'ERC-J': { min: 650, max: Infinity }
 };
-
-/* Number of input boxes per page for pagination */
-const PAGE_SIZE = 10;
 
 const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
   /**
@@ -53,7 +51,6 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
    * Per-lot state:
    *  toe1st: array(sampleSize) – 1st sampling toe-load values
    *  toe2nd: array(sampleSize2nd) – 2nd sampling toe-load values
-   *  show2ndTriggered: boolean – once 2nd sampling is triggered, it stays visible
    *  remarks: string
    */
   const [lotData, setLotData] = useState(() => {
@@ -62,16 +59,99 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
       initial[lot.lotNo] = {
         toe1st: Array(lot.sampleSize).fill(''),
         toe2nd: Array(lot.sampleSize2nd).fill(''),
-        show2ndTriggered: false,
         remarks: ''
       };
     });
     return initial;
   });
 
-  /* Pagination state for 1st and 2nd sampling per lot */
-  const [page1st, setPage1st] = useState({});
-  const [page2nd, setPage2nd] = useState({});
+  /* 2nd Sampling visibility state and popup */
+  const [show2ndSamplingMap, setShow2ndSamplingMap] = useState({});
+  const [popupLot, setPopupLot] = useState(null);
+
+  /* Pagination states */
+  const isMobile = window.innerWidth < 768;
+  const defaultRows = isMobile ? 10 : 20;
+  const [rowsPerPageMap, setRowsPerPageMap] = useState({});
+  const [pageMap, setPageMap] = useState({});
+  const [rowsPerPageMap2, setRowsPerPageMap2] = useState({});
+  const [pageMap2, setPageMap2] = useState({});
+
+  const setRowsAndResetPage = (lotNo, value, second = false) => {
+    if (second) {
+      setRowsPerPageMap2(prev => ({ ...prev, [lotNo]: value }));
+      setPageMap2(prev => ({ ...prev, [lotNo]: 0 }));
+    } else {
+      setRowsPerPageMap(prev => ({ ...prev, [lotNo]: value }));
+      setPageMap(prev => ({ ...prev, [lotNo]: 0 }));
+    }
+  };
+
+  /** Helper: is a single toe-load value rejected for given lot? */
+  const isRejectedValue = (lot, raw) => {
+    if (raw === '' || raw === null || raw === undefined) return false;
+    const v = parseFloat(String(raw).replace(',', '.'));
+    if (Number.isNaN(v)) return false;
+
+    const tol = TOLERANCES[lot.springType] || { min: 0, max: Infinity };
+
+    if (lot.springType === 'ERC-J') {
+      /* ERC-J: value must be > 650, so ≤650 is rejected */
+      return !(v > tol.min);
+    }
+    /* Other types: value must be within min-max band */
+    return v < tol.min || v > tol.max;
+  };
+
+  /* 2nd Sampling auto-show/hide logic with popup */
+  useEffect(() => {
+    lotsWithSampleSize.forEach(lot => {
+      const state = lotData[lot.lotNo];
+      if (!state) return;
+
+      const r1 = state.toe1st.filter(v => isRejectedValue(lot, v)).length;
+
+      const secondRequired = !lot.singleSampling && r1 > lot.accpNo && r1 < lot.rejNo;
+      const secondNotRequired = r1 <= lot.accpNo || r1 >= lot.rejNo;
+      const shown = !!show2ndSamplingMap[lot.lotNo];
+
+      /* Auto-open when required */
+      if (secondRequired && !shown) {
+        setShow2ndSamplingMap(prev => ({ ...prev, [lot.lotNo]: true }));
+      }
+
+      /* Check if 2nd sampling has data */
+      const has2ndData = state.toe2nd.some(v => v !== '');
+
+      /* Auto-hide or show popup when no longer required */
+      if (secondNotRequired && shown && !popupLot) {
+        if (has2ndData) {
+          setPopupLot(lot.lotNo);
+        } else {
+          setShow2ndSamplingMap(prev => ({ ...prev, [lot.lotNo]: false }));
+        }
+      }
+    });
+  }, [lotData, lotsWithSampleSize, popupLot, show2ndSamplingMap]);
+
+  /* Popup handlers */
+  const handlePopupYesKeep = () => {
+    if (!popupLot) return;
+    setShow2ndSamplingMap(prev => ({ ...prev, [popupLot]: false }));
+    setPopupLot(null);
+  };
+
+  const handlePopupNoDelete = () => {
+    if (!popupLot) return;
+    const lot = lotsWithSampleSize.find(l => l.lotNo === popupLot);
+    if (!lot) return;
+    setShow2ndSamplingMap(prev => ({ ...prev, [popupLot]: false }));
+    setLotData(prev => ({
+      ...prev,
+      [popupLot]: { ...prev[popupLot], toe2nd: Array(lot.sampleSize2nd).fill('') }
+    }));
+    setPopupLot(null);
+  };
 
   /** Update toe-load value (1st or 2nd sampling) */
   const handleToeChange = (lotNo, index, value, isSecond = false) => {
@@ -106,25 +186,8 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
     }));
   };
 
-  /** Helper: is a single toe-load value rejected for given lot? */
-  const isRejectedValue = (lot, raw) => {
-    if (raw === '' || raw === null || raw === undefined) return false;
-    const v = parseFloat(String(raw).replace(',', '.'));
-    if (Number.isNaN(v)) return false;
-
-    const tol = TOLERANCES[lot.springType] || { min: 0, max: Infinity };
-
-    if (lot.springType === 'ERC-J') {
-      /* ERC-J: value must be > 650, so ≤650 is rejected */
-      return !(v > tol.min);
-    }
-    /* Other types: value must be within min-max band */
-    return v < tol.min || v > tol.max;
-  };
-
   /**
    * Compute R1, R2, total & final result for a lot
-   * Also triggers 2nd sampling if condition met (and keeps it visible)
    */
   const computeLotSummary = (lot) => {
     const state = lotData[lot.lotNo];
@@ -133,29 +196,11 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
     }
 
     const r1 = state.toe1st.filter(v => isRejectedValue(lot, v)).length;
-
-    /* 2nd Sampling shows if: Acceptance No < R1 < Rejection No (and not single sampling) */
-    const shouldShow2nd = !lot.singleSampling && r1 > lot.accpNo && r1 < lot.rejNo;
-
-    /* Once triggered, keep 2nd sampling visible */
-    const showSecond = state.show2ndTriggered || shouldShow2nd;
-
-    /* If 2nd sampling should be triggered but not yet flagged, update state */
-    if (shouldShow2nd && !state.show2ndTriggered) {
-      setLotData(prev => ({
-        ...prev,
-        [lot.lotNo]: { ...prev[lot.lotNo], show2ndTriggered: true }
-      }));
-    }
-
+    const showSecond = !!show2ndSamplingMap[lot.lotNo];
     const r2 = showSecond ? state.toe2nd.filter(v => isRejectedValue(lot, v)).length : 0;
     const total = r1 + r2;
 
-    /* Determine final result based on the spec:
-     * OK - if R1 <= Accp No.
-     * OK - if R1 > Accp No. & R1 < Rej. No. & (R1 + R2) < Cumm. Rej. No.
-     * NOT OK - if R1 >= Rej. No. or (R1 + R2) >= Cumm. Rej. No.
-     */
+    /* Determine final result based on the spec */
     let result = 'PENDING';
     let color = '#fbbf24';
 
@@ -182,6 +227,12 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
     }
 
     return { r1, r2, showSecond, total, result, color };
+  };
+
+  /* Get value status for color coding */
+  const getValueStatus = (lot, v) => {
+    if (!v) return '';
+    return isRejectedValue(lot, v) ? 'fail' : 'pass';
   };
 
   /** Validate & save whole page (you can later split per-lot if needed) */
@@ -212,6 +263,27 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
 
   return (
     <div className="tlp-page">
+      {/* Popup for 2nd Sampling */}
+      {popupLot && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <p>
+              2nd Sampling is no longer required.
+              <br />
+              Do you want to hide it?
+            </p>
+            <div className="popup-actions">
+              <button className="popup-btn" onClick={handlePopupNoDelete}>
+                No (Clear & Hide)
+              </button>
+              <button className="popup-btn primary" onClick={handlePopupYesKeep}>
+                Yes (Hide Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="tlp-header">
         <div>
@@ -236,6 +308,22 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
         const summary = computeLotSummary(lot);
         const state = lotData[lot.lotNo];
 
+        /* Pagination values for 1st sampling */
+        const rows = rowsPerPageMap[lot.lotNo] || defaultRows;
+        const page = pageMap[lot.lotNo] || 0;
+        const start = page * rows;
+        const end = Math.min(start + rows, lot.sampleSize);
+        const paginated1 = state.toe1st.slice(start, end);
+        const totalPages = Math.ceil(lot.sampleSize / rows);
+
+        /* Pagination values for 2nd sampling */
+        const rows2 = rowsPerPageMap2[lot.lotNo] || defaultRows;
+        const page2 = pageMap2[lot.lotNo] || 0;
+        const start2 = page2 * rows2;
+        const end2 = Math.min(start2 + rows2, lot.sampleSize2nd);
+        const paginated2 = state.toe2nd.slice(start2, end2);
+        const totalPages2 = Math.ceil(lot.sampleSize2nd / rows2);
+
         return (
           <div key={lot.lotNo} className="tlp-card">
             {/* Lot header */}
@@ -252,7 +340,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
             {/* 1st Sampling */}
             <div className="tlp-sampling-block">
               <div className="tlp-sampling-header">
-                <div className="tlp-sampling-title">1st Sampling – Toe Load Value (Kgf)</div>
+                <div className="tlp-sampling-title">1st Sampling – Toe Load Value (Kgf) (n1: {lot.sampleSize})</div>
                 <ExcelImport
                   templateName={`${lot.lotNo}_ToeLoad_1st`}
                   sampleSize={lot.sampleSize}
@@ -262,23 +350,20 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
               </div>
 
               <div className="tlp-input-grid">
-                {state.toe1st
-                  .slice((page1st[lot.lotNo] || 0) * PAGE_SIZE, ((page1st[lot.lotNo] || 0) + 1) * PAGE_SIZE)
-                  .map((val, idx) => {
-                    const actualIndex = (page1st[lot.lotNo] || 0) * PAGE_SIZE + idx;
-                    return (
-                      <div key={actualIndex} className="tlp-input-wrapper">
-                        <span className="tlp-input-label">{actualIndex + 1}</span>
-                        <input
-                          type="number"
-                          step="0.1"
-                          className="tlp-input"
-                          value={val}
-                          onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, false)}
-                        />
-                      </div>
-                    );
-                  })}
+                {paginated1.map((val, idx) => {
+                  const actualIndex = start + idx;
+                  const status = getValueStatus(lot, val);
+                  return (
+                    <input
+                      key={actualIndex}
+                      type="number"
+                      step="0.1"
+                      className={`value-input ${status}`}
+                      value={val}
+                      onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, false)}
+                    />
+                  );
+                })}
               </div>
 
               <div className="tlp-summary-row">
@@ -290,35 +375,24 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                     Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong>
                   </div>
                 </div>
-                {lot.sampleSize > PAGE_SIZE && (
-                  <div className="tlp-pagination">
-                    <button
-                      className="tlp-page-btn"
-                      disabled={(page1st[lot.lotNo] || 0) === 0}
-                      onClick={() => setPage1st(prev => ({ ...prev, [lot.lotNo]: (prev[lot.lotNo] || 0) - 1 }))}
-                    >
-                      ‹ Prev
-                    </button>
-                    <span className="tlp-page-info">
-                      {((page1st[lot.lotNo] || 0) * PAGE_SIZE) + 1}–{Math.min(((page1st[lot.lotNo] || 0) + 1) * PAGE_SIZE, lot.sampleSize)} of {lot.sampleSize}
-                    </span>
-                    <button
-                      className="tlp-page-btn"
-                      disabled={((page1st[lot.lotNo] || 0) + 1) * PAGE_SIZE >= lot.sampleSize}
-                      onClick={() => setPage1st(prev => ({ ...prev, [lot.lotNo]: (prev[lot.lotNo] || 0) + 1 }))}
-                    >
-                      Next ›
-                    </button>
-                  </div>
-                )}
               </div>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                start={start}
+                end={end}
+                totalCount={lot.sampleSize}
+                rows={rows}
+                onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
+                onPageChange={(p) => setPageMap(prev => ({ ...prev, [lot.lotNo]: p }))}
+              />
             </div>
 
             {/* 2nd Sampling - only if triggered */}
             {summary.showSecond && (
               <div className="tlp-sampling-block tlp-sampling-second">
                 <div className="tlp-sampling-header">
-                  <div className="tlp-sampling-title">2nd Sampling – Toe Load Value (Kgf)</div>
+                  <div className="tlp-sampling-title">2nd Sampling – Toe Load Value (Kgf) (n2: {lot.sampleSize2nd})</div>
                   <ExcelImport
                     templateName={`${lot.lotNo}_ToeLoad_2nd`}
                     sampleSize={lot.sampleSize2nd}
@@ -328,23 +402,20 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                 </div>
 
                 <div className="tlp-input-grid">
-                  {state.toe2nd
-                    .slice((page2nd[lot.lotNo] || 0) * PAGE_SIZE, ((page2nd[lot.lotNo] || 0) + 1) * PAGE_SIZE)
-                    .map((val, idx) => {
-                      const actualIndex = (page2nd[lot.lotNo] || 0) * PAGE_SIZE + idx;
-                      return (
-                        <div key={actualIndex} className="tlp-input-wrapper">
-                          <span className="tlp-input-label">{actualIndex + 1}</span>
-                          <input
-                            type="number"
-                            step="0.1"
-                            className="tlp-input"
-                            value={val}
-                            onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, true)}
-                          />
-                        </div>
-                      );
-                    })}
+                  {paginated2.map((val, idx) => {
+                    const actualIndex = start2 + idx;
+                    const status = getValueStatus(lot, val);
+                    return (
+                      <input
+                        key={actualIndex}
+                        type="number"
+                        step="0.1"
+                        className={`value-input ${status}`}
+                        value={val}
+                        onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, true)}
+                      />
+                    );
+                  })}
                 </div>
 
                 <div className="tlp-summary-row">
@@ -356,28 +427,17 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                       Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'tlp-fail' : 'tlp-ok'}>{summary.total}</strong>
                     </div>
                   </div>
-                  {lot.sampleSize2nd > PAGE_SIZE && (
-                    <div className="tlp-pagination">
-                      <button
-                        className="tlp-page-btn"
-                        disabled={(page2nd[lot.lotNo] || 0) === 0}
-                        onClick={() => setPage2nd(prev => ({ ...prev, [lot.lotNo]: (prev[lot.lotNo] || 0) - 1 }))}
-                      >
-                        ‹ Prev
-                      </button>
-                      <span className="tlp-page-info">
-                        {((page2nd[lot.lotNo] || 0) * PAGE_SIZE) + 1}–{Math.min(((page2nd[lot.lotNo] || 0) + 1) * PAGE_SIZE, lot.sampleSize2nd)} of {lot.sampleSize2nd}
-                      </span>
-                      <button
-                        className="tlp-page-btn"
-                        disabled={((page2nd[lot.lotNo] || 0) + 1) * PAGE_SIZE >= lot.sampleSize2nd}
-                        onClick={() => setPage2nd(prev => ({ ...prev, [lot.lotNo]: (prev[lot.lotNo] || 0) + 1 }))}
-                      >
-                        Next ›
-                      </button>
-                    </div>
-                  )}
                 </div>
+                <Pagination
+                  currentPage={page2}
+                  totalPages={totalPages2}
+                  start={start2}
+                  end={end2}
+                  totalCount={lot.sampleSize2nd}
+                  rows={rows2}
+                  onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows, true)}
+                  onPageChange={(p) => setPageMap2(prev => ({ ...prev, [lot.lotNo]: p }))}
+                />
               </div>
             )}
 

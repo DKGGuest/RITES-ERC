@@ -1,7 +1,8 @@
 // src/pages/FinalWeightTestPage.jsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import ExcelImport from '../components/ExcelImport';
+import Pagination from '../components/Pagination';
 import { getDimensionWeightAQL } from '../utils/is2500Calculations';
 import "./FinalWeightTestPage.css";
 
@@ -14,8 +15,6 @@ const LOTS = [
 
 /* Weight Tolerance Table from Excel */
 const TOLERANCE = { "MK-III": 904, "MK-V": 1068, "ERC-J": 904 };
-
-const PAGE_SIZE = 10;
 
 export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
   /* Build lot data with IS 2500 Table 2 calculations */
@@ -40,16 +39,86 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
       initial[lot.lotNo] = {
         weight1st: Array(lot.sampleSize).fill(''),
         weight2nd: Array(lot.sampleSize2nd).fill(''),
-        remarks: '',
-        show2ndTriggered: false
+        remarks: ''
       };
     });
     return initial;
   });
 
+  /* 2nd Sampling visibility state and popup */
+  const [show2ndSamplingMap, setShow2ndSamplingMap] = useState({});
+  const [popupLot, setPopupLot] = useState(null);
+
   /* Pagination states */
-  const [page1st, setPage1st] = useState({});
-  const [page2nd, setPage2nd] = useState({});
+  const isMobile = window.innerWidth < 768;
+  const defaultRows = isMobile ? 10 : 20;
+  const [rowsPerPageMap, setRowsPerPageMap] = useState({});
+  const [pageMap, setPageMap] = useState({});
+  const [rowsPerPageMap2, setRowsPerPageMap2] = useState({});
+  const [pageMap2, setPageMap2] = useState({});
+
+  const setRowsAndResetPage = (lotNo, value, second = false) => {
+    if (second) {
+      setRowsPerPageMap2(prev => ({ ...prev, [lotNo]: value }));
+      setPageMap2(prev => ({ ...prev, [lotNo]: 0 }));
+    } else {
+      setRowsPerPageMap(prev => ({ ...prev, [lotNo]: value }));
+      setPageMap(prev => ({ ...prev, [lotNo]: 0 }));
+    }
+  };
+
+  /* 2nd Sampling auto-show/hide logic with popup */
+  useEffect(() => {
+    lotsData.forEach(lot => {
+      const state = lotStates[lot.lotNo];
+      if (!state) return;
+
+      const r1 = state.weight1st.filter(v => {
+        const num = parseFloat(v);
+        return !isNaN(num) && num < lot.minWeight;
+      }).length;
+
+      const secondRequired = r1 > lot.accpNo && r1 < lot.rejNo;
+      const secondNotRequired = r1 <= lot.accpNo || r1 >= lot.rejNo;
+      const shown = !!show2ndSamplingMap[lot.lotNo];
+
+      /* Auto-open when required */
+      if (secondRequired && !shown) {
+        setShow2ndSamplingMap(prev => ({ ...prev, [lot.lotNo]: true }));
+      }
+
+      /* Check if 2nd sampling has data */
+      const has2ndData = state.weight2nd.some(v => v !== '');
+
+      /* Auto-hide or show popup when no longer required */
+      if (secondNotRequired && shown && !popupLot) {
+        if (has2ndData) {
+          setPopupLot(lot.lotNo);
+        } else {
+          setShow2ndSamplingMap(prev => ({ ...prev, [lot.lotNo]: false }));
+        }
+      }
+    });
+  }, [lotStates, lotsData, popupLot, show2ndSamplingMap]);
+
+  /* Popup handlers */
+  const handlePopupYesKeep = () => {
+    if (!popupLot) return;
+    setShow2ndSamplingMap(prev => ({ ...prev, [popupLot]: false }));
+    setPopupLot(null);
+  };
+
+  const handlePopupNoDelete = () => {
+    if (!popupLot) return;
+    const lot = lotsData.find(l => l.lotNo === popupLot);
+    if (!lot) return;
+    setShow2ndSamplingMap(prev => ({ ...prev, [popupLot]: false }));
+    setLotStates(prev => ({
+      ...prev,
+      [popupLot]: { ...prev[popupLot], weight2nd: Array(lot.sampleSize2nd).fill('') }
+    }));
+    setPopupLot(null);
+  };
 
   /* Handle weight input change */
   const handleWeightChange = (lotNo, index, value, isSecond) => {
@@ -95,25 +164,16 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
       return !isNaN(num) && num < lot.minWeight;
     }).length;
 
-    const r2 = state.weight2nd.filter(v => {
+    const showSecond = !!show2ndSamplingMap[lot.lotNo];
+
+    const r2 = showSecond ? state.weight2nd.filter(v => {
       const num = parseFloat(v);
       return !isNaN(num) && num < lot.minWeight;
-    }).length;
+    }).length : 0;
 
     const total = r1 + r2;
-    const needSecond = r1 > lot.accpNo && r1 < lot.rejNo;
 
-    // Once 2nd sampling is triggered, keep it visible
-    if (needSecond && !state.show2ndTriggered) {
-      setLotStates(prev => ({
-        ...prev,
-        [lot.lotNo]: { ...prev[lot.lotNo], show2ndTriggered: true }
-      }));
-    }
-
-    const showSecond = state.show2ndTriggered || needSecond;
-
-    // Determine result
+    /* Determine result */
     let result = 'PENDING';
     let color = '#f59e0b';
     const hasInput = state.weight1st.some(v => v !== '');
@@ -135,8 +195,36 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
     return { r1, r2, total, showSecond, result, color };
   };
 
+  /* Get value status for color coding */
+  const getValueStatus = (v, minWeight) => {
+    if (!v) return '';
+    const num = parseFloat(v);
+    return !isNaN(num) && num >= minWeight ? 'pass' : 'fail';
+  };
+
   return (
     <div className="wt-container">
+      {/* Popup for 2nd Sampling */}
+      {popupLot && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <p>
+              2nd Sampling is no longer required.
+              <br />
+              Do you want to hide it?
+            </p>
+            <div className="popup-actions">
+              <button className="popup-btn" onClick={handlePopupNoDelete}>
+                No (Clear & Hide)
+              </button>
+              <button className="popup-btn primary" onClick={handlePopupYesKeep}>
+                Yes (Hide Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="wt-header">
         <div>
@@ -153,8 +241,22 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
       {lotsData.map(lot => {
         const state = lotStates[lot.lotNo];
         const summary = getSummary(lot);
-        const currentPage1 = page1st[lot.lotNo] || 0;
-        const currentPage2 = page2nd[lot.lotNo] || 0;
+
+        /* Pagination values for 1st sampling */
+        const rows = rowsPerPageMap[lot.lotNo] || defaultRows;
+        const page = pageMap[lot.lotNo] || 0;
+        const start = page * rows;
+        const end = Math.min(start + rows, lot.sampleSize);
+        const paginated1 = state.weight1st.slice(start, end);
+        const totalPages = Math.ceil(lot.sampleSize / rows);
+
+        /* Pagination values for 2nd sampling */
+        const rows2 = rowsPerPageMap2[lot.lotNo] || defaultRows;
+        const page2 = pageMap2[lot.lotNo] || 0;
+        const start2 = page2 * rows2;
+        const end2 = Math.min(start2 + rows2, lot.sampleSize2nd);
+        const paginated2 = state.weight2nd.slice(start2, end2);
+        const totalPages2 = Math.ceil(lot.sampleSize2nd / rows2);
 
         return (
           <div key={lot.lotNo} className="wt-card">
@@ -174,7 +276,7 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
             {/* 1st Sampling */}
             <div className="wt-sampling-block">
               <div className="wt-sampling-header">
-                <div className="wt-sampling-title">1st Sampling – Weight (g)</div>
+                <div className="wt-sampling-title">1st Sampling – Weight (g) (n1: {lot.sampleSize})</div>
                 <ExcelImport
                   templateName={`${lot.lotNo}_Weight_1st`}
                   sampleSize={lot.sampleSize}
@@ -183,15 +285,18 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                 />
               </div>
               <div className="wt-input-grid">
-                {state.weight1st.slice(currentPage1 * PAGE_SIZE, (currentPage1 + 1) * PAGE_SIZE).map((val, idx) => {
-                  const actualIdx = currentPage1 * PAGE_SIZE + idx;
-                  const num = parseFloat(val);
-                  const status = val === '' ? '' : (isNaN(num) ? '' : (num >= lot.minWeight ? 'pass' : 'fail'));
+                {paginated1.map((val, idx) => {
+                  const actualIdx = start + idx;
+                  const status = getValueStatus(val, lot.minWeight);
                   return (
-                    <div key={actualIdx} className="wt-input-wrapper">
-                      <span className="wt-input-label">{actualIdx + 1}</span>
-                      <input type="number" step="0.1" className={`wt-input wt-input-sm ${status}`} value={val} onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, false)} />
-                    </div>
+                    <input
+                      key={actualIdx}
+                      type="number"
+                      step="0.1"
+                      className={`value-input ${status}`}
+                      value={val}
+                      onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, false)}
+                    />
                   );
                 })}
               </div>
@@ -200,21 +305,24 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                   <div className="wt-summary-item">Rejected (R1): <strong className="wt-r1">{summary.r1}</strong></div>
                   <div className="wt-summary-item">Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong></div>
                 </div>
-                {lot.sampleSize > PAGE_SIZE && (
-                  <div className="wt-pagination">
-                    <button className="wt-page-btn" disabled={currentPage1 === 0} onClick={() => setPage1st(p => ({ ...p, [lot.lotNo]: currentPage1 - 1 }))}>‹ Prev</button>
-                    <span className="wt-page-info">{currentPage1 * PAGE_SIZE + 1}–{Math.min((currentPage1 + 1) * PAGE_SIZE, lot.sampleSize)} of {lot.sampleSize}</span>
-                    <button className="wt-page-btn" disabled={(currentPage1 + 1) * PAGE_SIZE >= lot.sampleSize} onClick={() => setPage1st(p => ({ ...p, [lot.lotNo]: currentPage1 + 1 }))}>Next ›</button>
-                  </div>
-                )}
               </div>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                start={start}
+                end={end}
+                totalCount={lot.sampleSize}
+                rows={rows}
+                onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
+                onPageChange={(p) => setPageMap(prev => ({ ...prev, [lot.lotNo]: p }))}
+              />
             </div>
 
             {/* 2nd Sampling */}
             {summary.showSecond && (
               <div className="wt-sampling-block wt-sampling-second">
                 <div className="wt-sampling-header">
-                  <div className="wt-sampling-title">2nd Sampling – Weight (g)</div>
+                  <div className="wt-sampling-title">2nd Sampling – Weight (g) (n2: {lot.sampleSize2nd})</div>
                   <ExcelImport
                     templateName={`${lot.lotNo}_Weight_2nd`}
                     sampleSize={lot.sampleSize2nd}
@@ -223,15 +331,18 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                   />
                 </div>
                 <div className="wt-input-grid">
-                  {state.weight2nd.slice(currentPage2 * PAGE_SIZE, (currentPage2 + 1) * PAGE_SIZE).map((val, idx) => {
-                    const actualIdx = currentPage2 * PAGE_SIZE + idx;
-                    const num = parseFloat(val);
-                    const status = val === '' ? '' : (isNaN(num) ? '' : (num >= lot.minWeight ? 'pass' : 'fail'));
+                  {paginated2.map((val, idx) => {
+                    const actualIdx = start2 + idx;
+                    const status = getValueStatus(val, lot.minWeight);
                     return (
-                      <div key={actualIdx} className="wt-input-wrapper">
-                        <span className="wt-input-label">{actualIdx + 1}</span>
-                        <input type="number" step="0.1" className={`wt-input wt-input-sm ${status}`} value={val} onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, true)} />
-                      </div>
+                      <input
+                        key={actualIdx}
+                        type="number"
+                        step="0.1"
+                        className={`value-input ${status}`}
+                        value={val}
+                        onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, true)}
+                      />
                     );
                   })}
                 </div>
@@ -240,14 +351,17 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                     <div className="wt-summary-item">Rejected (R2): <strong className="wt-r2">{summary.r2}</strong></div>
                     <div className="wt-summary-item">Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'wt-fail' : 'wt-ok'}>{summary.total}</strong></div>
                   </div>
-                  {lot.sampleSize2nd > PAGE_SIZE && (
-                    <div className="wt-pagination">
-                      <button className="wt-page-btn" disabled={currentPage2 === 0} onClick={() => setPage2nd(p => ({ ...p, [lot.lotNo]: currentPage2 - 1 }))}>‹ Prev</button>
-                      <span className="wt-page-info">{currentPage2 * PAGE_SIZE + 1}–{Math.min((currentPage2 + 1) * PAGE_SIZE, lot.sampleSize2nd)} of {lot.sampleSize2nd}</span>
-                      <button className="wt-page-btn" disabled={(currentPage2 + 1) * PAGE_SIZE >= lot.sampleSize2nd} onClick={() => setPage2nd(p => ({ ...p, [lot.lotNo]: currentPage2 + 1 }))}>Next ›</button>
-                    </div>
-                  )}
                 </div>
+                <Pagination
+                  currentPage={page2}
+                  totalPages={totalPages2}
+                  start={start2}
+                  end={end2}
+                  totalCount={lot.sampleSize2nd}
+                  rows={rows2}
+                  onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows, true)}
+                  onPageChange={(p) => setPageMap2(prev => ({ ...prev, [lot.lotNo]: p }))}
+                />
               </div>
             )}
 

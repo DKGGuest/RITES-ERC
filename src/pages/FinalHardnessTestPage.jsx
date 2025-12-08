@@ -1,17 +1,22 @@
-import { useState, useMemo } from 'react';
-import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
-import ExcelImport from '../components/ExcelImport';
-import { getHardnessToeLoadAQL, calculateBagsForSampling } from '../utils/is2500Calculations';
+import { useState, useMemo, useEffect } from "react";
+import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
+import ExcelImport from "../components/ExcelImport";
+import Pagination from "../components/Pagination";
+import "./FinalHardnessTestPage.css";
+import {
+  getHardnessToeLoadAQL,
+  calculateBagsForSampling,
+} from "../utils/is2500Calculations";
 
-/* Lots Data - Auto-fetched from Pre-Inspection (Vendor Call) */
+/* Auto-fetched lots */
 const lotsFromPreInspection = [
-  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', lotSize: 500 },
-  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', lotSize: 800 },
-  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', lotSize: 1200 }
+  { lotNo: "LOT-001", heatNo: "HT-2025-A1", lotSize: 500 },
+  { lotNo: "LOT-002", heatNo: "HT-2025-A2", lotSize: 800 },
+  { lotNo: "LOT-003", heatNo: "HT-2025-B1", lotSize: 1200 },
 ];
 
 const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
-  /* Calculate AQL values for each lot based on Table 2 - Hardness & Toe Load */
+  /* --- LOT AQL Info --- */
   const availableLots = useMemo(() => {
     return lotsFromPreInspection.map((lot) => {
       const aql = getHardnessToeLoadAQL(lot.lotSize);
@@ -24,181 +29,205 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         rejNo: aql.re1,
         sample2Size: aql.n2,
         cummRejNo: aql.cummRej,
-        singleSampling: aql.useSingleSampling || false
+        singleSampling: aql.useSingleSampling || false,
       };
     });
   }, []);
 
-  /* Calculate Total Sample Size and Bags for Sampling */
-  const totalSampleSize = availableLots.reduce((sum, l) => sum + l.sampleSize, 0);
-  const bagsForSampling = calculateBagsForSampling(totalSampleSize);
+  /* --- Initial Hardness Data Storage --- */
   const [lotData, setLotData] = useState(
-    availableLots.reduce((acc, lot) => ({
-      ...acc,
-      [lot.lotNo]: {
-        hardness1st: Array(lot.sampleSize).fill(''),
-        hardness2nd: Array(lot.sampleSize).fill(''),
-        remarks: ''
-      }
-    }), {})
+    availableLots.reduce(
+      (acc, lot) => ({
+        ...acc,
+        [lot.lotNo]: {
+          hardness1st: Array(lot.sampleSize).fill(""),
+          hardness2nd: Array(lot.sample2Size).fill(""),
+          remarks: "",
+        },
+      }),
+      {}
+    )
   );
 
-  const getValueStatus = v => {
-    if (!v) return '';
-    const val = parseFloat(v);
-    return val >= 40 && val <= 44 ? 'pass' : 'fail';
+  /* ------------------------------
+     PAGINATION - ROWS HANDLER
+  ------------------------------ */
+
+  // Default rows per page = desktop: 20, mobile: 10
+  const isMobile = window.innerWidth < 768;
+  const defaultRows = isMobile ? 10 : 20;
+
+  // Store row count per lot (1st sampling)
+  const [rowsPerPageMap, setRowsPerPageMap] = useState({});
+  // Store page number per lot (1st sampling)
+  const [pageMap, setPageMap] = useState({});
+
+  // Same for 2nd sampling
+  const [rowsPerPageMap2, setRowsPerPageMap2] = useState({});
+  const [pageMap2, setPageMap2] = useState({});
+
+  const setRowsAndResetPage = (lotNo, value, second = false) => {
+    if (second) {
+      setRowsPerPageMap2((prev) => ({ ...prev, [lotNo]: value }));
+      setPageMap2((prev) => ({ ...prev, [lotNo]: 0 }));
+    } else {
+      setRowsPerPageMap((prev) => ({ ...prev, [lotNo]: value }));
+      setPageMap((prev) => ({ ...prev, [lotNo]: 0 }));
+    }
   };
 
+  /* ------------------------------
+     2ND SAMPLING LOGIC
+  ------------------------------ */
+  const [show2ndSamplingMap, setShow2ndSamplingMap] = useState({});
+  const [popupLot, setPopupLot] = useState(null);
+
+ useEffect(() => {
+  availableLots.forEach((lot) => {
+    const data = lotData[lot.lotNo];
+    if (!data) return;
+
+    const R1 = data.hardness1st.filter(
+      (v) => v && (parseFloat(v) < 40 || parseFloat(v) > 44)
+    ).length;
+
+    const AC = lot.accpNo;
+    const RE = lot.rejNo;
+
+    const secondRequired = R1 > AC && R1 < RE;
+    const secondNotRequired = R1 <= AC || R1 >= RE;
+
+    const shown = !!show2ndSamplingMap[lot.lotNo];
+
+    // Auto-open when required
+    if (secondRequired && !shown) {
+      setShow2ndSamplingMap((prev) => ({
+        ...prev,
+        [lot.lotNo]: true,
+      }));
+    }
+
+    // Check if any 2nd sampling value is entered
+    const has2ndData = data.hardness2nd.some((v) => v !== "");
+
+    // Auto-hide or popup when 2nd sampling becomes unnecessary
+    if (secondNotRequired && shown && !popupLot) {
+      if (has2ndData) {
+        // Show popup only if user had entered something
+        setPopupLot(lot.lotNo);
+      } else {
+        // Auto-hide silently (no popup)
+        setShow2ndSamplingMap((prev) => ({
+          ...prev,
+          [lot.lotNo]: false,
+        }));
+      }
+    }
+  });
+}, [lotData, availableLots, popupLot, show2ndSamplingMap]);
+ /* ------------------------------
+     INPUT HANDLERS
+  ------------------------------ */
+
   const handleHardnessChange = (lotNo, idx, value, is2nd = false) => {
-    setLotData(prev => {
+    setLotData((prev) => {
       const updated = { ...prev[lotNo] };
-      const arr = is2nd ? [...updated.hardness2nd] : [...updated.hardness1st];
+      const arr = is2nd
+        ? [...updated.hardness2nd]
+        : [...updated.hardness1st];
+
       arr[idx] = value;
-      if (is2nd) updated.hardness2nd = arr;
-      else updated.hardness1st = arr;
-      return { ...prev, [lotNo]: updated };
+
+      return {
+        ...prev,
+        [lotNo]: {
+          ...updated,
+          [is2nd ? "hardness2nd" : "hardness1st"]: arr,
+        },
+      };
     });
   };
 
-  const handleRemarkChange = (lotNo, val) => {
-    setLotData(prev => ({
-      ...prev,
-      [lotNo]: { ...prev[lotNo], remarks: val }
-    }));
-  };
-
-  /* Handle Excel import for hardness values */
-  const handleExcelImport = (lotNo, values, isSecond) => {
-    setLotData(prev => ({
+  const handleExcelImport = (lotNo, values, is2nd = false) => {
+    setLotData((prev) => ({
       ...prev,
       [lotNo]: {
         ...prev[lotNo],
-        [isSecond ? 'hardness2nd' : 'hardness1st']: values
-      }
+        [is2nd ? "hardness2nd" : "hardness1st"]: values,
+      },
     }));
   };
 
-  const styles = `
-    .lot-section {
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 24px;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    }
-    .lot-header {
-      background: #f1f5f9;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-weight: 600;
-      color: #1e293b;
-      margin-bottom: 12px;
-    }
-    .limit-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 13px;
-      color: #475569;
-      margin-bottom: 12px;
-    }
-    .values-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-      gap: 8px;
-    }
-    .value-input {
-      text-align: center;
-      width: 100%;
-      padding: 6px;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      font-size: 13px;
-      transition: 0.2s ease;
-    }
-    .value-input.pass {
-      border-color: #22c55e;
-      background: #f0fdf4;
-    }
-    .value-input.fail {
-      border-color: #ef4444;
-      background: #fef2f2;
-    }
-    .yellow-box {
-      background: #fef9c3;
-      border: 1px solid #fde047;
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 14px;
-    }
-    .stats {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      margin-top: 16px;
-    }
-    .stat {
-      flex: 1;
-      min-width: 120px;
-      text-align: center;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 10px;
-      transition: 0.2s ease;
-    }
-    .stat:hover {
-      transform: scale(1.02);
-    }
-    .stat-value {
-      font-size: 18px;
-      font-weight: 700;
-    }
-    .stat-label {
-      font-size: 11px;
-      color: #64748b;
-    }
-  `;
+  const getValueStatus = (v) => {
+    if (!v) return "";
+    const num = parseFloat(v);
+    return num >= 40 && num <= 44 ? "pass" : "fail";
+  };
+
+  /* ------------------------------
+     POPUP ACTIONS
+  ------------------------------ */
+
+  const handlePopupYesKeep = () => {
+    if (!popupLot) return;
+    setShow2ndSamplingMap((prev) => ({ ...prev, [popupLot]: false }));
+    setPopupLot(null);
+  };
+
+  const handlePopupNoDelete = () => {
+    if (!popupLot) return;
+    const lot = availableLots.find((l) => l.lotNo === popupLot);
+    if (!lot) return;
+
+    setShow2ndSamplingMap((prev) => ({ ...prev, [popupLot]: false }));
+
+    setLotData((prev) => ({
+      ...prev,
+      [popupLot]: {
+        ...prev[popupLot],
+        hardness2nd: Array(lot.sample2Size).fill(""),
+      },
+    }));
+
+    setPopupLot(null);
+  };
+
+  /* ------------------------------
+     COMPONENT RENDER
+  ------------------------------ */
 
   return (
-    <div>
-      <style>{styles}</style>
+    <div className="fh-page">
+      {/* Popup */}
+      {popupLot && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <p>
+              2nd Sampling is no longer required.
+              <br />
+              Do you want to hide it?
+            </p>
+            <div className="popup-actions">
+              <button className="popup-btn" onClick={handlePopupNoDelete}>
+                No (Clear & Hide)
+              </button>
+              <button className="popup-btn primary" onClick={handlePopupYesKeep}>
+                Yes (Hide Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
-      <div
-        className="page-header"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}
-      >
+      <div className="fh-header">
         <div>
           <h1>Hardness Test</h1>
-          <p>Final Product Inspection - IS 2500 Table 2 (Double Sampling for Hardness & Toe Load)</p>
+          <p>Final Product Inspection — IS 2500</p>
         </div>
         <button className="btn btn-outline" onClick={onBack}>
           ← Back
         </button>
-      </div>
-
-      {/* Sampling Summary */}
-      <div style={{
-        background: '#f0f9ff',
-        border: '1px solid #0ea5e9',
-        borderRadius: '8px',
-        padding: '12px 16px',
-        marginBottom: '16px',
-        display: 'flex',
-        gap: '24px',
-        flexWrap: 'wrap',
-        fontSize: '14px'
-      }}>
-        <span><strong>Total Sample Size:</strong> {totalSampleSize}</span>
-        <span><strong>Bags for Sampling:</strong> {bagsForSampling}</span>
       </div>
 
       <FinalSubmoduleNav
@@ -206,201 +235,197 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         onNavigate={onNavigateSubmodule}
       />
 
-      {availableLots.map(lot => {
+      {/* LOT LOOP */}
+      {availableLots.map((lot) => {
         const data = lotData[lot.lotNo];
-        const rejected1st = data.hardness1st.filter(v => v && (v < 40 || v > 44)).length;
-        /* Show 2nd sampling when rejected >= Re1 (not >) */
-        const show2ndSampling = !lot.singleSampling && rejected1st >= lot.rejNo;
-        const rejected2nd = data.hardness2nd.filter(v => v && (v < 40 || v > 44)).length;
-        const totalRejected = rejected1st + rejected2nd;
+        const R1 = data.hardness1st.filter(
+          (v) => v && (v < 40 || v > 44)
+        ).length;
+        const R2 = data.hardness2nd.filter(
+          (v) => v && (v < 40 || v > 44)
+        ).length;
 
-        /* Result logic based on IS 2500 Double Sampling */
-        let result;
-        if (rejected1st <= lot.accpNo) {
-          result = { status: 'OK', color: '#22c55e' };
-        } else if (rejected1st > lot.accpNo && rejected1st < lot.rejNo) {
-          /* Need 2nd sampling - check cumulative */
-          if (totalRejected <= lot.cummRejNo) {
-            result = { status: 'OK', color: '#22c55e' };
-          } else {
-            result = { status: 'NOT OK', color: '#ef4444' };
-          }
-        } else if (rejected1st >= lot.rejNo) {
-          /* After 2nd sampling, check cumulative */
-          if (show2ndSampling && totalRejected <= lot.cummRejNo) {
-            result = { status: 'OK', color: '#22c55e' };
-          } else if (show2ndSampling && totalRejected > lot.cummRejNo) {
-            result = { status: 'NOT OK', color: '#ef4444' };
-          } else {
-            result = { status: 'Pending', color: '#f59e0b' };
-          }
-        } else {
-          result = { status: 'Pending', color: '#f59e0b' };
-        }
+        const totalRejected = R1 + R2;
+        const show2ndSampling = !!show2ndSamplingMap[lot.lotNo];
+
+        /* ------------------------------
+           PAGINATION VALUES (1st sampling)
+        ------------------------------ */
+        const rows = rowsPerPageMap[lot.lotNo] || defaultRows;
+        const page = pageMap[lot.lotNo] || 0;
+
+        const start = page * rows;
+        const end = Math.min(start + rows, lot.sampleSize);
+
+        const paginated1 = data.hardness1st.slice(start, end);
+
+        const totalPages = Math.ceil(lot.sampleSize / rows);
+
+        /* ------------------------------
+           PAGINATION VALUES (2nd sampling)
+        ------------------------------ */
+        const rows2 = rowsPerPageMap2[lot.lotNo] || defaultRows;
+        const page2 = pageMap2[lot.lotNo] || 0;
+
+        const start2 = page2 * rows2;
+        const end2 = Math.min(start2 + rows2, lot.sample2Size);
+
+        const paginated2 = data.hardness2nd.slice(start2, end2);
+        const totalPages2 = Math.ceil(lot.sample2Size / rows2);
 
         return (
           <div key={lot.lotNo} className="lot-section">
             <div className="lot-header">
-              📦 Lot: {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.quantity} | Sample Size: {lot.sampleSize}
+              📦 {lot.lotNo} | Heat {lot.heatNo} | Qty {lot.quantity}
             </div>
 
             <div className="limit-box">
-              Ac1: <strong>{lot.accpNo}</strong> | Re1:{' '}
-              <strong>{lot.rejNo}</strong> | Cumm. Rej No:{' '}
-              <strong>{lot.cummRejNo}</strong>
-              {lot.singleSampling && <span style={{ marginLeft: '12px', color: '#f59e0b' }}>(Single Sampling)</span>}
+              Ac1: <b>{lot.accpNo}</b> | Re1: <b>{lot.rejNo}</b> | Cumm:{" "}
+              <b>{lot.cummRejNo}</b>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-              <div>
-                <h4 style={{ marginBottom: '4px' }}>💎 Hardness Test (1st Sampling - n1: {lot.sampleSize})</h4>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
-                  Acceptable Range: 40 - 44 HRC
-                </p>
-              </div>
+            {/* FIRST SAMPLING */}
+            <div className="sampling-header">
+              <h3>1st Sampling (n1: {lot.sampleSize})</h3>
+
               <ExcelImport
                 templateName={`${lot.lotNo}_Hardness_1st`}
                 sampleSize={lot.sampleSize}
-                valueLabel="Hardness (HRC)"
-                onImport={(values) => handleExcelImport(lot.lotNo, values, false)}
+                valueLabel="Hardness"
+                onImport={(values) =>
+                  handleExcelImport(lot.lotNo, values, false)
+                }
               />
             </div>
 
             <div className="values-grid">
-              {data.hardness1st.map((val, i) => (
+              {paginated1.map((val, i) => (
                 <input
                   key={i}
                   type="number"
                   step="0.1"
                   className={`value-input ${getValueStatus(val)}`}
                   value={val}
-                  onChange={e => handleHardnessChange(lot.lotNo, i, e.target.value)}
-                  placeholder=""
+                  onChange={(e) =>
+                    handleHardnessChange(lot.lotNo, start + i, e.target.value)
+                  }
                 />
               ))}
             </div>
 
+           <Pagination
+             currentPage={page}
+             totalPages={totalPages}
+             start={start}
+             end={end}
+             totalCount={lot.sampleSize}
+             rows={rows}
+             onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
+             onPageChange={(p) =>
+             setPageMap((prev) => ({ ...prev, [lot.lotNo]: p }))
+             }
+           />
+
+            {/* SECOND SAMPLING */}
             {show2ndSampling && (
-              <div className="yellow-box">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                  <h4 style={{ fontSize: '13px', margin: 0 }}>
-                    ⚠️ 2nd Sampling Required (R1 = {rejected1st} ≥ Re1 {lot.rejNo}) - n2: {lot.sample2Size}
-                  </h4>
+              <>
+                <div className="sampling-header yellow-bg">
+                  <h3>⚠️ 2nd Sampling (n2: {lot.sample2Size})</h3>
                   <ExcelImport
                     templateName={`${lot.lotNo}_Hardness_2nd`}
                     sampleSize={lot.sample2Size}
-                    valueLabel="Hardness (HRC)"
-                    onImport={(values) => handleExcelImport(lot.lotNo, values, true)}
+                    valueLabel="Hardness"
+                    onImport={(values) =>
+                      handleExcelImport(lot.lotNo, values, true)
+                    }
                   />
                 </div>
+
                 <div className="values-grid">
-                  {data.hardness2nd.map((val, i) => (
+                  {paginated2.map((val, i) => (
                     <input
                       key={i}
                       type="number"
                       step="0.1"
                       className={`value-input ${getValueStatus(val)}`}
                       value={val}
-                      onChange={e =>
-                        handleHardnessChange(lot.lotNo, i, e.target.value, true)
+                      onChange={(e) =>
+                        handleHardnessChange(
+                          lot.lotNo,
+                          start2 + i,
+                          e.target.value,
+                          true
+                        )
                       }
-                      placeholder=""
                     />
                   ))}
                 </div>
-              </div>
+
+          <Pagination
+               currentPage={page2}
+               totalPages={totalPages2}
+               start={start2}
+               end={end2}
+               totalCount={lot.sample2Size}
+               rows={rows2}
+               onRowsChange={(newRows) =>
+                 setRowsAndResetPage(lot.lotNo, newRows, true)
+               }
+               onPageChange={(p) =>
+                 setPageMap2((prev) => ({ ...prev, [lot.lotNo]: p }))
+               }
+             />
+
+              </>
             )}
 
-            {/* Stats Section */}
+            {/* STATISTICS */}
             <div className="stats">
               <div className="stat">
-                <div className="stat-value">{rejected1st}</div>
-                <div className="stat-label">Rejected (R1)</div>
+                <div className="stat-value">{R1}</div>
+                <div className="stat-label">Rejected R1</div>
               </div>
 
               {show2ndSampling && (
                 <div className="stat">
-                  <div className="stat-value">{rejected2nd}</div>
-                  <div className="stat-label">Rejected (R2)</div>
+                  <div className="stat-value">{R2}</div>
+                  <div className="stat-label">Rejected R2</div>
                 </div>
               )}
 
               <div className="stat">
                 <div className="stat-value">{totalRejected}</div>
-                <div className="stat-label">Total Rejected (R1+R2)</div>
-              </div>
-
-              <div
-                className="stat"
-                style={{
-                  borderColor: result.color,
-                  color: result.color,
-                  background: result.color + '10'
-                }}
-              >
-                <div
-                  className="stat-value"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  {result.status === 'OK' && <span>✅</span>}
-                  {result.status === 'NOT OK' && <span>❌</span>}
-                  {result.status === 'Pending' && <span>⏳</span>}
-                  {result.status}
-                </div>
-                <div className="stat-label">Result</div>
+                <div className="stat-label">Total Rejected</div>
               </div>
             </div>
 
-            {/* Remarks */}
-            <div style={{ marginTop: '12px' }}>
-              <label
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#475569'
-                }}
-              >
-                Remarks
-              </label>
-              <textarea
-                rows="2"
-                style={{
-                  width: '100%',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  padding: '8px',
-                  fontSize: '13px',
-                  marginTop: '4px'
-                }}
-                value={data.remarks}
-                onChange={e => handleRemarkChange(lot.lotNo, e.target.value)}
-                placeholder="Enter remarks..."
-              />
-            </div>
+            {/* REMARKS */}
+            <textarea
+              className="remarks-box"
+              placeholder="Enter remarks..."
+              value={data.remarks}
+              onChange={(e) =>
+                setLotData((prev) => ({
+                  ...prev,
+                  [lot.lotNo]: {
+                    ...prev[lot.lotNo],
+                    remarks: e.target.value,
+                  },
+                }))
+              }
+            />
           </div>
         );
       })}
 
       {/* Bottom Buttons */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          marginTop: '20px',
-          gap: '10px'
-        }}
-      >
+      <div className="bottom-actions">
         <button className="btn btn-outline" onClick={onBack}>
           Cancel
         </button>
         <button
           className="btn btn-primary"
-          onClick={() => alert('Hardness Test data saved!')}
+          onClick={() => alert("Saved!")}
         >
           Save & Continue
         </button>

@@ -45,6 +45,32 @@
 .ad-lot-meta { font-size: 13px; color: #64748b; }
 .ad-lot-sample { font-size: 13px; color: #475569; }
 
+/* Test Info Row */
+.ad-test-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.ad-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ad-info-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+.ad-info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
 /* Sampling Block */
 .ad-sampling-block {
   background: #f8fafc;
@@ -57,7 +83,41 @@
 .ad-sampling-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 .ad-sampling-title { font-size: 14px; font-weight: 600; color: #1e293b; }
 
-/* Input Grid */
+/* Simplified Input Row */
+.ad-simple-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.ad-simple-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+.ad-input-r1, .ad-input-r2 {
+  width: 200px;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 12px;
+}
+.ad-simple-input-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #475569;
+  padding: 10px 0;
+}
+.ad-simple-input-info span {
+  background: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Input Grid - kept for potential future use */
 .ad-input-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
@@ -126,6 +186,7 @@
 /* RESPONSIVE */
 @media (max-width: 1024px) {
   .ad-input-grid { grid-template-columns: repeat(8, 1fr); }
+  .ad-test-info { gap: 12px; }
 }
 @media (max-width: 768px) {
   .ad-header { flex-direction: column; align-items: flex-start; gap: 12px; }
@@ -136,7 +197,14 @@
   .ad-pagination { width: 100%; justify-content: center; }
   .ad-actions { flex-direction: column-reverse; }
   .ad-btn { width: 100%; }
+  .ad-simple-input-row { flex-direction: column; gap: 16px; }
+  .ad-simple-input-group { width: 100%; min-width: unset; }
+  .ad-input-r1, .ad-input-r2 { width: 100%; }
+  .ad-simple-input-info { gap: 8px; }
+  .ad-test-info { gap: 8px; }
+  .ad-info-item { flex: 1 1 45%; }
 }
 @media (max-width: 480px) {
   .ad-input-grid { grid-template-columns: repeat(4, 1fr); }
+  .ad-info-item { flex: 1 1 100%; }
 }

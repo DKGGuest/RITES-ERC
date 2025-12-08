@@ -1,3 +1,5 @@
+
+/* Grid - Desktop 4 cols, Tablet 2, Mobile 1 */
 /* ----------------------------------------------
    FINAL PRODUCT DASHBOARD — CLEAN CSS
    ---------------------------------------------- */
@@ -48,8 +50,6 @@
   align-items: center;
   gap: 8px;
 }
-
-/* Grid - Desktop 4 cols, Tablet 2, Mobile 1 */
 .fp-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -408,9 +408,45 @@ select.fp-input {
   margin-top: 16px;
 }
 
+/* Checkbox Group */
+.fp-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.fp-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+}
+.fp-checkbox-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #0ea5e9;
+}
+
+/* Cumulative Results Grid */
+.fp-cumulative-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.fp-cumulative-grid .fp-input {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
 /* ===== RESPONSIVE - TABLET (1024px) ===== */
 @media (max-width: 1024px) {
   .fp-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fp-cumulative-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .fp-submodule-grid {
@@ -518,6 +554,10 @@ select.fp-input {
     font-size: 15px;
   }
   .fp-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .fp-cumulative-grid {
     grid-template-columns: 1fr;
     gap: 10px;
   }

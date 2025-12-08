@@ -1,0 +1,138 @@
+/* ---------------------------------------------------------
+   DESKTOP VERSION - UNCHANGED
+--------------------------------------------------------- */
+.chem-page {
+  padding: 20px;
+}
+
+.chem-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.chem-section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.chem-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.chem-label-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-left: 120px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.chem-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.chem-row-label {
+  width: 120px;
+  font-size: 14px;
+  font-weight: 600;
+  padding-top: 6px;
+}
+
+.chem-input-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.ladle-value {
+  padding: 10px;
+  background: #f1f5f9;
+  border: 1px solid #d0d7df;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.product-input {
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.remarks-input {
+  width: 100%;
+  min-height: 70px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+}
+
+.chem-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+/* ---------------------------------------------------------
+   MOBILE VERSION – TRUE FIELD-BY-FIELD STACK
+--------------------------------------------------------- */
+@media (max-width: 480px) {
+
+  /* Hide desktop grids */
+  .chem-label-grid,
+  .desktop-fields {
+    display: none !important;
+  }
+
+  /* Mobile container */
+  .mobile-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* Each field block */
+  .mobile-field-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .mobile-field-label {
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .mobile-ladle {
+    width: 100% !important;
+  }
+
+  .mobile-product {
+    width: 100% !important;
+  }
+
+  /* Stack main rows */
+  .chem-row {
+    flex-direction: column !important;
+  }
+
+  .chem-row-label {
+    width: 100% !important;
+  }
+
+  .remarks-input {
+    width: 100% !important;
+  }
+}
