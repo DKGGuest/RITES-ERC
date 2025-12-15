@@ -899,9 +899,12 @@ body {
   justify-content: space-between;
   align-items: center;
   box-shadow: var(--shadow-sm);
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
+  width: 100%;
   /* Ensure header sticks on all devices */
   -webkit-sticky: sticky;
 }
@@ -948,9 +951,10 @@ body {
 /* Main Layout */
 .app-container {
   display: flex;
-  min-height: calc(100vh - 65px);
+  min-height: 100vh;
   transition: all var(--duration-normal) var(--ease-standard);
   overflow: visible;
+  padding-top: 70px; /* Adjust to header height */
 }
 
 .sidebar {

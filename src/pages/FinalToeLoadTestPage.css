@@ -233,29 +233,60 @@
   color: #dc2626;
 }
 
-/* Final Row (Result + Remarks) */
+/* ========= Compact Summary Row ========= */
+.tlp-compact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.tlp-summary-item {
+  background: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.tlp-result-box.small {
+  padding: 6px 18px;
+  border-width: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Final Row - Remarks Only */
 .tlp-final-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
 }
-.tlp-final-result {
+.tlp-remarks-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+.tlp-remarks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
 .tlp-result-box {
-  padding: 10px 16px;
+  padding: 8px 20px;
   border: 2px solid;
   border-radius: 8px;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 15px;
   text-align: center;
-  display: inline-block;
-  width: fit-content;
+  white-space: nowrap;
 }
 .tlp-result-note {
   font-size: 11px;
@@ -273,11 +304,6 @@
 .tlp-note-fail {
   color: #dc2626;
   font-weight: 600;
-}
-.tlp-remarks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 .tlp-textarea {
   resize: vertical;
@@ -332,24 +358,103 @@
 .value-input.pass { background: #dcfce7; border-color: #22c55e; }
 .value-input.fail { background: #fee2e2; border-color: #ef4444; }
 
+/* RESPONSIVE */
 @media (max-width: 1024px) {
   .tlp-input-grid { grid-template-columns: repeat(8, 1fr); }
+  .tlp-lot-sample { font-size: 12px; }
 }
+
 @media (max-width: 768px) {
+  /* Header */
+  .tlp-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .tlp-title { font-size: 18px; }
+  .tlp-subtitle { font-size: 12px; }
+
+  /* Lot Header */
+  .tlp-lot-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .tlp-lot-info {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .tlp-lot-sample {
+    width: 100%;
+    font-size: 12px;
+  }
+
+  /* Grid & Table */
   .tlp-table { min-width: 700px; }
-  .tlp-actions { flex-direction:column-reverse; }
-  .tlp-btn { width:100%; }
   .tlp-grid { grid-template-columns: 1fr 1fr; }
-  .tlp-final-row { grid-template-columns: 1fr; }
-  .tlp-input-grid { grid-template-columns: repeat(5, 1fr); gap: 10px 12px; }
+  .tlp-input-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px 12px;
+  }
   .tlp-input-grid .tlp-input { max-width: 100%; }
-  .tlp-header { flex-direction: column; align-items: flex-start; }
-  .tlp-summary-row { flex-direction: column; gap: 10px; }
-  .tlp-pagination { width: 100%; justify-content: center; }
+  .tlp-input-label { font-size: 10px; }
+
+  /* Sampling */
+  .tlp-sampling-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .tlp-sampling-title { font-size: 13px; }
+
+  /* Summary */
+  .tlp-summary-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .tlp-compact-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .tlp-summary-item {
+    width: 100%;
+    font-size: 12px;
+  }
+  .tlp-result-box.small {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Pagination */
+  .tlp-pagination {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Actions */
+  .tlp-actions {
+    flex-direction: column-reverse;
+  }
+  .tlp-btn {
+    width: 100%;
+  }
 }
+
 @media (max-width: 480px) {
+  .tlp-page { padding: 12px; }
+  .tlp-card { padding: 12px; }
+  .tlp-title { font-size: 16px; }
   .tlp-table { min-width: 600px; }
   .tlp-grid { grid-template-columns: 1fr; }
   .tlp-stats { flex-direction: column; }
-  .tlp-input-grid { grid-template-columns: repeat(4, 1fr); }
+  .tlp-input-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px 10px;
+  }
+  .tlp-lot-badge { font-size: 13px; }
+  .tlp-lot-meta { font-size: 12px; }
+  .tlp-sampling-block { padding: 12px; }
+  .tlp-summary-item { font-size: 11px; padding: 5px 10px; }
 }

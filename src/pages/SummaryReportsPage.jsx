@@ -4,10 +4,10 @@ const SummaryReportsPage = ({ onBack }) => {
   return (
     <div className="summary-page-container">
       <div className="summary-page-header">
+        <h1 className="summary-page-title">📊 Summary and Reports</h1>
         <button className="summary-back-btn" onClick={onBack}>
           ← Back to Sub Module Session
         </button>
-        <h1 className="summary-page-title">📊 Summary and Reports</h1>
       </div>
 
       <div className="card">

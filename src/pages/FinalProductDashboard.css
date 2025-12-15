@@ -1,3 +1,9 @@
+/* Force consistent input and textarea font size */
+.fp-input,
+select.fp-input,
+.fp-textarea {
+  font-size: 14px !important;
+}
 
 /* Grid - Desktop 4 cols, Tablet 2, Mobile 1 */
 /* ----------------------------------------------
@@ -14,7 +20,7 @@
 .fp-breadcrumb {
   font-size: 13px;
   margin-bottom: 16px;
-  color: #475569;
+  color: #475569; 
 }
 .fp-link {
   color: #0ea5e9;

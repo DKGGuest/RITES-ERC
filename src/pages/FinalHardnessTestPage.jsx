@@ -248,6 +248,25 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         const totalRejected = R1 + R2;
         const show2ndSampling = !!show2ndSamplingMap[lot.lotNo];
 
+        /* Calculate result status */
+        let result = 'PENDING';
+        let color = '#f59e0b';
+        const hasInput = data.hardness1st.some(v => v !== '');
+
+        if (hasInput) {
+          if (R1 <= lot.accpNo) {
+            result = 'OK'; color = '#16a34a';
+          } else if (R1 >= lot.rejNo) {
+            result = 'NOT OK'; color = '#dc2626';
+          } else if (show2ndSampling) {
+            if (totalRejected < lot.cummRejNo) {
+              result = 'OK'; color = '#16a34a';
+            } else if (totalRejected >= lot.cummRejNo) {
+              result = 'NOT OK'; color = '#dc2626';
+            }
+          }
+        }
+
         /* ------------------------------
            PAGINATION VALUES (1st sampling)
         ------------------------------ */
@@ -299,32 +318,48 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
             </div>
 
             <div className="values-grid">
-              {paginated1.map((val, i) => (
-                <input
-                  key={i}
-                  type="number"
-                  step="0.1"
-                  className={`value-input ${getValueStatus(val)}`}
-                  value={val}
-                  onChange={(e) =>
-                    handleHardnessChange(lot.lotNo, start + i, e.target.value)
-                  }
-                />
-              ))}
+              {paginated1.map((val, i) => {
+                const actualIdx = start + i;
+                const status = getValueStatus(val);
+                return (
+                  <div key={actualIdx} className="input-wrapper">
+                    <label className="input-label">#{actualIdx + 1}</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className={`value-input ${status}`}
+                      value={val}
+                      onChange={(e) =>
+                        handleHardnessChange(lot.lotNo, actualIdx, e.target.value)
+                      }
+                      placeholder="0.0"
+                    />
+                  </div>
+                );
+              })}
             </div>
 
-           <Pagination
-             currentPage={page}
-             totalPages={totalPages}
-             start={start}
-             end={end}
-             totalCount={lot.sampleSize}
-             rows={rows}
-             onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
-             onPageChange={(p) =>
-             setPageMap((prev) => ({ ...prev, [lot.lotNo]: p }))
-             }
-           />
+            <div className="compact-row">
+              <div className="summary-item">
+                Rejected (R1): <strong className="r1-value">{R1}</strong>
+              </div>
+              <div className="summary-item">
+                Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong>
+              </div>
+              <div className="result-box small" style={{ borderColor: color, color: color }}>{result}</div>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                start={start}
+                end={end}
+                totalCount={lot.sampleSize}
+                rows={rows}
+                onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
+                onPageChange={(p) =>
+                setPageMap((prev) => ({ ...prev, [lot.lotNo]: p }))
+                }
+              />
+            </div>
 
             {/* SECOND SAMPLING */}
             {show2ndSampling && (
@@ -342,78 +377,80 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
                 </div>
 
                 <div className="values-grid">
-                  {paginated2.map((val, i) => (
-                    <input
-                      key={i}
-                      type="number"
-                      step="0.1"
-                      className={`value-input ${getValueStatus(val)}`}
-                      value={val}
-                      onChange={(e) =>
-                        handleHardnessChange(
-                          lot.lotNo,
-                          start2 + i,
-                          e.target.value,
-                          true
-                        )
-                      }
-                    />
-                  ))}
+                  {paginated2.map((val, i) => {
+                    const actualIdx = start2 + i;
+                    const status = getValueStatus(val);
+                    return (
+                      <div key={actualIdx} className="input-wrapper">
+                        <label className="input-label">#{actualIdx + 1}</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className={`value-input ${status}`}
+                          value={val}
+                          onChange={(e) =>
+                            handleHardnessChange(
+                              lot.lotNo,
+                              actualIdx,
+                              e.target.value,
+                              true
+                            )
+                          }
+                          placeholder="0.0"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
 
-          <Pagination
-               currentPage={page2}
-               totalPages={totalPages2}
-               start={start2}
-               end={end2}
-               totalCount={lot.sample2Size}
-               rows={rows2}
-               onRowsChange={(newRows) =>
-                 setRowsAndResetPage(lot.lotNo, newRows, true)
-               }
-               onPageChange={(p) =>
-                 setPageMap2((prev) => ({ ...prev, [lot.lotNo]: p }))
-               }
-             />
+                <div className="compact-row">
+                  <div className="summary-item">
+                    Rejected (R2): <strong className="r2-value">{R2}</strong>
+                  </div>
+                  <div className="summary-item">
+                    Total (R1 + R2): <strong className={totalRejected >= lot.cummRejNo ? 'fail-value' : 'ok-value'}>{totalRejected}</strong>
+                  </div>
+                  <div className="result-box small" style={{ borderColor: color, color: color }}>{result}</div>
+                  <Pagination
+                    currentPage={page2}
+                    totalPages={totalPages2}
+                    start={start2}
+                    end={end2}
+                    totalCount={lot.sample2Size}
+                    rows={rows2}
+                    onRowsChange={(newRows) =>
+                      setRowsAndResetPage(lot.lotNo, newRows, true)
+                    }
+                    onPageChange={(p) =>
+                      setPageMap2((prev) => ({ ...prev, [lot.lotNo]: p }))
+                    }
+                  />
+                </div>
 
               </>
             )}
 
-            {/* STATISTICS */}
-            <div className="stats">
-              <div className="stat">
-                <div className="stat-value">{R1}</div>
-                <div className="stat-label">Rejected R1</div>
-              </div>
-
-              {show2ndSampling && (
-                <div className="stat">
-                  <div className="stat-value">{R2}</div>
-                  <div className="stat-label">Rejected R2</div>
-                </div>
-              )}
-
-              <div className="stat">
-                <div className="stat-value">{totalRejected}</div>
-                <div className="stat-label">Total Rejected</div>
+            {/* REMARKS */}
+            <div className="final-row">
+              <div className="remarks-section">
+                <label className="label">Remarks</label>
+                <textarea
+                  className="remarks-box"
+                  rows="3"
+                  placeholder="Enter remarks..."
+                  value={data.remarks}
+                  onChange={(e) =>
+                    setLotData((prev) => ({
+                      ...prev,
+                      [lot.lotNo]: {
+                        ...prev[lot.lotNo],
+                        remarks: e.target.value,
+                      },
+                    }))
+                  }
+                />
               </div>
             </div>
-
-            {/* REMARKS */}
-            <textarea
-              className="remarks-box"
-              placeholder="Enter remarks..."
-              value={data.remarks}
-              onChange={(e) =>
-                setLotData((prev) => ({
-                  ...prev,
-                  [lot.lotNo]: {
-                    ...prev[lot.lotNo],
-                    remarks: e.target.value,
-                  },
-                }))
-              }
-            />
           </div>
         );
       })}

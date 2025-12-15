@@ -104,14 +104,7 @@ const AVAILABLE_INSPECTION_CALLS = [
   { callNo: 'CALL-2025-005', poNo: 'PO-2025-1005', materialICs: ['RM-IC-001'], productType: 'MK-III' },
 ];
 
-// Mock data for Raw Material IC Numbers from previous stage
-const AVAILABLE_RAW_MATERIAL_ICS = [
-  { id: 'RM-IC-001', label: 'RM-IC-001' },
-  { id: 'RM-IC-002', label: 'RM-IC-002' },
-  { id: 'RM-IC-003', label: 'RM-IC-003' },
-  { id: 'RM-IC-004', label: 'RM-IC-004' },
-  { id: 'RM-IC-005', label: 'RM-IC-005' },
-];
+
 
 const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, showSectionA = true, showSectionB = true }) => {
   const poData = MOCK_PO_DATA[call.po_no] || {};
@@ -149,14 +142,6 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     }
   }, [call, formData.productionLines, onFormDataChange]);
 
-
-  const getOfferedQtyStatus = () => {
-    if (formData.offeredQty < call.call_qty) return { type: 'error', message: 'Not allowed - Offered Qty cannot be less than Call Qty' };
-    if (formData.offeredQty === call.call_qty) return { type: 'success', message: 'Allowed - Quantities match' };
-    if (formData.offeredQty > call.call_qty) return { type: 'warning', message: 'Requires CM approval - Offered Qty exceeds Call Qty' };
-  };
-
-  const offeredQtyStatus = getOfferedQtyStatus();
 
   /* Auto-expand next section when current section is verified */
   const handleSectionAVerify = (checked) => {
@@ -236,28 +221,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     onFormDataChange({ productionLines: updated });
   };
 
-  // Handle multi-select for Raw Material ICs
-  // eslint-disable-next-line no-unused-vars
-  const handleRawMaterialICToggle = (lineIndex, icId) => {
-    const line = formData.productionLines[lineIndex];
-    const currentICs = line.rawMaterialICs || [];
-    const newICs = currentICs.includes(icId)
-      ? currentICs.filter(id => id !== icId)
-      : [...currentICs, icId];
-    updateProductionLine(lineIndex, 'rawMaterialICs', newICs);
-  };
-
-  // Validate production line fields
-  // eslint-disable-next-line no-unused-vars
-  const validateProductionLine = (line, _index) => {
-    const errors = {};
-    if (!line.icNumber) errors.icNumber = 'Required';
-    if (!line.rawMaterialICs || line.rawMaterialICs.length === 0) errors.rawMaterialICs = 'Required';
-    if (!line.productType) errors.productType = 'Required';
-    return errors;
-  };
-
-  // Check if field has error
+  // Check if field has error (for IC Number validation only)
   const hasError = (lineIndex, field) => {
     return productionLineErrors[lineIndex]?.[field];
   };
@@ -447,15 +411,15 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             <input type="text" className="form-input" value={call.call_qty} disabled />
           </div>
           <div className="form-group">
-            <label className="form-label required">Offered Qty</label>
+            <label className="form-label">Offered Qty</label>
             <input
-              type="number"
-              className={`form-input ${offeredQtyStatus.type === 'error' ? 'error' : ''}`}
+              type="text"
+              className="form-input"
               value={formData.offeredQty}
-              onChange={(e) => onFormDataChange({ offeredQty: Number(e.target.value) })}
+              disabled
             />
-            <div className={`form-${offeredQtyStatus.type === 'success' ? 'success' : offeredQtyStatus.type === 'error' ? 'error' : 'warning'}`} style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-4)', color: offeredQtyStatus.type === 'success' ? 'var(--color-success)' : offeredQtyStatus.type === 'error' ? 'var(--color-error)' : 'var(--color-warning)' }}>
-              {offeredQtyStatus.type === 'success' ? '✓' : offeredQtyStatus.type === 'error' ? '✗' : '⚠'} {offeredQtyStatus.message}
+            <div style={{ fontSize: 'var(--font-size-sm)', marginTop: 'var(--space-4)', color: 'var(--color-text-secondary)' }}>
+              Offered Qty as requested by Vendor
             </div>
           </div>
           {formData.offeredQty > call.call_qty && (
@@ -647,8 +611,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                     <th>Inspection Call Number <span style={{ color: '#ef4444' }}>*</span></th>
                     <th>PO Number</th>
                     <th>Raw Material</th>
-                    <th>Raw Material IC Number(s) <span style={{ color: '#ef4444' }}>*</span></th>
-                    <th>Product Type <span style={{ color: '#ef4444' }}>*</span></th>
+                    <th>Raw Material IC Number(s)</th>
+                    <th>Product Type</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -726,62 +690,35 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                       </td>
 
 
-                      {/* Raw Material IC Number(s) - Required Multi-Select Dropdown */}
-                      <td style={{ overflow: 'visible', position: 'relative' }}>
-                        <div style={{ position: 'relative' }}>
-                          <select
-                            multiple
+                      {/* Raw Material IC Number(s) - Auto-fetched based on vendor call (readonly) */}
+                      <td>
+                        <div>
+                          <input
+                            type="text"
                             className="form-input"
-                            value={line.rawMaterialICs || []}
-                            onChange={(e) => {
-                              const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                              updateProductionLine(idx, 'rawMaterialICs', selectedOptions);
-                            }}
-                            style={{
-
-
-
-                              minWidth: '180px',
-                              minHeight: '80px',
-                              padding: '8px',
-                              border: hasError(idx, 'rawMaterialICs') ? '2px solid #ef4444' : '1px solid #d1d5db',
-                              borderRadius: '6px',
-                              backgroundColor: hasError(idx, 'rawMaterialICs') ? '#fef2f2' : '#fff',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {AVAILABLE_RAW_MATERIAL_ICS.map(ic => (
-                              <option key={ic.id} value={ic.id}>{ic.label}</option>
-                            ))}
-                          </select>
-                          <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
-                            Hold Ctrl/Cmd to select multiple
-                          </div>
-                          {hasError(idx, 'rawMaterialICs') && (
-                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>⚠ Required</span>
-                          )}
+                            value={(line.rawMaterialICs || []).join(', ') || '-'}
+                            disabled
+                            style={{ minWidth: '150px', backgroundColor: '#f3f4f6' }}
+                          />
+                          {/* <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                            Auto-fetched from vendor call
+                          </div> */}
                         </div>
                       </td>
 
-                      {/* Product Type - Dropdown with MK-III and MK-V only */}
+                      {/* Product Type - Frozen as per PO Serial number (readonly) */}
                       <td>
                         <div>
-                          <MobileResponsiveSelect
-                            value={line.productType || ''}
-                            onChange={(e) => updateProductionLine(idx, 'productType', e.target.value)}
-                            options={[
-                              { value: '', label: 'Select' },
-                              { value: 'MK-III', label: 'MK-III' },
-                              { value: 'MK-V', label: 'MK-V' }
-                            ]}
-                            style={{
-                              border: hasError(idx, 'productType') ? '2px solid #ef4444' : undefined,
-                              backgroundColor: hasError(idx, 'productType') ? '#fef2f2' : undefined
-                            }}
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={line.productType || '-'}
+                            disabled
+                            style={{ minWidth: '100px', backgroundColor: '#f3f4f6' }}
                           />
-                          {hasError(idx, 'productType') && (
-                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>⚠ Required</span>
-                          )}
+                          {/* <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                            As per PO Sr. No.
+                          </div> */}
                         </div>
                       </td>
 

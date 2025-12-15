@@ -289,33 +289,35 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                   const actualIdx = start + idx;
                   const status = getValueStatus(val, lot.minWeight);
                   return (
-                    <input
-                      key={actualIdx}
-                      type="number"
-                      step="0.1"
-                      className={`value-input ${status}`}
-                      value={val}
-                      onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, false)}
-                    />
+                    <div key={actualIdx} className="wt-input-wrapper">
+                      <label className="wt-input-label">{actualIdx + 1}</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className={`wt-input-sm ${status}`}
+                        value={val}
+                        onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, false)}
+                        placeholder="0.0"
+                      />
+                    </div>
                   );
                 })}
               </div>
-              <div className="wt-summary-row">
-                <div className="wt-summary-left">
-                  <div className="wt-summary-item">Rejected (R1): <strong className="wt-r1">{summary.r1}</strong></div>
-                  <div className="wt-summary-item">Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong></div>
-                </div>
+              <div className="wt-compact-row">
+                <div className="wt-summary-item">Rejected (R1): <strong className="wt-r1">{summary.r1}</strong></div>
+                <div className="wt-summary-item">Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong></div>
+                <div className="wt-result-box small" style={{ borderColor: summary.color, color: summary.color }}>{summary.result}</div>
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  start={start}
+                  end={end}
+                  totalCount={lot.sampleSize}
+                  rows={rows}
+                  onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
+                  onPageChange={(p) => setPageMap(prev => ({ ...prev, [lot.lotNo]: p }))}
+                />
               </div>
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                start={start}
-                end={end}
-                totalCount={lot.sampleSize}
-                rows={rows}
-                onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
-                onPageChange={(p) => setPageMap(prev => ({ ...prev, [lot.lotNo]: p }))}
-              />
             </div>
 
             {/* 2nd Sampling */}
@@ -335,48 +337,41 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                     const actualIdx = start2 + idx;
                     const status = getValueStatus(val, lot.minWeight);
                     return (
-                      <input
-                        key={actualIdx}
-                        type="number"
-                        step="0.1"
-                        className={`value-input ${status}`}
-                        value={val}
-                        onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, true)}
-                      />
+                      <div key={actualIdx} className="wt-input-wrapper">
+                        <label className="wt-input-label">#{actualIdx + 1}</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className={`wt-input-sm ${status}`}
+                          value={val}
+                          onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, true)}
+                          placeholder="0.0"
+                        />
+                      </div>
                     );
                   })}
                 </div>
-                <div className="wt-summary-row">
-                  <div className="wt-summary-left">
-                    <div className="wt-summary-item">Rejected (R2): <strong className="wt-r2">{summary.r2}</strong></div>
-                    <div className="wt-summary-item">Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'wt-fail' : 'wt-ok'}>{summary.total}</strong></div>
-                  </div>
+                <div className="wt-compact-row">
+                  <div className="wt-summary-item">Rejected (R2): <strong className="wt-r2">{summary.r2}</strong></div>
+                  <div className="wt-summary-item">Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'wt-fail' : 'wt-ok'}>{summary.total}</strong></div>
+                  <div className="wt-result-box small" style={{ borderColor: summary.color, color: summary.color }}>{summary.result}</div>
+                  <Pagination
+                    currentPage={page2}
+                    totalPages={totalPages2}
+                    start={start2}
+                    end={end2}
+                    totalCount={lot.sampleSize2nd}
+                    rows={rows2}
+                    onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows, true)}
+                    onPageChange={(p) => setPageMap2(prev => ({ ...prev, [lot.lotNo]: p }))}
+                  />
                 </div>
-                <Pagination
-                  currentPage={page2}
-                  totalPages={totalPages2}
-                  start={start2}
-                  end={end2}
-                  totalCount={lot.sampleSize2nd}
-                  rows={rows2}
-                  onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows, true)}
-                  onPageChange={(p) => setPageMap2(prev => ({ ...prev, [lot.lotNo]: p }))}
-                />
               </div>
             )}
 
-            {/* Result & Remarks */}
+            {/* Remarks */}
             <div className="wt-final-row">
-              <div className="wt-final-result">
-                <label className="wt-label">Result of Weight Test</label>
-                <div className="wt-result-box" style={{ borderColor: summary.color, color: summary.color }}>{summary.result}</div>
-                {/* <div className="wt-result-note">
-                  <span className="wt-note-ok">✓ OK if R1 ≤ Accp No.</span><br />
-                  <span className="wt-note-ok">✓ OK if Accp No. &lt; R1 &lt; Rej No. AND (R1 + R2) &lt; Cumm. Rej. No.</span><br />
-                  <span className="wt-note-fail">✗ NOT OK if R1 ≥ Rej No. OR (R1 + R2) ≥ Cumm. Rej. No.</span>
-                </div> */}
-              </div>
-              <div className="wt-remarks">
+              <div className="wt-remarks-section">
                 <label className="wt-label">Remarks</label>
                 <textarea className="wt-input wt-textarea" rows="3" value={state.remarks} onChange={(e) => handleRemarksChange(lot.lotNo, e.target.value)} placeholder="Enter remarks..." />
               </div>

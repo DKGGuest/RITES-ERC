@@ -32,20 +32,35 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     const initial = {};
     lotsWithSampleSize.forEach((lot) => {
       initial[lot.lotNo] = {
+        /* Microstructure - array of dropdown values equal to sample size */
+        microstructure1st: Array(lot.sampleSize).fill(''),
         /* Decarb - array of values equal to sample size */
         decarb1st: Array(lot.sampleSize).fill(''),
         decarb2nd: Array(lot.sampleSize).fill(''),
-        /* Inclusion - array of samples, each sample has A, B, C, D ratings */
-        inclusion1st: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '' })),
-        inclusion2nd: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '' })),
+        /* Inclusion - array of samples, each sample has A, B, C, D ratings + Thick/Thin */
+        inclusion1st: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
+        inclusion2nd: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
         /* Freedom from Defects - array equal to sample size */
         defects1st: Array(lot.sampleSize).fill('OK'),
         defects2nd: Array(lot.sampleSize).fill('OK'),
-        remarks: ''
+        /* Separate remarks for each section */
+        microstructureRemarks: '',
+        decarbRemarks: '',
+        inclusionRemarks: '',
+        defectsRemarks: ''
       };
     });
     return initial;
   });
+
+  /* Handler for Microstructure change */
+  const handleMicrostructureChange = (lotNo, idx, value) => {
+    setLotData((prev) => {
+      const arr = [...prev[lotNo].microstructure1st];
+      arr[idx] = value;
+      return { ...prev, [lotNo]: { ...prev[lotNo], microstructure1st: arr } };
+    });
+  };
 
   /* Handler for Decarb change */
   const handleDecarbChange = (lotNo, idx, value, is2nd = false) => {
@@ -77,17 +92,41 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     });
   };
 
-  /* Handler for Remarks */
-  const handleRemarksChange = (lotNo, value) => {
+  /* Handler for Section-specific Remarks */
+  const handleSectionRemarksChange = (lotNo, section, value) => {
+    const remarkKey = `${section}Remarks`;
     setLotData((prev) => ({
       ...prev,
-      [lotNo]: { ...prev[lotNo], remarks: value }
+      [lotNo]: { ...prev[lotNo], [remarkKey]: value }
     }));
+  };
+
+  /* Validation functions */
+  const getMicrostructureStatus = (value) => {
+    if (!value || value === '') return '';
+    return value === 'Tempered Martensite' ? 'pass' : 'fail';
+  };
+
+  const getDecarbStatus = (value, maxDecarb) => {
+    if (!value || value === '') return '';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '';
+    return num <= maxDecarb ? 'pass' : 'fail';
+  };
+
+  const getInclusionStatus = (value) => {
+    if (!value || value === '') return '';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '';
+    return num <= 2.0 ? 'pass' : 'fail';
   };
 
   /* Calculate rejections per lot - per test basis */
   const getLotRejections = (lot) => {
     const data = lotData[lot.lotNo];
+
+    /* Microstructure rejection: count "Not Tempered Martensite" values */
+    const microstructureRej = data.microstructure1st.filter((v) => v === 'Not Tempered Martensite').length;
 
     /* Decarb rejection: count values exceeding max limit */
     const decarbRej1st = data.decarb1st.filter((v) => v !== '' && parseFloat(v) > lot.maxDecarb).length;
@@ -111,10 +150,11 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     const showDefects2nd = defectsRej1st > 1;
     const show2nd = showDecarb2nd || showInclusion2nd || showDefects2nd;
 
-    const total1st = decarbRej1st + inclusionRej1st + defectsRej1st;
+    const total1st = microstructureRej + decarbRej1st + inclusionRej1st + defectsRej1st;
     const total2nd = decarbRej2nd + inclusionRej2nd + defectsRej2nd;
 
     return {
+      microstructureRej,
       decarbRej1st, inclusionRej1st, defectsRej1st, total1st,
       decarbRej2nd, inclusionRej2nd, defectsRej2nd, total2nd,
       showDecarb2nd, showInclusion2nd, showDefects2nd, show2nd,
@@ -181,6 +221,14 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       outline: none;
       border-color: #0ea5e9;
     }
+    .ir-value-input.pass {
+      border-color: #22c55e;
+      background: #f0fdf4;
+    }
+    .ir-value-input.fail {
+      border-color: #ef4444;
+      background: #fee2e2;
+    }
     .ir-table-wrap {
       overflow-x: auto;
       margin-bottom: 6px;
@@ -212,12 +260,28 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       outline: none;
       border-color: #0ea5e9;
     }
+    .ir-inclusion-table input.pass {
+      border-color: #22c55e;
+      background: #f0fdf4;
+    }
+    .ir-inclusion-table input.fail {
+      border-color: #ef4444;
+      background: #fee2e2;
+    }
     .ir-defect-select {
       padding: 4px 6px;
       border: 1px solid #e2e8f0;
       border-radius: 4px;
       font-size: 11px;
       min-width: 60px;
+    }
+    .ir-defect-select.pass {
+      border-color: #22c55e;
+      background: #f0fdf4;
+    }
+    .ir-defect-select.fail {
+      border-color: #ef4444;
+      background: #fee2e2;
     }
     .ir-rej-info {
       font-size: 11px;
@@ -255,12 +319,182 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       color: #92400e;
       margin-bottom: 8px;
     }
+    .ir-collapse-btn {
+      font-size: 12px;
+      padding: 2px 10px;
+      min-width: 80px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .ir-collapse-btn:hover {
+      background: #e0e7ef;
+    }
+    .ir-acceptance-condition {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #1e40af;
+    }
+    .ir-acceptance-condition strong {
+      color: #1e3a8a;
+    }
+    .ir-type-select {
+      padding: 3px 6px;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      font-size: 11px;
+      margin-left: 8px;
+      background: #fff;
+    }
+    .ir-section-remarks {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .ir-section-remarks label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+    .ir-section-remarks textarea {
+      width: 100%;
+      min-height: 50px;
+      padding: 6px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      font-size: 11px;
+      resize: vertical;
+    }
     @media (max-width: 768px) {
       .ir-value-input { width: 50px; font-size: 11px; }
       .ir-inclusion-table input { width: 35px; }
       .ir-defect-select { min-width: 55px; font-size: 10px; }
+      .ir-test-section {
+        padding: 8px;
+        margin-bottom: 12px;
+      }
+      .ir-lot-block {
+        padding: 6px;
+        margin-bottom: 6px;
+      }
+      .ir-lot-header {
+        font-size: 11px;
+        padding-bottom: 4px;
+      }
+      .ir-summary-row {
+        gap: 6px;
+        margin-top: 6px;
+        padding-top: 6px;
+      }
+      .ir-summary-item {
+        padding: 4px 6px;
+        font-size: 11px;
+      }
+      .ir-2nd-sampling {
+        padding: 6px;
+        margin-top: 6px;
+      }
+      .ir-2nd-title {
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+      .ir-collapse-btn {
+        min-width: 60px;
+        font-size: 11px;
+        padding: 2px 6px;
+      }
+      .ir-test-title {
+        font-size: 13px;
+        padding-bottom: 4px;
+      }
+      .ir-values-grid {
+        gap: 4px;
+      }
+      .ir-value-input {
+        width: 40px;
+        font-size: 10px;
+      }
+      .ir-inclusion-table input {
+        width: 28px;
+        font-size: 10px;
+      }
+      .ir-defect-select {
+        min-width: 40px;
+        font-size: 10px;
+      }
+      .ir-rej-info {
+        font-size: 10px;
+        padding: 2px 4px;
+      }
+      .ir-table-wrap {
+        margin-bottom: 2px;
+      }
+      .ir-test-section {
+        margin-bottom: 8px;
+      }
+      .ir-test-section:last-child {
+        margin-bottom: 0;
+      }
+      .page-header {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .page-title {
+        font-size: 16px;
+      }
+      .page-subtitle {
+        font-size: 11px;
+      }
+      .btn {
+        font-size: 12px;
+        padding: 8px 12px;
+      }
+    }
+    @media (max-width: 480px) {
+      .ir-test-section {
+        padding: 4px;
+      }
+      .ir-lot-block {
+        padding: 2px;
+      }
+      .ir-collapse-btn {
+        min-width: 40px;
+        font-size: 10px;
+        padding: 1px 4px;
+      }
+      .btn {
+        font-size: 11px;
+        padding: 6px 8px;
+      }
+      .page-title {
+        font-size: 13px;
+      }
+      .page-subtitle {
+        font-size: 10px;
+      }
     }
   `;
+
+  // Collapse/expand state for each section
+  const [collapsed, setCollapsed] = useState({
+    decarb: false,
+    inclusion: true,
+    microstructure: true,
+    defects: true,
+    summary: true
+  });
+
+  const toggleCollapse = (key) => {
+    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <div>
@@ -269,7 +503,7 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       {/* Header */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h1 className="page-title">Inclusion Rating, Decarb & Defects</h1>
+          <h1 className="page-title">Inclusion Rating, Depth of Decarb, Freedom from Defects</h1>
           <p className="page-subtitle">No. of Readings: 6 or 0.5% of hardness sample size (whichever is higher)</p>
         </div>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
@@ -277,120 +511,126 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
 
       <FinalSubmoduleNav currentSubmodule="final-inclusion-rating" onNavigate={onNavigateSubmodule} />
 
-      {/* Info Note */}
-      {/* <div style={{ background: '#f0f9ff', border: '1px solid #0ea5e9', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '13px' }}>
-        <strong>Note:</strong> d = Bar Diameter (mm). Max Decarb = ≤0.25mm or (d/100)mm whichever is less.
-        One or multiple rejections in Inclusion (A/B/C/D) per sample = 1 rejection only.
-      </div> */}
-
       {/* ==================== SECTION 1: DEPTH OF DECARB ==================== */}
       <div className="ir-test-section">
-        <h3 className="ir-test-title">📏 Depth of Decarburization (All Lots)</h3>
-
-        {lotsWithSampleSize.map((lot) => {
-          const data = lotData[lot.lotNo];
-          const rej = getLotRejections(lot);
-
-          return (
-            <div key={lot.lotNo} className="ir-lot-block">
-              <div className="ir-lot-header">
-                📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.sampleSize} 
-              </div>
-
-              {/* 1st Sampling */}
-              <div className="ir-sampling-label">1st Sampling (n1: {lot.sampleSize})</div>
-              <div className="ir-values-grid">
-                {data.decarb1st.map((val, idx) => (
-                  <input
-                    key={idx}
-                    type="number"
-                    step="0.01"
-                    className="ir-value-input"
-                    value={val}
-                    onChange={(e) => handleDecarbChange(lot.lotNo, idx, e.target.value)}
-                    placeholder=""
-                  />
-                ))}
-              </div>
-
-              {/* 2nd Sampling - show only if decarb rejected > 1 */}
-              {rej.showDecarb2nd && (
-                <div className="ir-2nd-sampling">
-                  <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.decarbRej1st} &gt; 1)</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 className="ir-test-title">📏 Depth of Decarburization (All Lots)</h3>
+          <button className="ir-collapse-btn" onClick={() => toggleCollapse('decarb')}>
+            {collapsed.decarb ? 'Expand' : 'Collapse'}
+          </button>
+        </div>
+        {!collapsed.decarb && (
+          <>
+            <div className="ir-acceptance-condition">
+              <strong>Acceptance Condition (IS 3195):</strong> Depth of decarburization shall not exceed 0.25mm or (d/100)mm, whichever is less. Where d = Bar Diameter.
+            </div>
+            {lotsWithSampleSize.map((lot) => {
+              const data = lotData[lot.lotNo];
+              const rej = getLotRejections(lot);
+              return (
+                <div key={lot.lotNo} className="ir-lot-block">
+                  <div className="ir-lot-header">
+                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.sampleSize} | Max Decarb: {lot.maxDecarb.toFixed(2)}mm
+                  </div>
+                  {/* 1st Sampling */}
+                  <div className="ir-sampling-label">1st Sampling (n1: {lot.sampleSize})</div>
                   <div className="ir-values-grid">
-                    {data.decarb2nd.map((val, idx) => (
-                      <input
-                        key={idx}
-                        type="number"
-                        step="0.01"
-                        className="ir-value-input"
-                        value={val}
-                        onChange={(e) => handleDecarbChange(lot.lotNo, idx, e.target.value, true)}
-                        placeholder=""
-                      />
-                    ))}
+                    {data.decarb1st.map((val, idx) => {
+                      const status = getDecarbStatus(val, lot.maxDecarb);
+                      return (
+                        <input
+                          key={idx}
+                          type="number"
+                          step="0.01"
+                          className={`ir-value-input ${status}`}
+                          value={val}
+                          onChange={(e) => handleDecarbChange(lot.lotNo, idx, e.target.value)}
+                          placeholder=""
+                        />
+                      );
+                    })}
+                  </div>
+                  {/* 2nd Sampling - show only if decarb rejected > 1 */}
+                  {rej.showDecarb2nd && (
+                    <div className="ir-2nd-sampling">
+                      <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.decarbRej1st} &gt; 1)</div>
+                      <div className="ir-values-grid">
+                        {data.decarb2nd.map((val, idx) => {
+                          const status = getDecarbStatus(val, lot.maxDecarb);
+                          return (
+                            <input
+                              key={idx}
+                              type="number"
+                              step="0.01"
+                              className={`ir-value-input ${status}`}
+                              value={val}
+                              onChange={(e) => handleDecarbChange(lot.lotNo, idx, e.target.value, true)}
+                              placeholder=""
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div className="ir-rej-info">
+                    R1: {rej.decarbRej1st} {rej.showDecarb2nd && `| R2: ${rej.decarbRej2nd}`}
+                  </div>
+                  {/* Remarks for this lot's decarb test */}
+                  <div className="ir-section-remarks">
+                    <label>Remarks (Decarb - {lot.lotNo}):</label>
+                    <textarea
+                      value={data.decarbRemarks}
+                      onChange={(e) => handleSectionRemarksChange(lot.lotNo, 'decarb', e.target.value)}
+                      placeholder="Enter remarks for decarburization test..."
+                    />
                   </div>
                 </div>
-              )}
-
-              <div className="ir-rej-info">
-                R1: {rej.decarbRej1st} {rej.showDecarb2nd && `| R2: ${rej.decarbRej2nd}`}
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </>
+        )}
       </div>
 
       {/* ==================== SECTION 2: INCLUSION RATING ==================== */}
       <div className="ir-test-section">
-        <h3 className="ir-test-title">🔬 Inclusion Rating (All Lots)</h3>
-        {/* <p className="ir-note">A (Sulphide) | B (Alumina) | C (Silicate) | D (Globular Oxide) — Max: 2.0 | Note: 1+ rejection in A/B/C/D = 1 sample rejection</p> */}
-
-        {lotsWithSampleSize.map((lot) => {
-          const data = lotData[lot.lotNo];
-          const rej = getLotRejections(lot);
-
-          return (
-            <div key={lot.lotNo} className="ir-lot-block">
-              <div className="ir-lot-header">📦 {lot.lotNo} | Heat: {lot.heatNo} | Sample: {lot.sampleSize}</div>
-
-              {/* 1st Sampling Table */}
-              <div className="ir-sampling-label">1st Sampling (n1: {lot.sampleSize})</div>
-              <div className="ir-table-wrap">
-                <table className="ir-inclusion-table">
-                  <thead>
-                    <tr>
-                      <th>S#</th>
-                      <th>A</th>
-                      <th>B</th>
-                      <th>C</th>
-                      <th>D</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.inclusion1st.map((sample, idx) => (
-                      <tr key={idx}>
-                        <td>{idx + 1}</td>
-                        {['A', 'B', 'C', 'D'].map((type) => (
-                          <td key={type}>
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={sample[type]}
-                              onChange={(e) => handleInclusionChange(lot.lotNo, idx, type, e.target.value)}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* 2nd Sampling - show only if inclusion rejected > 1 */}
-              {rej.showInclusion2nd && (
-                <div className="ir-2nd-sampling">
-                  <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.inclusionRej1st} &gt; 1)</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 className="ir-test-title">🔬 Inclusion Rating (All Lots)</h3>
+          <button className="ir-collapse-btn" onClick={() => toggleCollapse('inclusion')}>
+            {collapsed.inclusion ? 'Expand' : 'Collapse'}
+          </button>
+        </div>
+        {!collapsed.inclusion && (
+          <>
+            <div className="ir-acceptance-condition">
+              <strong>Acceptance Condition (IS 4163):</strong> All inclusion ratings (A, B, C, D) shall not exceed 2.0 for both Thick and Thin series.
+            </div>
+            {lotsWithSampleSize.map((lot) => {
+              const data = lotData[lot.lotNo];
+              const rej = getLotRejections(lot);
+              return (
+                <div key={lot.lotNo} className="ir-lot-block">
+                  <div className="ir-lot-header">📦 {lot.lotNo} | Heat: {lot.heatNo} | Sample: {lot.sampleSize}</div>
+                  {/* 1st Sampling Table */}
+                  <div className="ir-sampling-label">
+                    1st Sampling (n1: {lot.sampleSize})
+                    <select
+                      className="ir-type-select"
+                      value={data.inclusion1st[0]?.type || 'Thick'}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        setLotData((prev) => ({
+                          ...prev,
+                          [lot.lotNo]: {
+                            ...prev[lot.lotNo],
+                            inclusion1st: prev[lot.lotNo].inclusion1st.map(s => ({ ...s, type: newType }))
+                          }
+                        }));
+                      }}
+                    >
+                      <option value="Thick">Thick</option>
+                      <option value="Thin">Thin</option>
+                    </select>
+                  </div>
                   <div className="ir-table-wrap">
                     <table className="ir-inclusion-table">
                       <thead>
@@ -403,136 +643,306 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.inclusion2nd.map((sample, idx) => (
+                        {data.inclusion1st.map((sample, idx) => (
                           <tr key={idx}>
                             <td>{idx + 1}</td>
-                            {['A', 'B', 'C', 'D'].map((type) => (
-                              <td key={type}>
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={sample[type]}
-                                  onChange={(e) => handleInclusionChange(lot.lotNo, idx, type, e.target.value, true)}
-                                />
-                              </td>
-                            ))}
+                            {['A', 'B', 'C', 'D'].map((type) => {
+                              const status = getInclusionStatus(sample[type]);
+                              return (
+                                <td key={type}>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    className={status}
+                                    value={sample[type]}
+                                    onChange={(e) => handleInclusionChange(lot.lotNo, idx, type, e.target.value)}
+                                  />
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  {/* 2nd Sampling - show only if inclusion rejected > 1 */}
+                  {rej.showInclusion2nd && (
+                    <div className="ir-2nd-sampling">
+                      <div className="ir-2nd-title">
+                        ⚠️ 2nd Sampling (R1: {rej.inclusionRej1st} &gt; 1)
+                        <select
+                          className="ir-type-select"
+                          value={data.inclusion2nd[0]?.type || 'Thick'}
+                          onChange={(e) => {
+                            const newType = e.target.value;
+                            setLotData((prev) => ({
+                              ...prev,
+                              [lot.lotNo]: {
+                                ...prev[lot.lotNo],
+                                inclusion2nd: prev[lot.lotNo].inclusion2nd.map(s => ({ ...s, type: newType }))
+                              }
+                            }));
+                          }}
+                        >
+                          <option value="Thick">Thick</option>
+                          <option value="Thin">Thin</option>
+                        </select>
+                      </div>
+                      <div className="ir-table-wrap">
+                        <table className="ir-inclusion-table">
+                          <thead>
+                            <tr>
+                              <th>S#</th>
+                              <th>A</th>
+                              <th>B</th>
+                              <th>C</th>
+                              <th>D</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.inclusion2nd.map((sample, idx) => (
+                              <tr key={idx}>
+                                <td>{idx + 1}</td>
+                                {['A', 'B', 'C', 'D'].map((type) => {
+                                  const status = getInclusionStatus(sample[type]);
+                                  return (
+                                    <td key={type}>
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        className={status}
+                                        value={sample[type]}
+                                        onChange={(e) => handleInclusionChange(lot.lotNo, idx, type, e.target.value, true)}
+                                      />
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  <div className="ir-rej-info">
+                    R1: {rej.inclusionRej1st} {rej.showInclusion2nd && `| R2: ${rej.inclusionRej2nd}`}
+                  </div>
+                  {/* Remarks for this lot's inclusion test */}
+                  <div className="ir-section-remarks">
+                    <label>Remarks (Inclusion - {lot.lotNo}):</label>
+                    <textarea
+                      value={data.inclusionRemarks}
+                      onChange={(e) => handleSectionRemarksChange(lot.lotNo, 'inclusion', e.target.value)}
+                      placeholder="Enter remarks for inclusion rating test..."
+                    />
+                  </div>
                 </div>
-              )}
-
-              <div className="ir-rej-info">
-                R1: {rej.inclusionRej1st} {rej.showInclusion2nd && `| R2: ${rej.inclusionRej2nd}`}
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </>
+        )}
       </div>
 
-      {/* ==================== SECTION 3: FREEDOM FROM DEFECTS ==================== */}
+      {/* ==================== SECTION 3: MICROSTRUCTURE ==================== */}
       <div className="ir-test-section">
-        <h3 className="ir-test-title">🛡️ Freedom from Defects (All Lots)</h3>
-
-        {lotsWithSampleSize.map((lot) => {
-          const data = lotData[lot.lotNo];
-          const rej = getLotRejections(lot);
-
-          return (
-            <div key={lot.lotNo} className="ir-lot-block">
-              <div className="ir-lot-header">📦 {lot.lotNo} | Heat: {lot.heatNo} | Sample: {lot.sampleSize}</div>
-
-              {/* 1st Sampling */}
-              <div className="ir-sampling-label">1st Sampling (n1: {lot.sampleSize})</div>
-              <div className="ir-values-grid">
-                {data.defects1st.map((val, idx) => (
-                  <select
-                    key={idx}
-                    className="ir-defect-select"
-                    value={val}
-                    onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value)}
-                  >
-                    <option value="OK">OK</option>
-                    <option value="NOT OK">NOT OK</option>
-                  </select>
-                ))}
-              </div>
-
-              {/* 2nd Sampling - show only if defects rejected > 1 */}
-              {rej.showDefects2nd && (
-                <div className="ir-2nd-sampling">
-                  <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.defectsRej1st} &gt; 1)</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 className="ir-test-title">🔬 Microstructure (All Lots)</h3>
+          <button className="ir-collapse-btn" onClick={() => toggleCollapse('microstructure')}>
+            {collapsed.microstructure ? 'Expand' : 'Collapse'}
+          </button>
+        </div>
+        {!collapsed.microstructure && (
+          <>
+            <div className="ir-acceptance-condition">
+              <strong>Acceptance Condition:</strong> Microstructure shall be Tempered Martensite as per IS 3195.
+            </div>
+            {lotsWithSampleSize.map((lot) => {
+              const data = lotData[lot.lotNo];
+              const rej = getLotRejections(lot);
+              return (
+                <div key={lot.lotNo} className="ir-lot-block">
+                  <div className="ir-lot-header">
+                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.sampleSize}
+                  </div>
+                  <div className="ir-sampling-label">Samples (n: {lot.sampleSize})</div>
                   <div className="ir-values-grid">
-                    {data.defects2nd.map((val, idx) => (
+                    {data.microstructure1st.map((val, idx) => {
+                      const status = getMicrostructureStatus(val);
+                      return (
+                        <select
+                          key={idx}
+                          className={`ir-defect-select ${status}`}
+                          value={val}
+                          onChange={(e) => handleMicrostructureChange(lot.lotNo, idx, e.target.value)}
+                        >
+                          <option value="">Select</option>
+                          <option value="Tempered Martensite">Tempered Martensite</option>
+                          <option value="Not Tempered Martensite">Not Tempered Martensite</option>
+                        </select>
+                      );
+                    })}
+                  </div>
+                  <div className="ir-rej-info">
+                    Rejected: {rej.microstructureRej}
+                  </div>
+                  <div className="ir-section-remarks">
+                    <label>Remarks (Microstructure - {lot.lotNo}):</label>
+                    <textarea
+                      value={data.microstructureRemarks}
+                      onChange={(e) => handleSectionRemarksChange(lot.lotNo, 'microstructure', e.target.value)}
+                      placeholder="Enter remarks for microstructure test..."
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      {/* ==================== SECTION 4: FREEDOM FROM DEFECTS ==================== */}
+      <div className="ir-test-section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 className="ir-test-title">🛡️ Freedom from Defects (All Lots)</h3>
+          <button className="ir-collapse-btn" onClick={() => toggleCollapse('defects')}>
+            {collapsed.defects ? 'Expand' : 'Collapse'}
+          </button>
+        </div>
+        {!collapsed.defects && (
+          <>
+            <div className="ir-acceptance-condition">
+              <strong>Acceptance Condition:</strong> Material shall be free from injurious surface defects such as cracks, seams, laps, and other visible defects as per IS 3195.
+            </div>
+            {lotsWithSampleSize.map((lot) => {
+              const data = lotData[lot.lotNo];
+              const rej = getLotRejections(lot);
+              return (
+                <div key={lot.lotNo} className="ir-lot-block">
+                  <div className="ir-lot-header">📦 {lot.lotNo} | Heat: {lot.heatNo} | Sample: {lot.sampleSize}</div>
+                  {/* 1st Sampling */}
+                  <div className="ir-sampling-label">1st Sampling (n1: {lot.sampleSize})</div>
+                  <div className="ir-values-grid">
+                    {data.defects1st.map((val, idx) => (
                       <select
                         key={idx}
                         className="ir-defect-select"
                         value={val}
-                        onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value, true)}
+                        onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value)}
                       >
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
                     ))}
                   </div>
+                  {/* 2nd Sampling - show only if defects rejected > 1 */}
+                  {rej.showDefects2nd && (
+                    <div className="ir-2nd-sampling">
+                      <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.defectsRej1st} &gt; 1)</div>
+                      <div className="ir-values-grid">
+                        {data.defects2nd.map((val, idx) => (
+                          <select
+                            key={idx}
+                            className="ir-defect-select"
+                            value={val}
+                            onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value, true)}
+                          >
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="ir-rej-info">
+                    R1: {rej.defectsRej1st} {rej.showDefects2nd && `| R2: ${rej.defectsRej2nd}`}
+                  </div>
+                  {/* Remarks for this lot's defects test */}
+                  <div className="ir-section-remarks">
+                    <label>Remarks (Defects - {lot.lotNo}):</label>
+                    <textarea
+                      value={data.defectsRemarks}
+                      onChange={(e) => handleSectionRemarksChange(lot.lotNo, 'defects', e.target.value)}
+                      placeholder="Enter remarks for freedom from defects test..."
+                    />
+                  </div>
                 </div>
-              )}
-
-              <div className="ir-rej-info">
-                R1: {rej.defectsRej1st} {rej.showDefects2nd && `| R2: ${rej.defectsRej2nd}`}
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </>
+        )}
       </div>
 
       {/* ==================== OVERALL SUMMARY ==================== */}
       <div className="ir-test-section" style={{ background: '#f0f9ff' }}>
-        <h3 className="ir-test-title">📊 Summary</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 className="ir-test-title">📊 Summary</h3>
+          <button className="ir-collapse-btn" onClick={() => toggleCollapse('summary')}>
+            {collapsed.summary ? 'Expand' : 'Collapse'}
+          </button>
+        </div>
+        {!collapsed.summary && (
+          <>
+            {lotsWithSampleSize.map((lot) => {
+              const rej = getLotRejections(lot);
+              const data = lotData[lot.lotNo];
+              /* Accept if no 2nd sampling needed (all tests R1 ≤ 1) OR if 2nd sampling and total ≤ 2 */
+              const isAccepted = !rej.show2nd || rej.totalCombined <= 2;
 
-        {lotsWithSampleSize.map((lot) => {
-          const rej = getLotRejections(lot);
-          /* Accept if no 2nd sampling needed (all tests R1 ≤ 1) OR if 2nd sampling and total ≤ 2 */
-          const isAccepted = !rej.show2nd || rej.totalCombined <= 2;
+              /* Concatenate all remarks with section and lot info */
+              const allRemarks = [
+                data.microstructureRemarks && `Microstructure (${lot.lotNo}): ${data.microstructureRemarks}`,
+                data.decarbRemarks && `Decarb (${lot.lotNo}): ${data.decarbRemarks}`,
+                data.inclusionRemarks && `Inclusion (${lot.lotNo}): ${data.inclusionRemarks}`,
+                data.defectsRemarks && `Defects (${lot.lotNo}): ${data.defectsRemarks}`
+              ].filter(Boolean).join(' | ');
 
-          return (
-            <div key={lot.lotNo} className="ir-lot-block">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600 }}>📦 {lot.lotNo}</span>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
-                    Decarb: {rej.decarbRej1st}{rej.showDecarb2nd && `+${rej.decarbRej2nd}`}
-                  </span>
-                  <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
-                    Inclusion: {rej.inclusionRej1st}{rej.showInclusion2nd && `+${rej.inclusionRej2nd}`}
-                  </span>
-                  <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
-                    Defects: {rej.defectsRej1st}{rej.showDefects2nd && `+${rej.defectsRej2nd}`}
-                  </span>
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    fontWeight: 700,
-                    fontSize: '11px',
-                    background: isAccepted ? '#dcfce7' : '#fee2e2',
-                    color: isAccepted ? '#166534' : '#991b1b'
-                  }}>
-                    {isAccepted ? '✓ OK' : '✗ NOT OK'}
-                  </span>
+              return (
+                <div key={lot.lotNo} className="ir-lot-block">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>📦 {lot.lotNo}</span>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                        Microstructure: {rej.microstructureRej}
+                      </span>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                        Decarb: {rej.decarbRej1st}{rej.showDecarb2nd && `+${rej.decarbRej2nd}`}
+                      </span>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                        Inclusion: {rej.inclusionRej1st}{rej.showInclusion2nd && `+${rej.inclusionRej2nd}`}
+                      </span>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                        Defects: {rej.defectsRej1st}{rej.showDefects2nd && `+${rej.defectsRej2nd}`}
+                      </span>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        fontWeight: 700,
+                        fontSize: '11px',
+                        background: isAccepted ? '#dcfce7' : '#fee2e2',
+                        color: isAccepted ? '#166534' : '#991b1b'
+                      }}>
+                        {isAccepted ? '✓ OK' : '✗ NOT OK'}
+                      </span>
+                    </div>
+                  </div>
+                  {allRemarks && (
+                    <div style={{
+                      marginTop: '8px',
+                      padding: '6px 8px',
+                      background: '#fef3c7',
+                      border: '1px solid #fbbf24',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      color: '#92400e'
+                    }}>
+                      <strong>Combined Remarks:</strong> {allRemarks}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <textarea
-                rows="1"
-                style={{ width: '100%', padding: '6px', border: '1px solid #e2e8f0', borderRadius: '4px', fontSize: '11px', marginTop: '8px' }}
-                value={lotData[lot.lotNo].remarks}
-                onChange={(e) => handleRemarksChange(lot.lotNo, e.target.value)}
-                placeholder="Remarks..."
-              />
-            </div>
-          );
-        })}
+              );
+            })}
+          </>
+        )}
       </div>
 
       {/* Action Buttons */}

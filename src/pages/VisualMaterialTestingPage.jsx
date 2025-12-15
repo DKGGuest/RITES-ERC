@@ -17,6 +17,7 @@ const pageStyles = `
   .submodule-page-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 16px;
     margin-bottom: 24px;
     padding-bottom: 16px;
@@ -553,10 +554,10 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
       <style>{pageStyles}</style>
 
       <div className="submodule-page-header">
+        <h1 className="submodule-page-title">🔬 Visual & Material Testing</h1>
         <button className="submodule-back-btn" onClick={onBack}>
           ← Back to Sub Module Session
         </button>
-        <h1 className="submodule-page-title">🔬 Visual & Material Testing</h1>
       </div>
 
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />

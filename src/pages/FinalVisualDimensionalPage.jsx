@@ -1,16 +1,58 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
 
-const availableLots = [
-  { lotNo: "LOT-001", heatNo: "HT-2025-A1", quantity: 500, sampleSize: 50, accpNo: 2, rejNo: 3, cummRejNo: 4 },
-  { lotNo: "LOT-002", heatNo: "HT-2025-A2", quantity: 800, sampleSize: 80, accpNo: 3, rejNo: 4, cummRejNo: 6 },
-  { lotNo: "LOT-003", heatNo: "HT-2025-B1", quantity: 1200, sampleSize: 125, accpNo: 5, rejNo: 6, cummRejNo: 8 }
+// Table 2 mapping for Dimension & Weight AQL 2.5
+const samplingTable = [
+  // ✔ LOT SIZE 2–150 → single sampling ONLY
+  { min: 2, max: 150, n1: 20, ac1: 0, re1: 3, n2: null, cumulative: null },
+
+  { min: 151, max: 280, n1: 20, ac1: 0, re1: 3, n2: 20, cumulative: 4 },
+  { min: 281, max: 500, n1: 32, ac1: 1, re1: 3, n2: 32, cumulative: 5 },
+  { min: 501, max: 1200, n1: 50, ac1: 2, re1: 5, n2: 50, cumulative: 7 },
+  { min: 1201, max: 3200, n1: 80, ac1: 3, re1: 6, n2: 125, cumulative: 10 },
+  { min: 3201, max: 10000, n1: 125, ac1: 5, re1: 9, n2: 200, cumulative: 13 },
+  { min: 10001, max: 35000, n1: 200, ac1: 7, re1: 11, n2: 315, cumulative: 19 },
+  { min: 35001, max: 150000, n1: 315, ac1: 11, re1: 16, n2: 500, cumulative: 27 },
+  { min: 150001, max: 500000, n1: 500, ac1: 11, re1: 16, n2: 800, cumulative: 27 }
 ];
+
+function getSamplingValues(lotSize) {
+  for (const row of samplingTable) {
+    if (lotSize >= row.min && lotSize <= row.max) {
+      return { ac: row.ac1, re: row.re1, sample: row.n1, cumulative: row.cumulative };
+    }
+  }
+  return { ac: null, re: null, sample: null, cumulative: null };
+}
+
+const availableLots = [
+  { lotNo: "LOT-001", heatNo: "HT-2025-A1", quantity: 500 },
+  { lotNo: "LOT-002", heatNo: "HT-2025-A2", quantity: 800 },
+  { lotNo: "LOT-003", heatNo: "HT-2025-B1", quantity: 1200 }
+].map(lot => {
+  const { ac, re, sample, cumulative } = getSamplingValues(lot.quantity);
+  return {
+    ...lot,
+    sampleSize: sample,
+    accpNo: ac,
+    rejNo: re,
+    cummRejNo: cumulative
+  };
+});
 
 const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
   /* Section collapse states */
   const [visualExpanded, setVisualExpanded] = useState(true);
   const [dimensionalExpanded, setDimensionalExpanded] = useState(true);
+
+  /* 2nd Sampling visibility states */
+  const [showVisual2ndMap, setShowVisual2ndMap] = useState({});
+  const [showDim2ndMap, setShowDim2ndMap] = useState({});
+
+  /* Popup states */
+  const [visualPopupLot, setVisualPopupLot] = useState(null);
+  const [dimPopupLot, setDimPopupLot] = useState(null);
 
   const [lotData, setLotData] = useState(
     availableLots.reduce(
@@ -44,6 +86,146 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
   };
 
   const safe = val => (val === "" || isNaN(val) ? 0 : Number(val));
+
+  /* ------------------------------
+     VISUAL 2ND SAMPLING LOGIC
+     Rules:
+     - If R1 <= Acceptance No., 2nd Sampling will not open and Lot accepted
+     - If R1 > Acceptance No. and R1 < Rejection No., 2nd Sampling will open
+     - If R1 >= Rejection No., 2nd sampling will not open and lot rejected
+  ------------------------------ */
+  useEffect(() => {
+    availableLots.forEach((lot) => {
+      const data = lotData[lot.lotNo];
+      if (!data) return;
+
+      const r1 = safe(data.visualR1);
+      const AC = lot.accpNo;
+      const RE = lot.rejNo;
+
+      const secondRequired = r1 > AC && r1 < RE;
+      const secondNotRequired = r1 <= AC || r1 >= RE;
+      const shown = !!showVisual2ndMap[lot.lotNo];
+
+      // Auto-open when required
+      if (secondRequired && !shown) {
+        setShowVisual2ndMap((prev) => ({
+          ...prev,
+          [lot.lotNo]: true,
+        }));
+      }
+
+      // Check if any 2nd sampling value is entered
+      const has2ndData = data.visualR2 !== "";
+
+      // Auto-hide or popup when 2nd sampling becomes unnecessary
+      if (secondNotRequired && shown && !visualPopupLot) {
+        if (has2ndData) {
+          // Show popup only if user had entered something
+          setVisualPopupLot(lot.lotNo);
+        } else {
+          // Auto-hide silently (no popup)
+          setShowVisual2ndMap((prev) => ({
+            ...prev,
+            [lot.lotNo]: false,
+          }));
+        }
+      }
+    });
+  }, [lotData, visualPopupLot, showVisual2ndMap]);
+
+  /* ------------------------------
+     DIMENSIONAL 2ND SAMPLING LOGIC
+     Rules:
+     - If R1 <= Acceptance No., 2nd Sampling will not open and Lot accepted
+     - If R1 > Acceptance No. and R1 < Rejection No., 2nd Sampling will open
+     - If R1 >= Rejection No., 2nd sampling will not open and lot rejected
+  ------------------------------ */
+  useEffect(() => {
+    availableLots.forEach((lot) => {
+      const data = lotData[lot.lotNo];
+      if (!data) return;
+
+      const r1 = safe(data.dimGo1) + safe(data.dimNoGo1) + safe(data.dimFlat1);
+      const AC = lot.accpNo;
+      const RE = lot.rejNo;
+
+      const secondRequired = r1 > AC && r1 < RE;
+      const secondNotRequired = r1 <= AC || r1 >= RE;
+      const shown = !!showDim2ndMap[lot.lotNo];
+
+      // Auto-open when required
+      if (secondRequired && !shown) {
+        setShowDim2ndMap((prev) => ({
+          ...prev,
+          [lot.lotNo]: true,
+        }));
+      }
+
+      // Check if any 2nd sampling value is entered
+      const has2ndData = data.dimGo2 !== "" || data.dimNoGo2 !== "" || data.dimFlat2 !== "";
+
+      // Auto-hide or popup when 2nd sampling becomes unnecessary
+      if (secondNotRequired && shown && !dimPopupLot) {
+        if (has2ndData) {
+          // Show popup only if user had entered something
+          setDimPopupLot(lot.lotNo);
+        } else {
+          // Auto-hide silently (no popup)
+          setShowDim2ndMap((prev) => ({
+            ...prev,
+            [lot.lotNo]: false,
+          }));
+        }
+      }
+    });
+  }, [lotData, dimPopupLot, showDim2ndMap]);
+
+  /* ------------------------------
+     VISUAL POPUP HANDLERS
+  ------------------------------ */
+  const handleVisualPopupYesKeep = () => {
+    if (!visualPopupLot) return;
+    setShowVisual2ndMap((prev) => ({ ...prev, [visualPopupLot]: false }));
+    setVisualPopupLot(null);
+  };
+
+  const handleVisualPopupNoDelete = () => {
+    if (!visualPopupLot) return;
+    setShowVisual2ndMap((prev) => ({ ...prev, [visualPopupLot]: false }));
+    setLotData((prev) => ({
+      ...prev,
+      [visualPopupLot]: {
+        ...prev[visualPopupLot],
+        visualR2: "",
+      },
+    }));
+    setVisualPopupLot(null);
+  };
+
+  /* ------------------------------
+     DIMENSIONAL POPUP HANDLERS
+  ------------------------------ */
+  const handleDimPopupYesKeep = () => {
+    if (!dimPopupLot) return;
+    setShowDim2ndMap((prev) => ({ ...prev, [dimPopupLot]: false }));
+    setDimPopupLot(null);
+  };
+
+  const handleDimPopupNoDelete = () => {
+    if (!dimPopupLot) return;
+    setShowDim2ndMap((prev) => ({ ...prev, [dimPopupLot]: false }));
+    setLotData((prev) => ({
+      ...prev,
+      [dimPopupLot]: {
+        ...prev[dimPopupLot],
+        dimGo2: "",
+        dimNoGo2: "",
+        dimFlat2: "",
+      },
+    }));
+    setDimPopupLot(null);
+  };
 
   const styles = `
     .section-wrapper {
@@ -162,11 +344,88 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
       padding-top: 12px;
       border-top: 1px dashed #cbd5e1;
     }
+    /* Popup */
+    .popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .popup-box {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 320px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .popup-actions {
+      margin-top: 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .popup-btn {
+      padding: 7px 14px;
+      border-radius: 6px;
+      background: #e2e8f0;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .popup-btn.primary {
+      background: #0f766e;
+      color: white;
+    }
   `;
 
   return (
     <div>
       <style>{styles}</style>
+
+      {/* Visual Popup */}
+      {visualPopupLot && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <p>
+              2nd Sampling is no longer required.
+              <br />
+              Do you want to hide it?
+            </p>
+            <div className="popup-actions">
+              <button className="popup-btn" onClick={handleVisualPopupNoDelete}>
+                No (Clear & Hide)
+              </button>
+              <button className="popup-btn primary" onClick={handleVisualPopupYesKeep}>
+                Yes (Hide Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dimensional Popup */}
+      {dimPopupLot && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <p>
+              2nd Sampling is no longer required.
+              <br />
+              Do you want to hide it?
+            </p>
+            <div className="popup-actions">
+              <button className="popup-btn" onClick={handleDimPopupNoDelete}>
+                No (Clear & Hide)
+              </button>
+              <button className="popup-btn primary" onClick={handleDimPopupYesKeep}>
+                Yes (Hide Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
@@ -196,7 +455,7 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
               const d = lotData[lot.lotNo];
               const r1 = safe(d.visualR1);
               const r2 = safe(d.visualR2);
-              const show2nd = r1 > lot.accpNo;
+              const show2nd = !!showVisual2ndMap[lot.lotNo];
               const totalRejected = r1 + (show2nd ? r2 : 0);
 
               /* 2nd sampling logic: If R1 > Acceptance No., show 2nd sampling */
@@ -308,7 +567,7 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
               const d = lotData[lot.lotNo];
               const r1 = safe(d.dimGo1) + safe(d.dimNoGo1) + safe(d.dimFlat1);
               const r2 = safe(d.dimGo2) + safe(d.dimNoGo2) + safe(d.dimFlat2);
-              const show2nd = r1 > lot.accpNo;
+              const show2nd = !!showDim2ndMap[lot.lotNo];
               const totalRejected = r1 + (show2nd ? r2 : 0);
 
               const status =

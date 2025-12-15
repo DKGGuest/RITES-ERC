@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DataTable from './DataTable';
 import StatusBadge from './StatusBadge';
 import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import { createStageValidationHandler, stageReverseMapping } from '../utils/stageValidation';
+import { getAllSchedules } from '../services/scheduleService';
 
 // Responsive styles for mobile
 const responsiveStyles = `
@@ -114,12 +115,13 @@ const responsiveStyles = `
   }
 `;
 
-const PendingCallsTab = ({ calls, onSchedule, onStart, onBulkSchedule, onBulkStart }) => {
+const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSchedule, onBulkStart }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Call Number');
   const [selectionError, setSelectionError] = useState('');
+  const [scheduledCalls, setScheduledCalls] = useState({});
   const [filters, setFilters] = useState({
     productTypes: [],
     vendors: [],
@@ -130,6 +132,23 @@ const PendingCallsTab = ({ calls, onSchedule, onStart, onBulkSchedule, onBulkSta
     stage: '',
     callNumbers: []
   });
+
+  // Fetch all scheduled calls on component mount
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      try {
+        const schedules = await getAllSchedules();
+        const scheduleMap = {};
+        schedules.forEach(schedule => {
+          scheduleMap[schedule.callNo] = schedule;
+        });
+        setScheduledCalls(scheduleMap);
+      } catch (error) {
+        console.error('Error fetching schedules:', error);
+      }
+    };
+    fetchSchedules();
+  }, []);
 
   const pendingCalls = calls.filter(c => c.status === 'Pending');
 
@@ -227,12 +246,37 @@ const PendingCallsTab = ({ calls, onSchedule, onStart, onBulkSchedule, onBulkSta
     setSelectionError
   );
 
+  // Check if a call is scheduled
+  const isScheduled = (callNo) => !!scheduledCalls[callNo];
+
+  // Refresh schedules after scheduling/rescheduling
+  const refreshSchedules = async () => {
+    try {
+      const schedules = await getAllSchedules();
+      const scheduleMap = {};
+      schedules.forEach(schedule => {
+        scheduleMap[schedule.callNo] = schedule;
+      });
+      setScheduledCalls(scheduleMap);
+    } catch (error) {
+      console.error('Error refreshing schedules:', error);
+    }
+  };
+
   // Show individual actions only when exactly one row is selected
+  // If not scheduled: show SCHEDULE only
+  // If scheduled: show RESCHEDULE and START
   const actions = selectedRows.length === 1 ? (row) => (
     selectedRows.includes(row.id) ? (
       <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
-        <button className="btn btn-sm btn-secondary" onClick={() => onSchedule(row)}>SCHEDULE</button>
-        <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>START</button>
+        {!isScheduled(row.call_no) ? (
+          <button className="btn btn-sm btn-secondary" onClick={() => onSchedule(row, refreshSchedules)}>SCHEDULE</button>
+        ) : (
+          <>
+            <button className="btn btn-sm btn-secondary" onClick={() => onReschedule(row, refreshSchedules)}>RESCHEDULE</button>
+            <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>START</button>
+          </>
+        )}
       </div>
     ) : null
   ) : null;

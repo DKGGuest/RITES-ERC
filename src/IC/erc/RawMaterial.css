@@ -1,0 +1,307 @@
+/* ------------------------------------------------------------------
+   RITES RAW MATERIAL IC – MATCH WORD DOCUMENT EXACTLY
+   Rows 1–5 fully supported including corrected 3-column Row-5
+------------------------------------------------------------------- */
+
+:root {
+  --page-width: 190mm;
+  --border: 1px solid #000;
+  --red: #e60000;
+  --font: "Times New Roman", Times, serif;
+}
+
+/* ----------- A4 PAGE WRAPPER ----------- */
+.rmc-a4 {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+/* ----------- MAIN SHEET ----------- */
+.rmc-sheet {
+  width: var(--page-width);
+  background: #fff;
+  padding: 6mm;
+  font-family: var(--font);
+  font-size: 12px;
+  color: #000;
+  line-height: 1.1;
+  box-sizing: border-box;
+  border: 1px dotted rgba(0, 0, 0, 0.25);
+}
+
+/* ----------- UNIVERSAL TABLE RULES ----------- */
+.rmc-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Main body table (rows 2–6) should respect percentage widths */
+.rmc-main {
+  table-layout: fixed;
+}
+
+.rmc-table td,
+.rmc-table th {
+  border: var(--border);
+  padding: 6px 8px;
+  vertical-align: top;
+  word-break: break-word;
+  white-space: pre-line;
+  font-size: 11px;
+}
+
+/* Small spacer used in header last column */
+.rmc-row-spacer {
+  margin-top: 6px;
+}
+
+/* ============================================================
+   ROW 1 – HEADER (5 columns)
+============================================================ */
+
+.rmc-top-col-1 { width: 7%; }
+.rmc-top-col-2 { width: 7%; }
+.rmc-top-col-3 { width: 28%; }
+.rmc-top-col-4 { width: 28%; }
+.rmc-top-col-5 { width: 30%; }
+
+.rmc-top td {
+  padding: 6px 8px;
+  vertical-align: top;
+}
+
+/* Header label bold (ROW-1 only) */
+.rmc-top .rmc-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* Red values (global) */
+.rmc-value-red {
+  font-weight: 700;
+  color: var(--red);
+  font-size: 11.5px;
+  white-space: pre-line;
+}
+
+
+/* ============================================================
+   ROW 2 – Contractor & Manufacturer
+============================================================ */
+
+.rmc-row2 td {
+  padding: 8px;
+  vertical-align: top;
+}
+
+/* Labels not bold */
+.rmc-row2 .rmc-label {
+  font-weight: normal;
+}
+
+.rmc-row2 .rmc-value-red {
+  font-weight: 700;
+  color: var(--red);
+  font-size: 11.4px;
+}
+
+.rmc-row2 .sub-label {
+  margin-top: 10px;
+  font-size: 11.5px;
+  font-weight: normal;
+  display: block;
+}
+
+
+/* ============================================================
+   ROW 3 – Contract Ref & Bill Paying Officer
+============================================================ */
+
+.rmc-row3 td {
+  padding: 8px;
+}
+
+.rmc-row3 .rmc-label {
+  font-weight: normal;
+}
+
+.rmc-row3 .rmc-value-red {
+  font-weight: 700;
+  color: var(--red);
+  font-size: 11.4px;
+}
+
+.rmc-row3 .sub-label {
+  margin-top: 10px;
+  font-weight: normal;
+  font-size: 11.5px;
+  display: block;
+}
+
+
+/* ============================================================
+   ROW 4 – Consignee Railway / Consignee Manufacturer / Purchasing Authority
+============================================================ */
+
+.rmc-row4 td {
+  padding: 8px;
+  vertical-align: top;
+}
+
+.rmc-row4 .rmc-label,
+.rmc-row4 .sub-label {
+  font-weight: normal;
+  font-size: 11.5px;
+  display: block;
+}
+
+.rmc-row4 .sub-label {
+  margin-top: 10px;
+}
+
+.rmc-row4 .rmc-value-red {
+  font-weight: 700;
+  color: var(--red);
+  font-size: 11.4px;
+  white-space: pre-line;
+}
+
+/* ======================== ROW 5 – 3 COLUMN TABLE (Description / Drg+Spec / QAP) ======================= */
+.rmc-row5-table {
+  table-layout: fixed;
+  border-top: none;  /* avoid double border with previous table */
+}
+
+.rmc-row5-table td {
+  padding: 8px;
+  vertical-align: top;
+  font-size: 11.5px;
+  white-space: pre-line;
+  border: var(--border);
+}
+
+/* LABELS — not bold, block display */
+.rmc-row5-table .rmc-label {
+  font-weight: normal;
+  font-size: 11.5px;
+  display: block;
+  margin-bottom: 3px;
+  line-height: 1.15;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* sublabel spacing (Specn. No. under Drg. No.) */
+.rmc-row5-table .sub-label {
+  margin-top: 10px;
+}
+
+/* RED VALUES */
+.rmc-row5-table .rmc-value-red {
+  color: var(--red);
+  font-weight: 700;
+  font-size: 11.5px;
+  line-height: 1.2;
+  display: block;
+  white-space: pre-line;
+}
+
+/* ======================== ROW 6 – Type of inspection (FULL WIDTH) ======================= */
+.rmc-row6-table {
+  border-top: none;  /* avoid double border */
+}
+
+.rmc-row6-table td {
+  padding: 6px 8px;
+  font-size: 11px;
+  border: var(--border);
+}
+
+.rmc-row6-table .rmc-label {
+  font-weight: bold;
+}
+
+
+/* ============================================================
+   SIX-COLUMN CHP TABLE
+  ============================================================ */
+
+.rmc-inner th {
+  text-align: center;
+  font-weight: 700;
+  font-size: 11.5px;
+  white-space: pre-line;
+}
+
+.rmc-inner .col-chp {
+  width: 12%;
+}
+
+.rmc-inner .col-contract {
+  width: 22%;
+}
+
+.rmc-inner .col-details {
+  width: 30%;
+}
+
+.rmc-inner .col-result {
+  width: 12%;
+}
+
+.rmc-inner .col-qty {
+  width: 12%;
+}
+
+.rmc-inner .col-reject {
+  width: 12%;
+}
+
+
+/* ============================================================
+   BOTTOM GRID & FOOTER
+  ============================================================ */
+
+.rmc-bottom td {
+  font-size: 11.3px;
+}
+
+.rmc-footer {
+  margin-top: 6px;
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+
+
+/* ============================================================
+   PRINT MODE – EXACT A4 OUTPUT
+============================================================ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .rmc-a4 { padding: 0; }
+
+  .rmc-sheet {
+    padding: 0;
+    width: 190mm;
+    border: none;
+  }
+
+  .rmc-table td,
+  .rmc-table th {
+    border: 1px solid #000 !important;
+  }
+}

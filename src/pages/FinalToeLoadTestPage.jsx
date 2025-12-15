@@ -354,38 +354,40 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                   const actualIndex = start + idx;
                   const status = getValueStatus(lot, val);
                   return (
-                    <input
-                      key={actualIndex}
-                      type="number"
-                      step="0.1"
-                      className={`value-input ${status}`}
-                      value={val}
-                      onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, false)}
-                    />
+                    <div key={actualIndex} className="tlp-input-wrapper">
+                      <label className="tlp-input-label">{actualIndex + 1}</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className={`tlp-input ${status}`}
+                        value={val}
+                        onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, false)}
+                        placeholder="0.0"
+                      />
+                    </div>
                   );
                 })}
               </div>
 
-              <div className="tlp-summary-row">
-                <div className="tlp-summary-left">
-                  <div className="tlp-summary-item">
-                    Rejected (R1): <strong className="tlp-r1">{summary.r1}</strong>
-                  </div>
-                  <div className="tlp-summary-item">
-                    Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong>
-                  </div>
+              <div className="tlp-compact-row">
+                <div className="tlp-summary-item">
+                  Rejected (R1): <strong className="tlp-r1">{summary.r1}</strong>
                 </div>
+                <div className="tlp-summary-item">
+                  Accp No.: <strong>{lot.accpNo}</strong> | Rej No.: <strong>{lot.rejNo}</strong> | Cumm. Rej: <strong>{lot.cummRejNo}</strong>
+                </div>
+                <div className="tlp-result-box small" style={{ borderColor: summary.color, color: summary.color }}>{summary.result}</div>
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  start={start}
+                  end={end}
+                  totalCount={lot.sampleSize}
+                  rows={rows}
+                  onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
+                  onPageChange={(p) => setPageMap(prev => ({ ...prev, [lot.lotNo]: p }))}
+                />
               </div>
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                start={start}
-                end={end}
-                totalCount={lot.sampleSize}
-                rows={rows}
-                onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
-                onPageChange={(p) => setPageMap(prev => ({ ...prev, [lot.lotNo]: p }))}
-              />
             </div>
 
             {/* 2nd Sampling - only if triggered */}
@@ -418,47 +420,31 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                   })}
                 </div>
 
-                <div className="tlp-summary-row">
-                  <div className="tlp-summary-left">
-                    <div className="tlp-summary-item">
-                      Rejected (R2): <strong className="tlp-r2">{summary.r2}</strong>
-                    </div>
-                    <div className="tlp-summary-item">
-                      Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'tlp-fail' : 'tlp-ok'}>{summary.total}</strong>
-                    </div>
+                <div className="tlp-compact-row">
+                  <div className="tlp-summary-item">
+                    Rejected (R2): <strong className="tlp-r2">{summary.r2}</strong>
                   </div>
+                  <div className="tlp-summary-item">
+                    Total (R1 + R2): <strong className={summary.total >= lot.cummRejNo ? 'tlp-fail' : 'tlp-ok'}>{summary.total}</strong>
+                  </div>
+                  <div className="tlp-result-box small" style={{ borderColor: summary.color, color: summary.color }}>{summary.result}</div>
+                  <Pagination
+                    currentPage={page2}
+                    totalPages={totalPages2}
+                    start={start2}
+                    end={end2}
+                    totalCount={lot.sampleSize2nd}
+                    rows={rows2}
+                    onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows, true)}
+                    onPageChange={(p) => setPageMap2(prev => ({ ...prev, [lot.lotNo]: p }))}
+                  />
                 </div>
-                <Pagination
-                  currentPage={page2}
-                  totalPages={totalPages2}
-                  start={start2}
-                  end={end2}
-                  totalCount={lot.sampleSize2nd}
-                  rows={rows2}
-                  onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows, true)}
-                  onPageChange={(p) => setPageMap2(prev => ({ ...prev, [lot.lotNo]: p }))}
-                />
               </div>
             )}
 
-            {/* Final Result + Remarks for this lot */}
+            {/* Remarks */}
             <div className="tlp-final-row">
-              <div className="tlp-final-result">
-                <label className="tlp-label">Result of Toe Load Test</label>
-                <div
-                  className="tlp-result-box"
-                  style={{ borderColor: summary.color, color: summary.color }}
-                >
-                  {summary.result}
-                </div>
-                {/* <div className="tlp-result-note">
-                  <span className="tlp-note-ok">✓ OK</span> if R1 ≤ Accp No.<br />
-                  <span className="tlp-note-ok">✓ OK</span> if Accp No. &lt; R1 &lt; Rej No. &amp; (R1 + R2) &lt; Cumm. Rej. No.<br />
-                  <span className="tlp-note-fail">✗ NOT OK</span> if R1 ≥ Rej No. or (R1 + R2) ≥ Cumm. Rej. No.
-                </div> */}
-              </div>
-
-              <div className="tlp-remarks">
+              <div className="tlp-remarks-section">
                 <label className="tlp-label">Remarks</label>
                 <textarea
                   rows={3}

@@ -126,10 +126,10 @@ const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'ERC-12
   return (
     <div className="dimensional-page-container">
       <div className="dimensional-page-header">
+        <h1 className="dimensional-page-title">📐 Dimensional Check & Material Testing</h1>
         <button className="dimensional-back-btn" onClick={onBack}>
           ← Back to Sub Module Session
         </button>
-        <h1 className="dimensional-page-title">📐 Dimensional Check & Material Testing</h1>
       </div>
 
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />

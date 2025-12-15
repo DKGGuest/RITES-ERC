@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
+import { savePoDetails, saveCallDetails, saveSubPoDetails, saveProductionLines } from '../services/inspectionFormService';
 
 // Responsive styles for mobile
 const responsiveStyles = `
@@ -40,6 +41,7 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
   const [sectionDVerified, setSectionDVerified] = useState(false);
   const [showSectionA] = useState(true);
   const [showSectionB] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const currentDateTime = new Date('2025-11-14T17:00:00').toLocaleString();
 
   // scroll to top when page mounts so navigation positions at the start
@@ -102,6 +104,82 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
     } catch (e) { /* no-op */ }
   }, [productionLines, onSelectedLinesChange]);
 
+  /**
+   * Save form data to backend before proceeding
+   */
+  const handleProceed = async () => {
+    setIsSaving(true);
+    try {
+      const userId = localStorage.getItem('userId') || 'system';
+
+      // Save Section A: PO Details
+      if (sectionAVerified) {
+        await savePoDetails({
+          inspectionCallNo: call.call_no,
+          poNumber: call.po_no,
+          poDate: call.po_date,
+          productName: call.product_name,
+          vendorName: call.vendor_name,
+          poQuantity: call.po_qty,
+          placeOfInspection: call.place_of_inspection,
+          isVerified: true,
+          verifiedBy: userId
+        });
+      }
+
+      // Save Section B: Inspection Call Details
+      if (sectionBVerified) {
+        await saveCallDetails({
+          inspectionCallNo: call.call_no,
+          inspectionCallDate: call.call_date,
+          shiftOfInspection: shiftOfInspection,
+          dateOfInspection: dateOfInspection,
+          productName: call.product_name,
+          productType: call.product_type,
+          poQty: call.po_qty,
+          callQty: call.call_qty,
+          offeredQty: offeredQty,
+          placeOfInspection: call.place_of_inspection,
+          isVerified: true,
+          verifiedBy: userId
+        });
+      }
+
+      // Save Section C: Sub PO Details (if applicable)
+      if (sectionCVerified && isSectionCRequired) {
+        await saveSubPoDetails({
+          inspectionCallNo: call.call_no,
+          rawMaterialName: call.product_name,
+          placeOfInspection: call.place_of_inspection,
+          isVerified: true,
+          verifiedBy: userId
+        });
+      }
+
+      // Save Section D: Production Lines (for Process inspections)
+      if (sectionDVerified && isSectionDRequired && productionLines.length > 0) {
+        const linesToSave = productionLines.map(line => ({
+          inspectionCallNo: call.call_no,
+          lineNumber: line.lineNumber,
+          icNumber: line.icNumber || '',
+          poNumber: line.poNumber || '',
+          rawMaterialIcs: line.rawMaterialICs || [],
+          productType: line.productType || '',
+          isVerified: true,
+          verifiedBy: userId
+        }));
+        await saveProductionLines(call.call_no, linesToSave);
+      }
+
+      // Proceed to next step after saving
+      onProceed(call.product_type);
+    } catch (error) {
+      console.error('Error saving inspection form data:', error);
+      alert('Failed to save inspection data. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div>
@@ -153,11 +231,11 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
             <button className="btn btn-secondary" onClick={onBack} style={{ minHeight: '48px' }}>Back to Landing Page</button>
             <button
             className="btn btn-primary"
-            disabled={!canProceed}
-            onClick={() => onProceed(call.product_type)}
+            disabled={!canProceed || isSaving}
+            onClick={handleProceed}
             style={{ minHeight: '48px' }}
             >
-            {canProceed ? 'Proceed to Inspection' : 'Complete All Sections to Proceed'}
+            {isSaving ? 'Saving...' : (canProceed ? 'Proceed to Inspection' : 'Complete All Sections to Proceed')}
             </button>
         </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LoginPage from './pages/LoginPage';
 import IELandingPage from './pages/IELandingPage';
 import InspectionInitiationPage from './pages/InspectionInitiationPage';
 import MultiTabInspectionInitiationPage from './pages/MultiTabInspectionInitiationPage';
@@ -25,17 +26,48 @@ import FinalApplicationDeflectionPage from './pages/FinalApplicationDeflectionPa
 import FinalToeLoadTestPage from './pages/FinalToeLoadTestPage';
 import FinalWeightTestPage from './pages/FinalWeightTestPage';
 import FinalReportsPage from './pages/FinalReportsPage';
+import RawMaterialCertificate from './IC/erc/rawmaterial';
+import ProcessMaterialCertificate from './IC/erc/ProcessMaterial';
+import { isAuthenticated, getStoredUser, logoutUser } from './services/authService';
 
 const App = () => {
+  // Authentication state
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+
   const [currentPage, setCurrentPage] = useState('landing');
   const [selectedCall, setSelectedCall] = useState(null);
   const [selectedCalls, setSelectedCalls] = useState([]);
-  const [userEmail] = useState('inspector@sarthi.com');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile overlay
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop collapse
-
-  // Track which inspection type is currently active (to show only that option in nav)
   const [activeInspectionType, setActiveInspectionType] = useState(null); // 'raw-material', 'process', or 'final-product'
+	  const [landingActiveTab, setLandingActiveTab] = useState('pending'); // Which tab is active on landing page
+
+  // Check authentication on mount
+  useEffect(() => {
+    if (isAuthenticated()) {
+      const user = getStoredUser();
+      setCurrentUser(user);
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  // Handle successful login
+  const handleLoginSuccess = (userData) => {
+    setCurrentUser(userData);
+    setIsLoggedIn(true);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    logoutUser();
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setCurrentPage('landing');
+    setSelectedCall(null);
+    setSelectedCalls([]);
+    setActiveInspectionType(null);
+  };
 
   // Shared state for submodule pages
   const [rmHeats, setRmHeats] = useState([{ heatNo: '', weight: '' }]);
@@ -53,14 +85,10 @@ const App = () => {
   const [processLotNumbers, setProcessLotNumbers] = useState(['LOT-001', 'LOT-002', 'LOT-003']);
 
   useEffect(() => {
-    // Ensure page scrolls to top when switching pages
-    try {
-      window.scrollTo(0, 0);
-      const mainEl = document.querySelector('.main-content');
-      if (mainEl) mainEl.scrollTop = 0;
-    } catch (e) {
-      // ignore in non-browser environments
-    }
+    // Scroll to top on page change
+    window.scrollTo(0, 0);
+    const mainEl = document.querySelector('.main-content');
+    if (mainEl) mainEl.scrollTop = 0;
   }, [currentPage]);
 
   const handleStartInspection = (call) => {
@@ -88,12 +116,21 @@ const App = () => {
     }
   };
 
-  const handleBackToLanding = () => {
-    setCurrentPage('landing');
-    setSelectedCall(null);
-    setSelectedCalls([]);
-    setActiveInspectionType(null); // Reset active inspection type when returning to landing
-  };
+	  const handleBackToLanding = () => {
+	    setCurrentPage('landing');
+	    setSelectedCall(null);
+	    setSelectedCalls([]);
+	    setActiveInspectionType(null);
+	    setLandingActiveTab('pending');
+	  };
+
+	  const handleBackToIssuanceIC = () => {
+	    setCurrentPage('landing');
+	    setSelectedCall(null);
+	    setSelectedCalls([]);
+	    setActiveInspectionType(null);
+	    setLandingActiveTab('certificates');
+	  };
 
   // Navigation to submodule pages
   const handleNavigateToSubModule = (subModule) => {
@@ -111,6 +148,11 @@ const App = () => {
   const handleBackToFinalProduct = () => {
     setCurrentPage('final-product');
   };
+
+  // Show login page if not authenticated
+  if (!isLoggedIn) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <div>
@@ -131,22 +173,25 @@ const App = () => {
             ☰
           </button>
           <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-            {new Date('2025-11-14T17:00:00').toLocaleString()}
+            {new Date().toLocaleString()}
           </div>
           <div className="user-info">
-            <div className="user-avatar">IE</div>
+            <div className="user-avatar">{currentUser?.userName?.charAt(0)?.toUpperCase() || 'U'}</div>
             <div>
-              <div style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text)' }}>Inspector Engineer</div>
-              <div>{userEmail}</div>
+              <div style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text)' }}>
+                {currentUser?.userName || 'User'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                {currentUser?.roleName || 'Inspector'}
+              </div>
             </div>
           </div>
-          <button className="btn btn-sm btn-outline">Logout</button>
+          <button className="btn btn-sm btn-outline" onClick={handleLogout}>Logout</button>
         </div>
       </header>
 
-      <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-          {/* Desktop collapse toggle button */}
+      <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}> 
+        <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} ${isSidebarCollapsed ? 'collapsed' : ''}`}> 
           <button
             className="sidebar-toggle-btn"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -164,47 +209,43 @@ const App = () => {
                 <span className="sidebar-icon">🏠</span>
                 <span className="sidebar-text">Landing Page</span>
               </li>
-              {/* Only show Raw Material if it's the active inspection type or no type selected yet */}
               {(activeInspectionType === 'raw-material' || activeInspectionType === null) && (
-              <li
-                className={`sidebar-item ${currentPage === 'raw-material' ? 'active' : ''}`}
-                onClick={() => { if (activeInspectionType === 'raw-material') { setCurrentPage('raw-material'); setIsSidebarOpen(false); } }}
-                style={{ opacity: activeInspectionType === 'raw-material' ? 1 : 0.5, cursor: activeInspectionType === 'raw-material' ? 'pointer' : 'not-allowed' }}
-                title="Raw Material Inspection"
-              >
-                <span className="sidebar-icon">📦</span>
-                <span className="sidebar-text">Raw Material Inspection</span>
-              </li>
+                <li
+                  className={`sidebar-item ${currentPage === 'raw-material' ? 'active' : ''}`}
+                  onClick={() => { if (activeInspectionType === 'raw-material') { setCurrentPage('raw-material'); setIsSidebarOpen(false); } }}
+                  style={{ opacity: activeInspectionType === 'raw-material' ? 1 : 0.5, cursor: activeInspectionType === 'raw-material' ? 'pointer' : 'not-allowed' }}
+                  title="Raw Material Inspection"
+                >
+                  <span className="sidebar-icon">📦</span>
+                  <span className="sidebar-text">Raw Material Inspection</span>
+                </li>
               )}
-              {/* Only show Process Inspection if it's the active inspection type or no type selected yet */}
               {(activeInspectionType === 'process' || activeInspectionType === null) && (
-              <li
-                className={`sidebar-item ${currentPage === 'process' ? 'active' : ''}`}
-                onClick={() => { if (activeInspectionType === 'process') { setCurrentPage('process'); setIsSidebarOpen(false); } }}
-                style={{ opacity: activeInspectionType === 'process' ? 1 : 0.5, cursor: activeInspectionType === 'process' ? 'pointer' : 'not-allowed' }}
-                title="Process Inspection"
-              >
-                <span className="sidebar-icon">⚙️</span>
-                <span className="sidebar-text">Process Inspection</span>
-              </li>
+                <li
+                  className={`sidebar-item ${currentPage === 'process' ? 'active' : ''}`}
+                  onClick={() => { if (activeInspectionType === 'process') { setCurrentPage('process'); setIsSidebarOpen(false); } }}
+                  style={{ opacity: activeInspectionType === 'process' ? 1 : 0.5, cursor: activeInspectionType === 'process' ? 'pointer' : 'not-allowed' }}
+                  title="Process Inspection"
+                >
+                  <span className="sidebar-icon">⚙️</span>
+                  <span className="sidebar-text">Process Inspection</span>
+                </li>
               )}
-              {/* Only show Final Product if it's the active inspection type or no type selected yet */}
               {(activeInspectionType === 'final-product' || activeInspectionType === null) && (
-              <li
-                className={`sidebar-item ${currentPage === 'final-product' ? 'active' : ''}`}
-                onClick={() => { if (activeInspectionType === 'final-product') { setCurrentPage('final-product'); setIsSidebarOpen(false); } }}
-                style={{ opacity: activeInspectionType === 'final-product' ? 1 : 0.5, cursor: activeInspectionType === 'final-product' ? 'pointer' : 'not-allowed' }}
-                title="Final Product Inspection"
-              >
-                <span className="sidebar-icon">✅</span>
-                <span className="sidebar-text">Final Product Inspection</span>
-              </li>
+                <li
+                  className={`sidebar-item ${currentPage === 'final-product' ? 'active' : ''}`}
+                  onClick={() => { if (activeInspectionType === 'final-product') { setCurrentPage('final-product'); setIsSidebarOpen(false); } }}
+                  style={{ opacity: activeInspectionType === 'final-product' ? 1 : 0.5, cursor: activeInspectionType === 'final-product' ? 'pointer' : 'not-allowed' }}
+                  title="Final Product Inspection"
+                >
+                  <span className="sidebar-icon">✅</span>
+                  <span className="sidebar-text">Final Product Inspection</span>
+                </li>
               )}
             </ul>
           </nav>
         </aside>
 
-        {/* Mobile overlay when sidebar is open */}
         {isSidebarOpen && (
           <div
             className="sidebar-overlay"
@@ -212,14 +253,16 @@ const App = () => {
             aria-hidden="true"
           />
         )}
-
         <main className="main-content">
-          {currentPage === 'landing' && (
-            <IELandingPage
-              onStartInspection={handleStartInspection}
-              onStartMultipleInspections={handleStartMultipleInspections}
-            />
-          )}
+	          {currentPage === 'landing' && (
+	            <IELandingPage
+	              onStartInspection={handleStartInspection}
+	              onStartMultipleInspections={handleStartMultipleInspections}
+	              setSelectedCall={setSelectedCall}
+	              setCurrentPage={setCurrentPage}
+	              initialTab={landingActiveTab}
+	            />
+	          )}
           {currentPage === 'initiation' && selectedCall && (
             <InspectionInitiationPage
               call={selectedCall}
@@ -334,6 +377,12 @@ const App = () => {
           {currentPage === 'final-reports' && (
             <FinalReportsPage onBack={handleBackToFinalProduct} onNavigateSubmodule={setCurrentPage} />
           )}
+	          {currentPage === 'ic-rawmaterial' && selectedCall && (
+	            <RawMaterialCertificate call={selectedCall} onBack={handleBackToIssuanceIC} />
+	          )}
+	          {currentPage === 'ic-processmaterial' && selectedCall && (
+	            <ProcessMaterialCertificate call={selectedCall} onBack={handleBackToIssuanceIC} />
+	          )}
         </main>
       </div>
     </div>

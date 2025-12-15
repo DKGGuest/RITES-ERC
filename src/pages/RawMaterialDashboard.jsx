@@ -287,8 +287,11 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
         {/* Action Buttons */}
         <div className="rm-action-buttons" style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '24px' }}>
           <button className="btn btn-outline" style={{ minHeight: '44px', padding: '10px 20px' }}>Save Draft</button>
-          <button className="btn btn-secondary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { if (window.confirm('Are you sure you want to reject this lot?')) { alert('Raw Material lot rejected'); } }}>Reject Lot</button>
-          <button className="btn btn-primary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { alert('Raw Material lot accepted and inspection completed!'); onBack(); }}>Accept Lot &amp; Complete Inspection</button>
+          {/* <button className="btn btn-secondary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { if (window.confirm('Are you sure you want to reject this lot?')) { alert('Raw Material lot rejected'); } }}>Reject Lot</button>
+          <button className="btn btn-primary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { alert('Raw Material lot accepted and inspection completed!'); onBack(); }}>Accept Lot &amp; Complete Inspection</button> */}
+           <button className="btn btn-outline">Pause Inspection</button>
+          <button className="btn btn-outline">Withheld Inspection</button>
+          <button className="btn btn-primary">Finish Inspection</button>
         </div>
       </div>
 

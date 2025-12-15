@@ -288,7 +288,7 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
       <Divider sx={{ mb: 3 }} />
 
       {/* Save Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+      {/* <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
         <Button
           variant="contained"
           color="primary"
@@ -297,7 +297,7 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
         >
           Save Calibration Data
         </Button>
-      </Box>
+      </Box> */}
 
       {/* Error Summary */}
       {Object.keys(errors).length > 0 && (

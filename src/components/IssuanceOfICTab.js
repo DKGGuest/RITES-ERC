@@ -6,7 +6,7 @@ import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import CallsFilterSection from './common/CallsFilterSection';
 import { createStageValidationHandler } from '../utils/stageValidation';
 
-const IssuanceOfICTab = ({ calls }) => {
+const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Call Number');
@@ -108,13 +108,37 @@ const IssuanceOfICTab = ({ calls }) => {
     console.log('View selected IC calls:', selectedICCalls.map(call => call.call_no));
   };
 
+  const getICPageForStage = (stage) => {
+    if (stage === 'Raw Material Inspection' || stage === 'Raw Material') {
+      return 'ic-rawmaterial';
+    } else if (stage === 'Process Inspection' || stage === 'ERC Process' || stage.includes('Process')) {
+      return 'ic-processmaterial';
+    } else if (stage === 'Final Product Inspection' || stage === 'Final Product' || stage.includes('Final')) {
+      return 'ic-finalproduct';
+    }
+    return 'ic-rawmaterial'; // default fallback
+  };
+
   const actions = selectedRows.length === 1 ? (row) => (
     selectedRows.includes(row.id) ? (
       <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
-        <button className="btn btn-sm btn-primary" onClick={() => console.log('Issue IC for:', row.call_no)}>
+        <button
+          className="btn btn-sm btn-primary"
+          onClick={() => {
+            if (setSelectedCall) setSelectedCall(row);
+            if (setCurrentPage) setCurrentPage(getICPageForStage(row.stage));
+          }}
+        >
           Issue IC
         </button>
-        <button className="btn btn-sm btn-outline" onClick={() => console.log('View Details:', row.call_no)}>
+
+        <button
+          className="btn btn-sm btn-outline"
+          onClick={() => {
+            if (setSelectedCall) setSelectedCall(row);
+            if (setCurrentPage) setCurrentPage(getICPageForStage(row.stage));
+          }}
+        >
           View
         </button>
       </div>

@@ -588,7 +588,9 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         {/* ACTION BUTTONS */}
         <div className="fp-actions">
           <button className="btn btn-outline">Save Draft</button>
-          <button className="btn btn-primary">Submit &amp; Generate IC</button>
+          <button className="btn btn-outline">Pause Inspection</button>
+          <button className="btn btn-outline">Withheld Inspection</button>
+          <button className="btn btn-primary">Finish Inspection</button>
         </div>
       </div>
 

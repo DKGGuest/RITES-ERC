@@ -899,7 +899,7 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         </div>
 
         {/* Validation Rules Info */}
-        <div style={{ padding: 'var(--space-16)', backgroundColor: '#fffbeb', borderTop: '1px solid #fbbf24' }}>
+        {/* <div style={{ padding: 'var(--space-16)', backgroundColor: '#fffbeb', borderTop: '1px solid #fbbf24' }}>
           <strong style={{ color: '#92400e' }}>📋 Validation Rules Applied:</strong>
           <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', color: '#92400e', fontSize: '13px' }}>
             <li>Qty Accepted in Raw Material Stage ≥ Qty Accepted in Process Inspection</li>
@@ -907,9 +907,19 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
             <li>Qty Accepted in Final Inspection ≤ Qty Ordered in PO</li>
             <li>Accepted quantity mapped to any PO must not exceed Raw Material quantity passed for that PO</li>
           </ul>
-        </div>
+        </div> */}
       </div>
-
+     
+        {/* Action Buttons */}
+        <div className="rm-action-buttons" style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '24px' }}>
+          <button className="btn btn-outline" style={{ minHeight: '44px', padding: '10px 20px' }}>Save Draft</button>
+          {/* <button className="btn btn-secondary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { if (window.confirm('Are you sure you want to reject this lot?')) { alert('Raw Material lot rejected'); } }}>Reject Lot</button>
+          <button className="btn btn-primary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { alert('Raw Material lot accepted and inspection completed!'); onBack(); }}>Accept Lot &amp; Complete Inspection</button> */}
+           <button className="btn btn-outline">Pause Inspection</button>
+          <button className="btn btn-outline">Withheld Inspection</button>
+          <button className="btn btn-primary">Finish Inspection</button>
+        </div>
+        
       {/* Return button */}
       <div style={{ marginTop: 'var(--space-24)' }}>
         <button className="btn btn-secondary" onClick={onBack}>Return to Landing Page</button>

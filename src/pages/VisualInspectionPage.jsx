@@ -73,10 +73,10 @@ const VisualInspectionPage = ({ onBack, heats = [] }) => {
   return (
     <div className="visual-page-container">
       <div className="visual-page-header">
+        <h1 className="visual-page-title">👁️ Visual Inspection</h1>
         <button className="visual-back-btn" onClick={onBack}>
           ← Back to Sub Module Session
         </button>
-        <h1 className="visual-page-title">👁️ Visual Inspection</h1>
       </div>
 
       <div className="card">

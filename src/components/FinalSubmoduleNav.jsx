@@ -7,11 +7,11 @@ import './FinalSubmoduleNav.css';
 
 const FINAL_SUBMODULES = [
   { id: 'final-calibration-documents', label: 'Calibration', icon: '📋' },
-  { id: 'final-visual-dimensional', label: 'Visual & Dim', icon: '👁️' },
+  { id: 'final-visual-dimensional', label: 'Visual', icon: '👁️' },
   { id: 'final-chemical-analysis', label: 'Chemical', icon: '🧪' },
   { id: 'final-hardness-test', label: 'Hardness', icon: '💎' },
   { id: 'final-inclusion-rating', label: 'Inclusion', icon: '🔬' },
-  { id: 'final-application-deflection', label: 'Deflection', icon: '📏' },
+  { id: 'final-application-deflection', label: 'Dim & Defl', icon: '📏' },
   { id: 'final-weight-test', label: 'Weight', icon: '⚖️' },
   { id: 'final-toe-load-test', label: 'Toe Load', icon: '🦶' },
   { id: 'final-reports', label: 'Reports', icon: '📊' },
