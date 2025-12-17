@@ -113,7 +113,7 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [], shift: selectedShi
   );
 
   // Product type for validation (can be changed based on selection)
-  const [productType, setProductType] = useState('MK-III'); // Options: MK-III, MK-V, ERC-J
+  // const [productType, setProductType] = useState('MK-III'); // Options: MK-III, MK-V, ERC-J
 
   const shift = selectedShift; // A, B, C, G - provided by parent (Section B)
 
