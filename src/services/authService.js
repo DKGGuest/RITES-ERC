@@ -3,7 +3,8 @@
  * Handles login API calls and token management
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/sarthi-backend';
+// TODO: Uncomment for production with backend
+// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/sarthi-backend';
 
 /**
  * Login user with userId and password
@@ -12,6 +13,8 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/sar
  * @returns {Promise<Object>} Login response with user data and token
  */
 export const loginUser = async (userId, password) => {
+  // TODO: Uncomment for production with backend
+  /*
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
@@ -34,6 +37,26 @@ export const loginUser = async (userId, password) => {
   } catch (error) {
     throw error;
   }
+  */
+
+  // Mock login for Vercel deployment (no backend)
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      // Accept any userId with password "password" or "123456" for demo
+      if (password === 'password' || password === '123456' || password === 'admin') {
+        resolve({
+          data: {
+            token: 'mock-jwt-token-for-vercel-deployment',
+            userId: userId,
+            userName: `User ${userId}`,
+            roleName: 'Inspector'
+          }
+        });
+      } else {
+        reject(new Error('Invalid credentials. Use password: "password" or "123456"'));
+      }
+    }, 500); // Simulate network delay
+  });
 };
 
 /**

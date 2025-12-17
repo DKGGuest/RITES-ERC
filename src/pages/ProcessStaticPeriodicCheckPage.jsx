@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import ProcessLineToggle from '../components/ProcessLineToggle';
+import ProcessSubmoduleNav from '../components/ProcessSubmoduleNav';
 
-const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [] }) => {
+const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [], onNavigateSubmodule }) => {
   // Active line + per-line state store
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
   const defaultLineState = {
@@ -57,6 +58,12 @@ const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [] }) => {
           ← Back to Process Dashboard
         </button>
       </div>
+
+      {/* Submodule Navigation */}
+      <ProcessSubmoduleNav
+        currentSubmodule="process-static-periodic-check"
+        onNavigate={onNavigateSubmodule}
+      />
 
       {/* Equipment Verification Checks */}
       <div className="card">

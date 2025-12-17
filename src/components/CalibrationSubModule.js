@@ -1,45 +1,68 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  FormControlLabel, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Box,
+  Typography,
+  TextField,
+  FormControlLabel,
   Switch,
   Grid,
   Paper,
   Divider,
   Alert
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
 import CalibrationHeatRow from './CalibrationHeatRow';
+import HeatToggle from './HeatToggle';
+
+const STORAGE_KEY = 'calibration_draft_data';
 
 /**
  * Calibration & Document Verification Sub Module
  * Inside ERC Raw Material Inspection Main Module
- * 
- * This page covers the calibration information of all the instruments used during 
+ *
+ * This page covers the calibration information of all the instruments used during
  * the inspection of Raw Material & document verification of that particular vendor
  */
-const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
-  const [formData, setFormData] = useState({
-    rdsoApprovalValidity: {
-      approvalId: '',
-      validFrom: '',
-      validTo: ''
-    },
-    heats: [],
-    gaugesAvailable: false,
-    vendorVerification: {
-      verified: false,
-      verifiedBy: '',
-      verifiedAt: ''
+const CalibrationSubModule = ({ preInspectionHeats = [], inspectionCallNo = '' }) => {
+  const [activeHeatIndex, setActiveHeatIndex] = useState(0);
+
+  // Load draft data from localStorage or initialize empty
+  const loadDraftData = useCallback(() => {
+    const storageKey = `${STORAGE_KEY}_${inspectionCallNo}`;
+    const savedDraft = localStorage.getItem(storageKey);
+    if (savedDraft) {
+      try {
+        return JSON.parse(savedDraft);
+      } catch (e) {
+        console.error('Error parsing draft data:', e);
+      }
     }
+    return null;
+  }, [inspectionCallNo]);
+
+  const [formData, setFormData] = useState(() => {
+    const draft = loadDraftData();
+    if (draft) {
+      return draft;
+    }
+    return {
+      rdsoApprovalValidity: {
+        approvalId: '',
+        validFrom: '',
+        validTo: ''
+      },
+      heats: [],
+      gaugesAvailable: false,
+      vendorVerification: {
+        verified: false,
+        verifiedBy: '',
+        verifiedAt: ''
+      }
+    };
   });
 
   const [errors, setErrors] = useState({});
 
-  // Initialize heats from pre-inspection data
+  // Initialize heats from pre-inspection data (only if no draft exists)
   useEffect(() => {
     if (preInspectionHeats && preInspectionHeats.length > 0 && formData.heats.length === 0) {
       const initialHeats = preInspectionHeats.map(heat => ({
@@ -53,6 +76,12 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
       setFormData(prev => ({ ...prev, heats: initialHeats }));
     }
   }, [preInspectionHeats, formData.heats.length]);
+
+  // Auto-save to localStorage on formData change (persist while switching tabs/submodules)
+  useEffect(() => {
+    const storageKey = `${STORAGE_KEY}_${inspectionCallNo}`;
+    localStorage.setItem(storageKey, JSON.stringify(formData));
+  }, [formData, inspectionCallNo]);
 
   const handleRDSOChange = (field, value) => {
     setFormData(prev => ({
@@ -73,18 +102,6 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
     setFormData(prev => ({ ...prev, heats: updatedHeats }));
   };
 
-  const handleAddHeat = () => {
-    const newHeat = {
-      heatNo: `HEAT-${formData.heats.length + 1}`,
-      percentC: '',
-      percentSi: '',
-      percentMn: '',
-      percentP: '',
-      percentS: ''
-    };
-    setFormData(prev => ({ ...prev, heats: [...prev.heats, newHeat] }));
-  };
-
   const handleRemoveHeat = (index) => {
     const updatedHeats = formData.heats.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, heats: updatedHeats }));
@@ -94,6 +111,8 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
     setFormData(prev => ({ ...prev, gaugesAvailable: event.target.checked }));
   };
 
+  // Validation will be called from parent component during Save Draft or Submit
+  // eslint-disable-next-line no-unused-vars
   const validateForm = () => {
     const newErrors = {};
     
@@ -144,28 +163,6 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSave = () => {
-    if (validateForm()) {
-      console.log('Calibration & Document Verification Data:', formData);
-
-      // TODO: Future integration with Spring Boot API
-      // Example API call:
-      // fetch('/api/calibration/save', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // })
-
-      if (onSave) {
-        onSave(formData);
-      }
-
-      alert('Data saved successfully! Check console for details.');
-    } else {
-      alert('Please fix validation errors before saving.');
-    }
   };
 
   return (
@@ -230,36 +227,39 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
 
       {/* Heat Rows */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-          Ladle Analysis of Each Heat as per TC
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Ladle Analysis of Each Heat as per TC
+          </Typography>
+        </Box>
 
         {formData.heats.length === 0 && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            No heats available. Add heat rows or ensure pre-inspection data is entered.
+            No heats available. Ensure pre-inspection data is entered.
           </Alert>
         )}
 
-        {formData.heats.map((heat, index) => (
+        {/* Heat Toggle - Switch between heats */}
+        {formData.heats.length > 0 && (
+          <HeatToggle
+            heats={formData.heats}
+            activeHeatIndex={activeHeatIndex}
+            onHeatChange={setActiveHeatIndex}
+          />
+        )}
+
+        {/* Show only the selected heat */}
+        {formData.heats.length > 0 && formData.heats[activeHeatIndex] && (
           <CalibrationHeatRow
-            key={index}
-            heat={heat}
-            index={index}
+            key={activeHeatIndex}
+            heat={formData.heats[activeHeatIndex]}
+            index={activeHeatIndex}
             onUpdate={handleHeatUpdate}
             onRemove={handleRemoveHeat}
-            canRemove={formData.heats.length > 1}
-            isVendor={true} // TODO: Replace with actual role check
+            canRemove={false}
+            isVendor={true}
           />
-        ))}
-
-        <Button
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={handleAddHeat}
-          sx={{ mt: 2 }}
-        >
-          Add Heat Row
-        </Button>
+        )}
       </Box>
 
       <Divider sx={{ mb: 3 }} />
@@ -284,20 +284,6 @@ const CalibrationSubModule = ({ preInspectionHeats = [], onSave }) => {
           label={formData.gaugesAvailable ? 'Yes - RDSO approved Gauges Available' : 'No - RDSO approved Gauges Not Available'}
         />
       </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* Save Button */}
-      {/* <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSave}
-          size="large"
-        >
-          Save Calibration Data
-        </Button>
-      </Box> */}
 
       {/* Error Summary */}
       {Object.keys(errors).length > 0 && (

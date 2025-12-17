@@ -111,8 +111,18 @@ export default function RawMaterialPreview({ data = {} }) {
               </td>
             </tr>
 
-            {/* ROW 5: Description / Drg + Spec / QAP (3 columns) */}
-            <tr className="rmc-row5">
+          </tbody>
+        </table>
+
+        {/* =============== ROW 5: Description / Drg+Spec / QAP (3 COLUMNS - SEPARATE TABLE) =============== */}
+        <table className="rmc-table rmc-row5-table">
+          <colgroup>
+            <col style={{ width: "40%" }} />
+            <col style={{ width: "25%" }} />
+            <col style={{ width: "35%" }} />
+          </colgroup>
+          <tbody>
+            <tr>
               <td className="col-desc">
                 <span className="rmc-label">विवरण / Description</span>
                 <span className="rmc-value-red">{get("description")}</span>
@@ -124,20 +134,22 @@ export default function RawMaterialPreview({ data = {} }) {
                 <span className="rmc-value-red">{get("specNo")}</span>
               </td>
               <td className="col-qap">
-                <span className="rmc-label">
-                  प्रमाण आधार योजना सं. / QAP No.
-                </span>
+                <span className="rmc-label">गुणवत्ता आश्वासन योजना सं. / QAP No.</span>
                 <span className="rmc-value-red">{get("qapNo")}</span>
               </td>
             </tr>
+          </tbody>
+        </table>
 
-            {/* ROW 6: Static text – Type of inspection/tests conducted */}
+        {/* =============== ROW 6: Type of inspection/tests conducted (FULL WIDTH) =============== */}
+        <table className="rmc-table rmc-row6-table">
+          <tbody>
             <tr>
-              <td colSpan={3}>
+              <td>
                 <span className="rmc-label">
                   किए गए निरीक्षण/परीक्षण विवरण / Type of inspection/tests
                   conducted: Visual / Physical / Chemical / Metallurgical /
-                  Electrical / Dimensional / ADP / Performance
+                  Electrical / Dimensional / NDT / Performance
                 </span>
               </td>
             </tr>

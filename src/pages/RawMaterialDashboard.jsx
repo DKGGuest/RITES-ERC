@@ -10,14 +10,44 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
 
   // Pre-Inspection Data Entry State
   const [sourceOfRawMaterial, setSourceOfRawMaterial] = useState('');
+  // Mock data simulating vendor call data - will be replaced with API data
   const [heats] = useState([
-    { heatNo: 'H001', weight: '2.5', colorCode: 'RED' },
-    { heatNo: 'H002', weight: '3.0', colorCode: 'BLUE' }
+    {
+      id: 1,
+      heatNo: 'H001',
+      weight: '2.5',
+      tcNo: 'TC-2025-001',
+      tcDate: '2025-11-10',
+      manufacturerName: 'Steel Authority of India',
+      invoiceNumber: 'INV-2025-0012',
+      invoiceDate: '2025-11-05',
+      subPoNumber: 'SPO-2025-001',
+      subPoDate: '2025-10-15',
+      subPoQty: '5.0',
+      totalValueOfPo: '₹ 25,00,000',
+      tcQuantity: '2.5',
+      offeredQty: '2.5',
+      colorCode: ''
+    },
+    {
+      id: 2,
+      heatNo: 'H002',
+      weight: '3.0',
+      tcNo: 'TC-2025-002',
+      tcDate: '2025-11-12',
+      manufacturerName: 'Steel Authority of India',
+      invoiceNumber: 'INV-2025-0012',
+      invoiceDate: '2025-11-05',
+      subPoNumber: 'SPO-2025-001',
+      subPoDate: '2025-10-15',
+      subPoQty: '5.0',
+      totalValueOfPo: '₹ 25,00,000',
+      tcQuantity: '3.0',
+      offeredQty: '3.0',
+      colorCode: ''
+    }
   ]);
-  const [numberOfBundles, setNumberOfBundles] = useState('10');
-  const [testCertificates] = useState([
-    { certificateNo: 'TC-2025-001', heatNo: 'H001', certificateDate: '2025-11-10' }
-  ]);
+  const [numberOfBundles, setNumberOfBundles] = useState('');
 
 
 
@@ -53,10 +83,20 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
     return heats.length;
   }, [heats]);
 
+  /**
+   * Calculate No. of ERC (Finished) based on product model
+   * MK-V:   Weight / 0.00114 (weight per clip in MT)
+   * MK-III: Weight / 0.000092 (weight per clip in MT)
+   */
   const numberOfERC = useMemo(() => {
-    // Assuming 1 ERC per 0.5 MT of material
-    return Math.ceil(parseFloat(totalQuantity) / 0.5);
-  }, [totalQuantity]);
+    const weightMT = parseFloat(totalQuantity) || 0;
+    if (productModel === 'MK-V') {
+      return Math.floor(weightMT / 0.00114);
+    } else {
+      // MK-III
+      return Math.floor(weightMT / 0.000092);
+    }
+  }, [totalQuantity, productModel]);
 
   // (defect lists and counts handled in visual module state)
 
@@ -66,7 +106,7 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
     if (isInitialMount.current) {
       isInitialMount.current = false;
     }
-  }, [sourceOfRawMaterial, heats, numberOfBundles, testCertificates]);
+  }, [sourceOfRawMaterial, heats, numberOfBundles]);
 
   const heatNumbers = useMemo(() => heats.map(h => h.heatNo).filter(Boolean), [heats]);
 
@@ -125,71 +165,69 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
       <div className="card" style={{ marginBottom: 'var(--space-24)' }}>
         <div className="card-header rm-card-header">
           <h3 className="card-title rm-card-title">Pre-Inspection Data Entry</h3>
-          <p className="card-subtitle">Enter raw material details before starting inspection</p>
+          {/* <p className="card-subtitle">Heat data from vendor call + cumulative inspection summary</p> */}
         </div>
 
-        <div className="rm-form-grid">
-          <div className="rm-form-group">
-            <label className="rm-form-label required">Source of Raw Material</label>
-            <MobileResponsiveSelect
-              value={sourceOfRawMaterial}
-              onChange={(e) => setSourceOfRawMaterial(e.target.value)}
-              options={[
-                { value: '', label: 'Select Source' },
-                { value: 'domestic', label: 'Domestic' },
-                { value: 'imported', label: 'Imported' }
-              ]}
-              required={true}
-            />
-          </div>
-
-          <div className="rm-form-group">
-            <label className="rm-form-label required">No. of Bundles</label>
-            <input
-              type="number"
-              className="rm-form-input"
-              value={numberOfBundles}
-              onChange={(e) => setNumberOfBundles(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="rm-form-group">
-            <label className="rm-form-label">Total Quantity of Raw Material (MT)</label>
-            <input
-              type="text"
-              className="rm-form-input"
-              value={totalQuantity}
-              disabled
-            />
-            <span className="rm-form-hint">Auto-calculated from heat weights</span>
-          </div>
-
-          <div className="rm-form-group">
-            <label className="rm-form-label">No. of Heats</label>
-            <input
-              type="text"
-              className="rm-form-input"
-              value={numberOfHeats}
-              disabled
-            />
-            <span className="rm-form-hint">Auto-calculated from heat entries</span>
-          </div>
-
-          <div className="rm-form-group">
-            <label className="rm-form-label">No. of ERC (to be inspected)</label>
-            <input
-              type="text"
-              className="rm-form-input"
-              value={numberOfERC}
-              disabled
-            />
-            <span className="rm-form-hint">Auto-calculated (1 ERC per 0.5 MT)</span>
-          </div>
-        </div>
-
-        {/* Heat Number Details with nested Test Certificates */}
+        {/* Section 1: Heat Data from Vendor Call (with Color Code manual entry) */}
         <HeatNumberDetails />
+
+        {/* Section 2: Cumulative Data Summary */}
+        <div style={{ marginTop: '24px', padding: '16px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+          <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#166534' }}>
+            📊 Cumulative Data Summary
+          </h4>
+          <div className="rm-form-grid">
+            {/* Auto-calculated fields */}
+            <div className="rm-form-group">
+              <label className="rm-form-label">Total Heats Offered</label>
+              <input type="text" className="rm-form-input" value={numberOfHeats} disabled />
+              <span className="rm-form-hint">Auto-calculated from vendor call</span>
+            </div>
+
+            <div className="rm-form-group">
+              <label className="rm-form-label">Total Qty Offered (MT)</label>
+              <input type="text" className="rm-form-input" value={totalQuantity} disabled />
+              <span className="rm-form-hint">Auto-calculated from heat weights</span>
+            </div>
+
+            {/* Manual entry fields */}
+            <div className="rm-form-group">
+              <label className="rm-form-label required">No. of Bundles</label>
+              <input
+                type="number"
+                className="rm-form-input"
+                value={numberOfBundles}
+                onChange={(e) => setNumberOfBundles(e.target.value)}
+                placeholder="Enter number"
+                style={{ backgroundColor: '#ffffff' }}
+                required
+              />
+              <span className="rm-form-hint">Manual entry required</span>
+            </div>
+
+            <div className="rm-form-group">
+              <label className="rm-form-label">No. of ERC (Finished)</label>
+              <input type="text" className="rm-form-input" value={numberOfERC.toLocaleString()} disabled />
+              <span className="rm-form-hint">
+                {productModel === 'MK-V' ? 'Calculated: Wt ÷ 0.00114' : 'Calculated: Wt ÷ 0.000092'} ({productModel})
+              </span>
+            </div>
+
+            <div className="rm-form-group">
+              <label className="rm-form-label required">Source of Raw Material</label>
+              <MobileResponsiveSelect
+                value={sourceOfRawMaterial}
+                onChange={(e) => setSourceOfRawMaterial(e.target.value)}
+                options={[
+                  { value: '', label: 'Select Source' },
+                  { value: 'domestic', label: 'Domestic' },
+                  { value: 'imported', label: 'Imported' }
+                ]}
+                required={true}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Sub Module Session */}
@@ -205,14 +243,24 @@ const RawMaterialDashboard = ({ onBack, onNavigateToSubModule, onHeatsChange, on
             <p className="submodule-btn-desc">Verify instrument calibration</p>
           </button>
           <button className="submodule-btn" onClick={() => onNavigateToSubModule('visual-inspection')}>
-            <span className="submodule-btn-icon">�️</span>
+            <span className="submodule-btn-icon">👁️</span>
             <p className="submodule-btn-title">Visual Inspection</p>
             <p className="submodule-btn-desc">Visual check & defects</p>
           </button>
           <button className="submodule-btn" onClick={() => onNavigateToSubModule('dimensional-check')}>
             <span className="submodule-btn-icon">📐</span>
             <p className="submodule-btn-title">Dimensional Check</p>
-            <p className="submodule-btn-desc">Material testing & dimensions</p>
+            <p className="submodule-btn-desc">Check bar dimensions</p>
+          </button>
+          <button className="submodule-btn" onClick={() => onNavigateToSubModule('material-testing')}>
+            <span className="submodule-btn-icon">🧪</span>
+            <p className="submodule-btn-title">Material Testing</p>
+            <p className="submodule-btn-desc">Chemical & mechanical tests</p>
+          </button>
+          <button className="submodule-btn" onClick={() => onNavigateToSubModule('packing-storage')}>
+            <span className="submodule-btn-icon">📦</span>
+            <p className="submodule-btn-title">Packing & Storage</p>
+            <p className="submodule-btn-desc">Verify packing conditions</p>
           </button>
           <button className="submodule-btn" onClick={() => onNavigateToSubModule('summary-reports')}>
             <span className="submodule-btn-icon">📊</span>

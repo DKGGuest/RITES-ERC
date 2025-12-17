@@ -1,0 +1,230 @@
+/* MpiSection.css */
+
+.mpi-section {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.mpi-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.mpi-section__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.mpi-section__subtitle {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0;
+}
+
+.mpi-section__toggle {
+  padding: 6px 14px;
+  font-size: 1.2rem;
+}
+
+.mpi-table-wrapper {
+  overflow-x: auto;
+}
+
+.mpi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.mpi-th,
+.mpi-td {
+  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.mpi-th {
+  background: #f8d7da;
+  color: #333;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mpi-td--time {
+  background: #f3f4f6;
+  font-weight: 600;
+  white-space: nowrap;
+  width: 70px;
+}
+
+.mpi-td--checkbox {
+  width: 60px;
+}
+
+.mpi-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.mpi-select,
+.mpi-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.mpi-select {
+  min-width: 100px;
+}
+
+.mpi-results-select {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.mpi-row--rejected {
+  background: #e3f2fd;
+}
+
+.mpi-td--rejected-label {
+  background: #e3f2fd;
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.mpi-rejected-label {
+  font-size: 0.85rem;
+}
+
+.mpi-td--rejected-input {
+  background: #fff;
+}
+
+.mpi-input--rejected {
+  text-align: center;
+}
+
+/* Mobile Cards - Hidden by default */
+.mpi-mobile-cards {
+  display: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .mpi-table {
+    display: none;
+  }
+
+  .mpi-mobile-cards {
+    display: block;
+  }
+
+  .mpi-mobile-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .mpi-mobile-card__header {
+    background: #fef7f0;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mpi-mobile-card__time {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .mpi-mobile-card__body {
+    padding: 12px;
+  }
+
+  .mpi-mobile-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .mpi-mobile-field:last-child {
+    border-bottom: none;
+  }
+
+  .mpi-mobile-field__label {
+    background: #dc2626;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 120px;
+  }
+
+  .mpi-mobile-field__value {
+    flex: 1;
+    margin-left: 12px;
+  }
+
+  .mpi-mobile-field__value input,
+  .mpi-mobile-field__value select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .mpi-mobile-field--rejected {
+    background: #e0f2fe;
+    margin: 0 -12px;
+    padding: 8px 12px;
+  }
+
+  .mpi-mobile-field--rejected .mpi-mobile-field__label {
+    background: #0284c7;
+  }
+}
+
+@media (max-width: 480px) {
+  .mpi-section {
+    padding: 12px;
+  }
+
+  .mpi-mobile-field {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mpi-mobile-field__label {
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .mpi-mobile-field__value {
+    margin-left: 0;
+  }
+
+  .mpi-section__title {
+    font-size: 1rem;
+  }
+}

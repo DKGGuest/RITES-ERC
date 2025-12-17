@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import FormField from '../components/FormField';
 import { MOCK_PO_DATA } from '../data/mockData';
 import { formatDate } from '../utils/helpers';
 
@@ -423,11 +422,7 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
   const [lotNumbers, setLotNumbers] = useState(LINE_DATA[initialLine]?.lotNumbers || []);
   const [heatNumbersMap, setHeatNumbersMap] = useState(LINE_DATA[initialLine]?.heatNumbersMap || {});
 
-  // Modal state for adding Lot Number via popup
-  const [showAddLotModal, setShowAddLotModal] = useState(false);
-  const [modalLotNo, setModalLotNo] = useState('');
-  const openAddLotModal = () => { setModalLotNo(''); setShowAddLotModal(true); };
-  const closeAddLotModal = () => setShowAddLotModal(false);
+  // Lot data is now auto-fetched from vendor call (read-only)
 
   // Final Inspection Results - Remarks (manual entry, required)
   const [finalInspectionRemarks, setFinalInspectionRemarks] = useState('');
@@ -479,28 +474,6 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
       setLotNumbers(lineData.lotNumbers);
       setHeatNumbersMap(lineData.heatNumbersMap);
     }
-  };
-
-  const addLotNumber = (lotNo) => {
-    const next = (lotNo || modalLotNo).trim();
-    if (!next) return;
-    if (!lotNumbers.includes(next)) {
-      setLotNumbers([...lotNumbers, next]);
-    }
-    setModalLotNo('');
-    setShowAddLotModal(false);
-  };
-
-  const removeLotNumber = (lotNo) => {
-    setLotNumbers(prev => prev.filter(l => l !== lotNo));
-    setHeatNumbersMap(prev => {
-      const { [lotNo]: removed, ...rest } = prev; // eslint-disable-line no-unused-vars
-      return rest;
-    });
-  };
-
-  const updateHeatNumber = (lotNo, heatNo) => {
-    setHeatNumbersMap({ ...heatNumbersMap, [lotNo]: heatNo });
   };
 
   const manufacturingLines = (selectedLines && selectedLines.length > 0) ? selectedLines : ['Line-1'];
@@ -601,110 +574,46 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         </div>
       </div>
 
-      {/* Pre-Inspection Data Entry - Always visible above submodule session */}
+      {/* Pre-Inspection Data Entry - Auto-fetched from vendor call */}
       <div className="card compact-card" style={{ marginBottom: 'var(--space-16)' }}>
-        <div className="card-header">
-          <h3 className="card-title">Pre-Inspection Data Entry - {selectedLine}</h3>
-          <p className="card-subtitle">3 readings/hour</p>
+        <div className="card-header" style={{ paddingBottom: '8px' }}>
+          <h3 className="card-title" style={{ marginBottom: '4px' }}>Pre-Inspection Data Entry - {selectedLine}</h3>
+          {/* <span style={{ fontSize: '12px', color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>📥 Auto-fetched from Vendor Call</span> */}
         </div>
-        <div style={{ marginBottom: 'var(--space-16)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-12)' }}>
-            <h4 style={{ margin: 0 }}>Lot Number Entry</h4>
-            <button
-              className="btn btn-primary"
-              onClick={openAddLotModal}
-              aria-label="Add Lot Number"
-              title="Add Lot Number"
-            >
-              + Add
-            </button>
-          </div>
-          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-12)' }}>
-            <strong>Multiple Lot Numbers can be added.</strong> Add all lot numbers for this inspection.
-          </p>
-          <div style={{ display: 'flex', gap: 'var(--space-8)', flexWrap: 'wrap' }}>
-            {lotNumbers.length === 0 && (
-              <span className="status-badge alert">No lot numbers added</span>
-            )}
-            {lotNumbers.map(lot => (
-              <span key={lot} className="status-badge valid" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                {lot}
-                <button
-                  onClick={() => removeLotNumber(lot)}
-                  aria-label={`Remove ${lot}`}
-                  title="Remove"
-                  style={{
-                    marginLeft: 6,
-                    width: 18,
-                    height: 18,
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: 'var(--color-error)',
-                    fontWeight: 700,
-                    lineHeight: '18px',
-                    padding: 0
-                  }}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-        <div style={{ marginTop: 'var(--space-12)' }}>
-          <h4 style={{ marginBottom: 'var(--space-8)' }}>Heat Number Selection</h4>
-          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-warning)', marginBottom: 'var(--space-12)', fontWeight: 'var(--font-weight-medium)' }}>⚠ <strong>CONSTRAINT:</strong> Heat No. has to be selected for Each Lot No.</p>
-          <div className="lot-heat-grid">
-            {lotNumbers.map(lot => (
-              <div key={lot} className="lot-heat-item" style={{ position: 'relative' }}>
-                <button
-                  onClick={() => removeLotNumber(lot)}
-                  aria-label={`Remove ${lot}`}
-                  title="Remove lot"
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    border: '1px solid #fecaca',
-                    background: '#fff',
-                    color: '#ef4444',
-                    cursor: 'pointer',
-                    lineHeight: '22px'
-                  }}
-                >
-                  ×
-                </button>
-                <div className="lot-heat-lot">
-                  <div className="lot-heat-label">Lot Number</div>
-                  <div className="lot-heat-value">{lot}</div>
-                </div>
-                <div className="lot-heat-heat">
-                  <div className="lot-heat-label">Heat Number (from previous stage/RM IC)</div>
-                  <select
 
-                    className="form-control"
-                    value={heatNumbersMap[lot] || ''}
-                    onChange={(e) => updateHeatNumber(lot, e.target.value)}
-                  >
-                    <option value="">Select Heat Number</option>
-                    <option value="H001">H001</option>
-                    <option value="H002">H002</option>
-                    <option value="H003">H003</option>
-                    <option value="H004">H004</option>
-                    <option value="H005">H005</option>
-                  </select>
-                </div>
+        {/* Compact Lot-Heat Mapping Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
+          {lotNumbers.map(lot => (
+            <div key={lot} style={{
+              background: '#fefce8',
+              border: '1px solid #fef08a',
+              borderRadius: '6px',
+              padding: '10px'
+            }}>
+              <div style={{ marginBottom: '6px' }}>
+                <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Lot Number</span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{lot}</span>
               </div>
-            ))}
-          </div>
+              <div>
+                <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Heat No. (from RM IC)</span>
+                <span style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#1f2937',
+                  background: '#f3f4f6',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  marginTop: '4px'
+                }}>{heatNumbersMap[lot] || 'H001'}</span>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="alert alert-info" style={{ marginTop: 'var(--space-12)' }}>
-          ℹ️ <strong>Info:</strong> 3 readings per hour are required for all process parameters
+
+        <div style={{ marginTop: '12px', fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ background: '#dbeafe', padding: '2px 6px', borderRadius: '4px', color: '#1d4ed8' }}>ℹ️</span>
+          3 readings per hour are required for all process parameters
         </div>
       </div>
 
@@ -924,39 +833,6 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
       <div style={{ marginTop: 'var(--space-24)' }}>
         <button className="btn btn-secondary" onClick={onBack}>Return to Landing Page</button>
       </div>
-
-      {showAddLotModal && (
-        <div className="modal-overlay" onClick={closeAddLotModal}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">Add Lot Number</div>
-
-              <button className="btn btn-outline" onClick={closeAddLotModal} aria-label="Close">×</button>
-            </div>
-            <div className="modal-body">
-              <FormField label="Lot Number">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="e.g., LOT-002"
-                  value={modalLotNo}
-                  onChange={(e) => setModalLotNo(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addLotNumber(); } }}
-                />
-              </FormField>
-              {modalLotNo && lotNumbers.includes(modalLotNo) && (
-                <div className="alert alert-warning" style={{ marginTop: 'var(--space-12)' }}>
-                  This lot number is already added
-                </div>
-              )}
-            </div>
-            <div className="modal-footer" style={{ justifyContent: 'flex-end' }}>
-              <button className="btn btn-outline" onClick={closeAddLotModal}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => addLotNumber()} disabled={!modalLotNo || lotNumbers.includes(modalLotNo)}>Add</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

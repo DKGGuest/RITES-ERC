@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import ProcessLineToggle from '../components/ProcessLineToggle';
+import ProcessSubmoduleNav from '../components/ProcessSubmoduleNav';
 import StatusBadge from '../components/StatusBadge';
 import FormField from '../components/FormField';
 
-const ProcessSummaryReportsPage = ({ onBack, selectedLines = [] }) => {
+const ProcessSummaryReportsPage = ({ onBack, selectedLines = [], onNavigateSubmodule }) => {
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
   // Mock data for summary
   const lotNumbers = ['LOT-001', 'LOT-002'];
@@ -26,6 +27,12 @@ const ProcessSummaryReportsPage = ({ onBack, selectedLines = [] }) => {
           ← Back to Process Dashboard
         </button>
       </div>
+
+      {/* Submodule Navigation */}
+      <ProcessSubmoduleNav
+        currentSubmodule="process-summary-reports"
+        onNavigate={onNavigateSubmodule}
+      />
 
       <div className="card">
         <div className="card-header">

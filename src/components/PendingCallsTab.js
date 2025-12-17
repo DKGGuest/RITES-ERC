@@ -227,12 +227,20 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
 
   // removeFilter helper removed (unused in current UI)
 
+  // Helper to get scheduled date for a call
+  const getScheduledDate = (callNo) => {
+    const schedule = scheduledCalls[callNo];
+    return schedule?.scheduleDate ? formatDate(schedule.scheduleDate) : '-';
+  };
+
   const columns = [
     { key: 'call_no', label: 'Call No.' },
     { key: 'po_no', label: 'PO No.' },
     { key: 'vendor_name', label: 'Vendor Name' },
     { key: 'product_type', label: 'Product Type', render: (val) => getProductTypeDisplayName(val) },
-    { key: 'requested_date', label: 'Requested Date', render: (val) => formatDate(val) },
+    { key: 'call_date', label: 'Call Date', render: (val) => formatDate(val) },
+    { key: 'desired_inspection_date', label: 'Desired Inspection Date', render: (val) => formatDate(val) },
+    { key: 'scheduled_date', label: 'Scheduled Date', render: (val, row) => getScheduledDate(row.call_no) },
     { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
   ];
 

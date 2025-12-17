@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import ProcessLineToggle from '../components/ProcessLineToggle';
+import ProcessSubmoduleNav from '../components/ProcessSubmoduleNav';
 
-const ProcessOilTankCounterPage = ({ onBack, selectedLines = [] }) => {
+const ProcessOilTankCounterPage = ({ onBack, selectedLines = [], onNavigateSubmodule }) => {
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
   const defaultLineState = { oilTankCounter: 45000, cleaningDone: false };
   const [perLineState, setPerLineState] = useState({});
@@ -39,6 +40,12 @@ const ProcessOilTankCounterPage = ({ onBack, selectedLines = [] }) => {
           ← Back to Process Dashboard
         </button>
       </div>
+
+      {/* Submodule Navigation */}
+      <ProcessSubmoduleNav
+        currentSubmodule="process-oil-tank-counter"
+        onNavigate={onNavigateSubmodule}
+      />
 
       <div className="card">
         <div className="card-header">

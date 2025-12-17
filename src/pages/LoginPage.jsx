@@ -1,17 +1,28 @@
 import { useState } from 'react';
-import { loginUser, storeAuthData } from '../services/authService';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { loginUser, storeAuthData, isAuthenticated } from '../services/authService';
+import { ROUTES } from '../routes';
 import './LoginPage.css';
 
 /**
  * Login Page Component
  * Handles user authentication with userId and password
  */
-const LoginPage = ({ onLoginSuccess }) => {
+const LoginPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Redirect if already authenticated
+  if (isAuthenticated()) {
+    const from = location.state?.from?.pathname || ROUTES.LANDING;
+    navigate(from, { replace: true });
+    return null;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,13 +42,14 @@ const LoginPage = ({ onLoginSuccess }) => {
 
     try {
       const response = await loginUser(userId, password);
-      
+
       // Store auth data (response.data contains the user info)
       const userData = response.data || response;
       storeAuthData(userData);
-      
-      // Notify parent component of successful login
-      onLoginSuccess(userData);
+
+      // Navigate to the intended destination or landing page
+      const from = location.state?.from?.pathname || ROUTES.LANDING;
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {

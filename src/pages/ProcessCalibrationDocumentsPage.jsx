@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import CalibrationModule from '../components/CalibrationModule';
 import ProcessLineToggle from '../components/ProcessLineToggle';
+import ProcessSubmoduleNav from '../components/ProcessSubmoduleNav';
 
-const ProcessCalibrationDocumentsPage = ({ onBack, selectedLines = [] }) => {
+const ProcessCalibrationDocumentsPage = ({ onBack, selectedLines = [], onNavigateSubmodule }) => {
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
   return (
     <div>
@@ -24,6 +25,12 @@ const ProcessCalibrationDocumentsPage = ({ onBack, selectedLines = [] }) => {
           ← Back to Process Dashboard
         </button>
       </div>
+
+      {/* Submodule Navigation */}
+      <ProcessSubmoduleNav
+        currentSubmodule="process-calibration-documents"
+        onNavigate={onNavigateSubmodule}
+      />
 
       <CalibrationModule />
 

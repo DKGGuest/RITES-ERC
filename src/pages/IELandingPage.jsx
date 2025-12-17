@@ -4,9 +4,12 @@ import Tabs from '../components/Tabs';
 import PendingCallsTab from '../components/PendingCallsTab';
 import CompletedCallsTab from '../components/CompletedCallsTab';
 import IssuanceOfICTab from '../components/IssuanceOfICTab';
+import BillingStageTab from '../components/BillingStageTab';
 import PerformanceDashboard from '../components/PerformanceDashboard';
 import Modal from '../components/Modal';
-import { scheduleInspection, rescheduleInspection, getScheduleByCallNo } from '../services/scheduleService';
+import Notification from '../components/Notification';
+import { scheduleInspection, rescheduleInspection, getScheduleByCallNo, validateScheduleLimit, MAX_CALLS_PER_DAY } from '../services/scheduleService';
+import { raiseBill, updateBillingStatus, approvePayment, BILLING_STATUS } from '../services/billingService';
 import { getStoredUser } from '../services/authService';
 
 const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending' }) => {
@@ -21,13 +24,20 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshCallback, setRefreshCallback] = useState(null);
   const [previousSchedule, setPreviousSchedule] = useState(null);
+  const [notification, setNotification] = useState({ message: '', type: 'error' });
 
   const pendingCount = MOCK_INSPECTION_CALLS.filter(call => call.status === 'Pending').length;
   const completedCount = MOCK_INSPECTION_CALLS.filter(call => call.status === 'Completed').length;
+  const billingCount = MOCK_INSPECTION_CALLS.filter(call =>
+    call.ic_issued === true &&
+    call.billing_status &&
+    call.billing_status !== BILLING_STATUS.PAYMENT_DONE
+  ).length;
 
   const tabs = [
     { id: 'pending', label: 'List of Calls Pending', description: `${pendingCount} pending` },
     { id: 'certificates', label: 'Issuance of IC', description: `${completedCount} ready for IC` },
+    { id: 'billing', label: 'Billing Stage', description: `${billingCount} in billing` },
     { id: 'completed', label: 'Calls Completed', description: `${completedCount} completed` },
     { id: 'performance', label: 'Performance', description: 'KPI overview' },
   ];
@@ -86,10 +96,15 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     setShowScheduleModal(true);
   };
 
+  // Helper to show notification
+  const showNotification = (message, type = 'error') => {
+    setNotification({ message, type });
+  };
+
   // Submit schedule/reschedule to backend API
   const handleScheduleSubmit = async () => {
     if (!scheduleDate) {
-      alert('Please select a schedule date');
+      showNotification('Please select a schedule date', 'warning');
       return;
     }
 
@@ -98,6 +113,32 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     const userName = currentUser?.userName || 'System';
 
     try {
+      // Validate scheduled date is before or on desired inspection date
+      const callsToValidate = isBulkSchedule ? selectedCalls : [selectedCallLocal];
+      for (const call of callsToValidate) {
+        if (call?.desired_inspection_date) {
+          const scheduledDateObj = new Date(scheduleDate);
+          const desiredDateObj = new Date(call.desired_inspection_date);
+          if (scheduledDateObj > desiredDateObj) {
+            showNotification(`Scheduled date cannot be after the Desired Inspection Date (${call.desired_inspection_date}) for call ${call.call_no}. Please select an earlier date.`, 'error');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+
+      // Validate schedule limit (5 calls per day) - only for new schedules, not reschedules
+      if (!isReschedule) {
+        const callsToSchedule = isBulkSchedule ? selectedCalls.length : 1;
+        const validation = await validateScheduleLimit(scheduleDate, callsToSchedule);
+
+        if (!validation.canSchedule) {
+          showNotification(`Cannot schedule ${callsToSchedule} call(s) for this date. Maximum ${MAX_CALLS_PER_DAY} calls allowed per day. Currently ${validation.currentCount} call(s) scheduled, ${validation.remaining} slot(s) remaining.`, 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       if (isBulkSchedule) {
         // Bulk scheduling
         for (const call of selectedCalls) {
@@ -126,6 +167,9 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         }
       }
 
+      // Show success notification
+      showNotification('Inspection scheduled successfully!', 'success');
+
       // Refresh the schedule list
       if (refreshCallback) {
         refreshCallback();
@@ -140,7 +184,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       setIsBulkSchedule(false);
       setIsReschedule(false);
     } catch (error) {
-      alert(error.message || 'Failed to schedule inspection');
+      showNotification(error.message || 'Failed to schedule inspection', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -154,8 +198,65 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     onStartMultipleInspections(calls);
   };
 
+  // Billing Stage Handlers
+  const handleRaiseBill = async (call) => {
+    // TODO: Open modal to collect bill details
+    const billNo = `BILL-${Date.now()}`;
+    const billDate = new Date().toISOString().split('T')[0];
+    const billAmount = call.call_qty * call.rate;
+
+    try {
+      await raiseBill({
+        callNo: call.call_no,
+        billNo,
+        billDate,
+        billAmount,
+        createdBy: getStoredUser()?.userName || 'System'
+      });
+      showNotification('Bill raised successfully!', 'success');
+    } catch (error) {
+      showNotification(error.message || 'Failed to raise bill', 'error');
+    }
+  };
+
+  const handleUpdateBillingStatus = async (call, newStatus) => {
+    try {
+      await updateBillingStatus({
+        callNo: call.call_no,
+        billing_status: newStatus,
+        updatedBy: getStoredUser()?.userName || 'System'
+      });
+      showNotification(`Status updated to "${newStatus}"`, 'success');
+    } catch (error) {
+      showNotification(error.message || 'Failed to update status', 'error');
+    }
+  };
+
+  const handleApprovePayment = async (call) => {
+    try {
+      await approvePayment({
+        callNo: call.call_no,
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentRef: `PAY-${Date.now()}`,
+        approvedBy: getStoredUser()?.userName || 'System'
+      });
+      showNotification('Payment approved! Call moved to Completed.', 'success');
+    } catch (error) {
+      showNotification(error.message || 'Failed to approve payment', 'error');
+    }
+  };
+
   return (
     <div>
+      {/* In-app Notification */}
+      <Notification
+        message={notification.message}
+        type={notification.type}
+        autoClose={true}
+        autoCloseDelay={5000}
+        onClose={() => setNotification({ message: '', type: 'error' })}
+      />
+
       <div className="breadcrumb">
         <div className="breadcrumb-item breadcrumb-active">Landing Page</div>
       </div>
@@ -185,12 +286,22 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         />
       )}
 
-      {/* 3. Calls Completed - Third */}
+      {/* 3. Billing Stage - Third */}
+      {activeTab === 'billing' && (
+        <BillingStageTab
+          calls={MOCK_INSPECTION_CALLS}
+          onRaiseBill={handleRaiseBill}
+          onUpdateStatus={handleUpdateBillingStatus}
+          onApprovePayment={handleApprovePayment}
+        />
+      )}
+
+      {/* 4. Calls Completed - Fourth */}
       {activeTab === 'completed' && (
         <CompletedCallsTab calls={MOCK_INSPECTION_CALLS} />
       )}
 
-      {/* 4. Performance - Fourth (Last) */}
+      {/* 5. Performance - Fifth (Last) */}
       {activeTab === 'performance' && (
         <PerformanceDashboard />
       )}

@@ -1,0 +1,155 @@
+/* TemperingSection.css */
+
+.tempering-section {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.tempering-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.tempering-section__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.tempering-section__subtitle {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0;
+}
+
+.tempering-section__toggle {
+  padding: 6px 14px;
+  font-size: 1.2rem;
+}
+
+.tempering-table-wrapper {
+  overflow-x: auto;
+}
+
+.tempering-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.tempering-th,
+.tempering-td {
+  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.tempering-th {
+  background: #f8d7da;
+  color: #333;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tempering-td--time {
+  background: #f3f4f6;
+  font-weight: 600;
+  white-space: nowrap;
+  width: 70px;
+}
+
+.tempering-td--checkbox {
+  width: 60px;
+}
+
+.tempering-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.tempering-select,
+.tempering-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.tempering-select {
+  min-width: 100px;
+}
+
+.tempering-input {
+  min-width: 60px;
+}
+
+.tempering-row--rejected {
+  background: #e3f2fd;
+}
+
+.tempering-td--rejected-label {
+  background: #e3f2fd;
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.tempering-rejected-label {
+  font-size: 0.85rem;
+}
+
+.tempering-td--rejected-sum {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+}
+
+.tempering-rejected-sum {
+  font-size: 0.95rem;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .tempering-section {
+    padding: 12px;
+  }
+  
+  .tempering-table {
+    font-size: 0.85rem;
+  }
+  
+  .tempering-th,
+  .tempering-td {
+    padding: 4px 6px;
+  }
+  
+  .tempering-select,
+  .tempering-input {
+    padding: 3px 4px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .tempering-table {
+    font-size: 0.8rem;
+  }
+  
+  .tempering-th,
+  .tempering-td {
+    padding: 3px 4px;
+  }
+  
+  .tempering-section__title {
+    font-size: 1rem;
+  }
+}
+

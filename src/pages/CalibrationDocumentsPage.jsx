@@ -1,21 +1,26 @@
 import CalibrationSubModule from '../components/CalibrationSubModule';
+import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
 import './CalibrationDocumentsPage.css';
 
-const CalibrationDocumentsPage = ({ onBack, heats }) => {
+const CalibrationDocumentsPage = ({ onBack, heats = [], onNavigateSubmodule, inspectionCallNo = '' }) => {
   return (
     <div className="calibration-page-container">
       <div className="calibration-page-header">
         <h1 className="calibration-page-title">📄 Calibration & Documents</h1>
         <button className="calibration-back-btn" onClick={onBack}>
-          ← Back to Sub Module Session
+          ← Back to Raw Material Dashboard
         </button>
       </div>
 
+      {/* Submodule Navigation */}
+      <RawMaterialSubmoduleNav
+        currentSubmodule="calibration-documents"
+        onNavigate={onNavigateSubmodule}
+      />
+
       <CalibrationSubModule
         preInspectionHeats={heats}
-        onSave={(data) => {
-          console.log('Calibration data saved:', data);
-        }}
+        inspectionCallNo={inspectionCallNo}
       />
     </div>
   );

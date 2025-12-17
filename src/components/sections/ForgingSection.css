@@ -1,0 +1,254 @@
+/* =====================================================
+   FORGING SECTION COMPONENT STYLES
+   ===================================================== */
+
+.forging-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.forging-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.forging-section__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.forging-section__subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 4px 0 0;
+}
+
+.forging-section__toggle {
+  padding: 8px 16px;
+  font-size: 1.25rem;
+}
+
+/* Table Styles */
+.forging-table-wrapper {
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.forging-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2px solid #4a7c59;
+}
+
+.forging-th {
+  background-color: #fef7f0;
+  color: #1f4d2e;
+  border: 1px solid #4a7c59;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.forging-th--time {
+  min-width: 90px;
+  border-left: 3px solid #0d0d0d;
+}
+
+.forging-th--checkbox {
+  min-width: 90px;
+}
+
+.forging-th--lot {
+  min-width: 100px;
+}
+
+.forging-th--temp {
+  min-width: 100px;
+}
+
+.forging-th--remarks {
+  min-width: 120px;
+}
+
+.forging-td {
+  border: 1px solid #4a7c59;
+  padding: 4px 8px;
+  text-align: center;
+  vertical-align: middle;
+  background-color: #fff;
+}
+
+.forging-td--time {
+  font-weight: 600;
+  border-left: 3px solid #0d0d0d;
+  font-size: 12px;
+}
+
+.forging-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.forging-select {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.forging-td--temp-input {
+  padding: 2px 6px;
+}
+
+.forging-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Rejected Row */
+.forging-row--rejected {
+  background-color: #e0f2fe;
+}
+
+.forging-td--rejected-label {
+  background-color: #e0f2fe;
+  padding: 4px 8px;
+}
+
+.forging-rejected-label {
+  font-weight: 500;
+  color: #333;
+  font-size: 11px;
+}
+
+.forging-td--rejected-input {
+  background-color: #fff;
+  padding: 2px 6px;
+}
+
+.forging-input--rejected {
+  text-align: center;
+}
+
+/* Mobile Cards - hidden on desktop */
+.forging-mobile-cards {
+  display: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .forging-table {
+    display: none;
+  }
+
+  .forging-mobile-cards {
+    display: block;
+  }
+
+  .forging-mobile-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .forging-mobile-card__header {
+    background-color: #fef7f0;
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .forging-mobile-card__time {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1f2937;
+  }
+
+  .forging-mobile-card__body {
+    padding: 12px;
+  }
+
+  .forging-mobile-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .forging-mobile-field:last-child {
+    border-bottom: none;
+  }
+
+  .forging-mobile-field__label {
+    background-color: #dc2626;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 100px;
+  }
+
+  .forging-mobile-field__value {
+    flex: 1;
+    margin-left: 12px;
+  }
+
+  .forging-mobile-field__value input,
+  .forging-mobile-field__value select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .forging-mobile-field--rejected {
+    background-color: #e0f2fe;
+    margin: 0 -12px;
+    padding: 8px 12px;
+  }
+
+  .forging-mobile-field--rejected .forging-mobile-field__label {
+    background-color: #0284c7;
+  }
+}
+
+@media (max-width: 480px) {
+  .forging-mobile-field {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .forging-mobile-field__label {
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .forging-mobile-field__value {
+    margin-left: 0;
+  }
+}
+

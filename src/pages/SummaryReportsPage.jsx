@@ -1,14 +1,32 @@
+import { useState } from 'react';
+import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
+import HeatToggle from '../components/HeatToggle';
 import './SummaryReportsPage.css';
 
-const SummaryReportsPage = ({ onBack }) => {
+const SummaryReportsPage = ({ onBack, heats = [], onNavigateSubmodule }) => {
+  const [activeHeatIndex, setActiveHeatIndex] = useState(0);
+
   return (
     <div className="summary-page-container">
       <div className="summary-page-header">
         <h1 className="summary-page-title">📊 Summary and Reports</h1>
         <button className="summary-back-btn" onClick={onBack}>
-          ← Back to Sub Module Session
+          ← Back to Raw Material Dashboard
         </button>
       </div>
+
+      {/* Submodule Navigation */}
+      <RawMaterialSubmoduleNav
+        currentSubmodule="summary-reports"
+        onNavigate={onNavigateSubmodule}
+      />
+
+      {/* Heat Toggle */}
+      <HeatToggle
+        heats={heats}
+        activeHeatIndex={activeHeatIndex}
+        onHeatChange={setActiveHeatIndex}
+      />
 
       <div className="card">
         <div className="card-header">
