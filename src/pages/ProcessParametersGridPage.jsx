@@ -154,17 +154,6 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [], shift: selectedShi
     return idx;
   })();
 
-  // Section collapse/expand states
-  const [turningExpanded] = useState(true);
-  const [mpiExpanded] = useState(true);
-  const [forgingExpanded] = useState(true);
-  const [quenchingExpanded] = useState(true);
-  const [temperingExpanded] = useState(true);
-  const [dimensionExpanded] = useState(true);
-
-
-  // Helper to select rows to render: all 8 hours or only the current hour (per-section)
-
   // Per-section hour expand/collapse (current hour only vs all 8 hours)
   const [showAllShearing, setShowAllShearing] = useState(false);
   const [showAllTurning, setShowAllTurning] = useState(false);
@@ -174,137 +163,11 @@ const ProcessParametersGridPage = ({ onBack, lotNumbers = [], shift: selectedShi
   const [showAllTempering, setShowAllTempering] = useState(false);
   const [showAllDimension, setShowAllDimension] = useState(false);
 
+  // Helper to select rows to render: all 8 hours or only the current hour (per-section)
   const visibleRows = (arr, showAll) => (
     (showAll ? arr.map((row, idx) => ({ row, idx }))
              : arr.map((row, idx) => ({ row, idx })).filter(({ idx }) => idx === currentHourIndex))
   );
-
-  const updateTurningData = (index, field, value, sampleIndex = null) => {
-    const updated = [...turningData];
-    if (sampleIndex !== null && Array.isArray(updated[index][field])) {
-      const fieldArray = [...updated[index][field]];
-      fieldArray[sampleIndex] = value;
-      updated[index][field] = fieldArray;
-    } else {
-      updated[index][field] = value;
-    }
-    setTurningData(updated);
-  };
-
-  const updateMpiData = (index, field, value, sampleIndex = null) => {
-    const updated = [...mpiData];
-    if (sampleIndex !== null && Array.isArray(updated[index][field])) {
-      const fieldArray = [...updated[index][field]];
-      fieldArray[sampleIndex] = value;
-      updated[index][field] = fieldArray;
-    } else {
-      updated[index][field] = value;
-    }
-    setMpiData(updated);
-  };
-
-  const updateForgingData = (index, field, value, sampleIndex = null) => {
-    const updated = [...forgingData];
-    if (sampleIndex !== null && Array.isArray(updated[index][field])) {
-      const fieldArray = [...updated[index][field]];
-      fieldArray[sampleIndex] = value;
-      updated[index][field] = fieldArray;
-    } else {
-      updated[index][field] = value;
-    }
-    setForgingData(updated);
-  };
-
-  const updateQuenchingData = (index, field, value) => {
-    const updated = [...quenchingData];
-    updated[index][field] = value;
-    setQuenchingData(updated);
-  };
-
-  const updateTemperingData = (index, field, value) => {
-    const updated = [...temperingData];
-    updated[index][field] = value;
-    setTemperingData(updated);
-  };
-
-  const updateDimensionData = (index, field, value) => {
-    const updated = [...finalCheckData];
-    updated[index][field] = value;
-    setFinalCheckData(updated);
-  };
-
-  // Validation helpers
-  const getQuenchingTempValidation = (value) => {
-    if (!value) return null;
-    const num = parseFloat(value);
-    if (num >= 70) return { error: true, message: 'Must be < 70°C' };
-    return { error: false, message: '✓ Valid' };
-  };
-
-  const getQuenchingDurationValidation = (value) => {
-    if (!value) return null;
-    const num = parseInt(value);
-    if (num <= 12) return { error: true, message: 'Must be > 12 min' };
-    return { error: false, message: '✓ Valid' };
-  };
-
-  const getQuenchingHardnessValidation = (value) => {
-    if (!value) return null;
-    const num = parseFloat(value);
-    if (num < 45 || num > 55) return { error: true, message: 'Must be 45-55 HRc' };
-
-    return { error: false, message: '✓ Valid' };
-  };
-
-  // Dimension grid validation helpers
-  const getFinalHardnessValidation = (value) => {
-    if (!value) return null;
-    const num = parseInt(value);
-    if (num < 40 || num > 44) return { error: true, message: 'Must be 40-44 HRc' };
-    return { error: false, message: '✓ Valid' };
-  };
-
-  const getToeLoadValidation = (value, type) => {
-    if (!value) return null;
-    const num = parseInt(value);
-    switch (type) {
-      case 'MK-III':
-        if (num < 850 || num > 1100) return { error: true, message: 'MK-III: 850-1100 KgF' };
-        break;
-      case 'MK-V':
-        if (num < 1200 || num > 1500) return { error: true, message: 'MK-V: 1200-1500 KgF' };
-        break;
-      case 'ERC-J':
-        if (num < 650) return { error: true, message: 'ERC-J: ≥650 KgF' };
-        break;
-      default:
-        return null;
-    }
-    return { error: false, message: '✓ Valid' };
-  };
-
-  const getWeightValidation = (value, type) => {
-    if (!value) return null;
-    const num = parseFloat(value);
-    switch (type) {
-      case 'MK-III':
-        if (num < 904) return { error: true, message: 'MK-III: ≥904 gm' };
-        break;
-      case 'MK-V':
-        if (num < 1068) return { error: true, message: 'MK-V: ≥1068 gm' };
-        break;
-      case 'ERC-J':
-        if (num < 904) return { error: true, message: 'ERC-J: ≥904 gm' };
-        break;
-      default:
-        return null;
-    }
-    return { error: false, message: '✓ Valid' };
-  };
-
-  // Check if tempering temp/duration was entered in first hour (Once/Shift rule)
-  const isTemperingTempTakenInFirstHour = temperingData[0].temperingTemperature !== '';
-  const isTemperingDurationTakenInFirstHour = temperingData[0].temperingDuration !== '';
 
   return (
     <div>
