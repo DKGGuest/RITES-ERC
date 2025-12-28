@@ -169,6 +169,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     };
 
     fetchInspectionData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call?.po_no, call?.call_no, onLadleValuesChange]);
 
   // Use fetched data from backend (stabilized)
