@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -22,7 +22,7 @@ const STORAGE_KEY = 'calibration_draft_data';
  * This page covers the calibration information of all the instruments used during
  * the inspection of Raw Material & document verification of that particular vendor
  */
-const CalibrationSubModule = ({ preInspectionHeats = [], inspectionCallNo = '' }) => {
+const CalibrationSubModule = ({ preInspectionHeats = [], vendorLadleValues: vendorLadleProp = null, inspectionCallNo = '' }) => {
   const [activeHeatIndex, setActiveHeatIndex] = useState(0);
 
   // Load draft data from localStorage or initialize empty
@@ -60,22 +60,40 @@ const CalibrationSubModule = ({ preInspectionHeats = [], inspectionCallNo = '' }
     };
   });
 
+  // Store vendor ladle values separately (read-only, from database)
+  const [vendorLadleValues, setVendorLadleValues] = useState([]);
+
   const [errors, setErrors] = useState({});
 
-  // Initialize heats from pre-inspection data (only if no draft exists)
+  // Initialize heats from pre-inspection data and vendor ladle values from prop
   useEffect(() => {
-    if (preInspectionHeats && preInspectionHeats.length > 0 && formData.heats.length === 0) {
-      const initialHeats = preInspectionHeats.map(heat => ({
+    if (preInspectionHeats && preInspectionHeats.length > 0) {
+      // Use vendor ladle values from prop (fetched from database)
+      // These are the same values for all heats as stored at PO level
+      const ladleData = preInspectionHeats.map(heat => ({
         heatNo: heat.heatNo || heat,
-        percentC: '',
-        percentSi: '',
-        percentMn: '',
-        percentP: '',
-        percentS: ''
+        percentC: vendorLadleProp?.percentC ?? null,
+        percentSi: vendorLadleProp?.percentSi ?? null,
+        percentMn: vendorLadleProp?.percentMn ?? null,
+        percentS: vendorLadleProp?.percentS ?? null,
+        percentP: vendorLadleProp?.percentP ?? null
       }));
-      setFormData(prev => ({ ...prev, heats: initialHeats }));
+      setVendorLadleValues(ladleData);
+
+      // Initialize product values (IE input) only if no draft exists
+      if (formData.heats.length === 0) {
+        const initialHeats = preInspectionHeats.map(heat => ({
+          heatNo: heat.heatNo || heat,
+          percentC: '',
+          percentSi: '',
+          percentMn: '',
+          percentP: '',
+          percentS: ''
+        }));
+        setFormData(prev => ({ ...prev, heats: initialHeats }));
+      }
     }
-  }, [preInspectionHeats, formData.heats.length]);
+  }, [preInspectionHeats, vendorLadleProp, formData.heats.length]);
 
   // Auto-save to localStorage on formData change (persist while switching tabs/submodules)
   useEffect(() => {
@@ -102,6 +120,7 @@ const CalibrationSubModule = ({ preInspectionHeats = [], inspectionCallNo = '' }
     setFormData(prev => ({ ...prev, heats: updatedHeats }));
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleRemoveHeat = (index) => {
     const updatedHeats = formData.heats.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, heats: updatedHeats }));
@@ -169,7 +188,7 @@ const CalibrationSubModule = ({ preInspectionHeats = [], inspectionCallNo = '' }
     <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
       {/* Section Header */}
       <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 1 }}>
-        Calibration & Document Verification Sub Module inside ERC Raw Material Inspection Main Module
+        Calibration & Document 
       </Typography>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -255,9 +274,7 @@ const CalibrationSubModule = ({ preInspectionHeats = [], inspectionCallNo = '' }
             heat={formData.heats[activeHeatIndex]}
             index={activeHeatIndex}
             onUpdate={handleHeatUpdate}
-            onRemove={handleRemoveHeat}
-            canRemove={false}
-            isVendor={true}
+            ladleValues={vendorLadleValues[activeHeatIndex] || {}}
           />
         )}
       </Box>

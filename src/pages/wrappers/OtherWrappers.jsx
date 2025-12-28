@@ -10,13 +10,31 @@ import { ROUTES } from '../../routes';
  */
 export const MultiInitiationWrapper = () => {
   const navigate = useNavigate();
-  const { 
-    selectedCalls, 
+  const {
+    selectedCalls,
+    setSelectedCall,
     setActiveInspectionType,
-    setLandingActiveTab 
+    setInspectionShift,
+    setInspectionDate,
+    setLandingActiveTab
   } = useInspection();
 
-  const handleProceed = (productType) => {
+  const handleProceed = (productType, shift, date) => {
+    // Set the first call as selectedCall for display purposes
+    if (selectedCalls && selectedCalls.length > 0) {
+      setSelectedCall(selectedCalls[0]);
+    }
+
+    // Save inspection shift and date
+    if (shift) {
+      setInspectionShift(shift);
+      sessionStorage.setItem('inspectionShift', shift);
+    }
+    if (date) {
+      setInspectionDate(date);
+      sessionStorage.setItem('inspectionDate', date);
+    }
+
     if (productType === 'Raw Material') {
       setActiveInspectionType('raw-material');
       navigate(ROUTES.RAW_MATERIAL);

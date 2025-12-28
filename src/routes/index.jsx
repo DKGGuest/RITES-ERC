@@ -47,6 +47,15 @@ export const ROUTES = {
   // IC (Inspection Certificate) Routes
   IC_RAW_MATERIAL: '/ic/raw-material',
   IC_PROCESS: '/ic/process-material',
+
+  // CM (Controlling Manager) Routes
+  CM_DASHBOARD: '/cm',
+  CM_APPROVALS: '/cm/approvals',
+  CM_WORKLOAD: '/cm/workload',
+  CM_PERFORMANCE: '/cm/performance',
+
+  // Call Desk Routes
+  CALL_DESK: '/call-desk',
 };
 
 /**

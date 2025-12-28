@@ -2,7 +2,7 @@ import CalibrationSubModule from '../components/CalibrationSubModule';
 import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
 import './CalibrationDocumentsPage.css';
 
-const CalibrationDocumentsPage = ({ onBack, heats = [], onNavigateSubmodule, inspectionCallNo = '' }) => {
+const CalibrationDocumentsPage = ({ onBack, heats = [], ladleValues = null, onNavigateSubmodule, inspectionCallNo = '' }) => {
   return (
     <div className="calibration-page-container">
       <div className="calibration-page-header">
@@ -20,6 +20,7 @@ const CalibrationDocumentsPage = ({ onBack, heats = [], onNavigateSubmodule, ins
 
       <CalibrationSubModule
         preInspectionHeats={heats}
+        vendorLadleValues={ladleValues}
         inspectionCallNo={inspectionCallNo}
       />
     </div>

@@ -4,6 +4,7 @@ import { ROUTES } from './routes';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
+import { getStoredUser } from './services/authService';
 
 // Page Wrappers
 import LandingPageWrapper from './pages/wrappers/LandingPageWrapper';
@@ -42,6 +43,23 @@ import {
   RawMaterialCertificateWrapper,
   ProcessMaterialCertificateWrapper,
 } from './pages/wrappers/OtherWrappers';
+import { CMDashboardWrapper } from './pages/wrappers/CMWrappers';
+import { CallDeskDashboardWrapper } from './pages/wrappers/CallDeskWrapper';
+
+/**
+ * Role-based redirect component
+ */
+const RoleBasedRedirect = () => {
+  const currentUser = getStoredUser();
+
+  if (currentUser?.roleName === 'CM') {
+    return <Navigate to={ROUTES.CM_DASHBOARD} replace />;
+  } else if (currentUser?.roleName === 'CALL_DESK') {
+    return <Navigate to={ROUTES.CALL_DESK} replace />;
+  } else {
+    return <Navigate to={ROUTES.LANDING} replace />;
+  }
+};
 
 /**
  * Main App Component with React Router
@@ -102,10 +120,16 @@ const App = () => {
             {/* IC (Inspection Certificate) Routes */}
             <Route path={ROUTES.IC_RAW_MATERIAL} element={<RawMaterialCertificateWrapper />} />
             <Route path={ROUTES.IC_PROCESS} element={<ProcessMaterialCertificateWrapper />} />
+
+            {/* CM (Controlling Manager) Routes */}
+            <Route path={ROUTES.CM_DASHBOARD} element={<CMDashboardWrapper />} />
+
+            {/* Call Desk Routes */}
+            <Route path={ROUTES.CALL_DESK} element={<CallDeskDashboardWrapper />} />
           </Route>
 
-          {/* Catch-all redirect to landing */}
-          <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
+          {/* Catch-all redirect - role-based */}
+          <Route path="*" element={<RoleBasedRedirect />} />
         </Routes>
       </InspectionProvider>
     </BrowserRouter>

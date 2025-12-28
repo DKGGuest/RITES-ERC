@@ -77,7 +77,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'lotNo', e.target.value)}
                         disabled={row.noProduction}
                       >
-                        <option value="">Dropdown</option>
+                        <option value="">Select Lot No.</option>
                         {availableLotNumbers.map(lot => (
                           <option key={lot} value={lot}>{lot}</option>
                         ))}
@@ -90,6 +90,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'testResults', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -112,6 +113,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'testResults', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -126,6 +128,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'testResults', e.target.value, 2)}
                         disabled={row.noProduction}
                       >
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -173,7 +176,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'lotNo', e.target.value)}
                         disabled={row.noProduction}
                       >
-                        <option value="">Dropdown</option>
+                        <option value="">Select Lot No.</option>
                         {availableLotNumbers.map(lot => (
                           <option key={lot} value={lot}>{lot}</option>
                         ))}
@@ -189,6 +192,7 @@ const MpiSection = ({
                           onChange={e => updateData(idx, 'testResults', e.target.value, sampleIdx)}
                           disabled={row.noProduction}
                         >
+                          <option value="">Select</option>
                           <option value="OK">OK</option>
                           <option value="Not OK">Not OK</option>
                         </select>

@@ -42,11 +42,11 @@ const FinalInspection = ({ call, onBack }) => {
         </div>
         <div className="form-grid">
           <div className="form-group">
-            <label className="form-label">PO / Sub PO Number</label>
+            <label className="form-label">PO Number</label>
             <input type="text" className="form-input" value={poData.sub_po_no || poData.po_no || ''} disabled />
           </div>
           <div className="form-group">
-            <label className="form-label">PO / Sub PO Date</label>
+            <label className="form-label">PO  Date</label>
             <input type="text" className="form-input" value={poData.sub_po_date ? formatDate(poData.sub_po_date) : (poData.po_date ? formatDate(poData.po_date) : '')} disabled />
           </div>
           <div className="form-group">

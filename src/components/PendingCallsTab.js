@@ -115,7 +115,7 @@ const responsiveStyles = `
   }
 `;
 
-const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSchedule, onBulkStart }) => {
+const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSchedule, onBulkStart, isLoading = false }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
@@ -150,7 +150,8 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
     fetchSchedules();
   }, []);
 
-  const pendingCalls = calls.filter(c => c.status === 'Pending');
+  // Use all calls directly - filtering by assignedToUser is done in workflowService
+  const pendingCalls = calls;
 
   // Extract unique values for filter dropdowns
   const uniqueProductTypes = [...new Set(pendingCalls.map(c => c.product_type))];
@@ -289,13 +290,29 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
     ) : null
   ) : null;
 
+  // Separate selected calls into scheduled and unscheduled
+  const scheduledCallsData = selectedCallsData.filter(call => isScheduled(call.call_no));
+  const unscheduledCallsData = selectedCallsData.filter(call => !isScheduled(call.call_no));
+
+  // Enrich scheduled calls with their schedule info
+  const scheduledCallsWithInfo = scheduledCallsData.map(call => ({
+    ...call,
+    scheduleInfo: scheduledCalls[call.call_no]
+  }));
+
   const handleBulkSchedule = () => {
-    onBulkSchedule(selectedCallsData);
-    setSelectedRows([]);
+    // Pass only unscheduled calls to schedule, but also send scheduled calls info for display
+    // Pass refreshSchedules so the schedule data is refreshed after successful scheduling
+    onBulkSchedule(unscheduledCallsData, { scheduledCallsWithInfo, refreshSchedules });
   };
 
   const handleBulkStart = () => {
-    onBulkStart(selectedCallsData);
+    // Pass scheduling info to parent for proper handling
+    onBulkStart(selectedCallsData, {
+      scheduledCalls: scheduledCallsData,
+      unscheduledCalls: unscheduledCallsData,
+      refreshSchedules
+    });
     setSelectedRows([]);
   };
 
@@ -1202,32 +1219,63 @@ return (
           borderRadius: 'var(--radius-base)',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 'var(--space-12)'
         }}>
           <div style={{ fontWeight: 'var(--font-weight-medium)' }}>
             {selectedRows.length} inspection calls selected
+            {unscheduledCallsData.length > 0 && (
+              <span style={{ color: 'var(--color-warning)', fontSize: '12px', marginLeft: '8px' }}>
+                ({unscheduledCallsData.length} not scheduled)
+              </span>
+            )}
           </div>
           <div className="pending-calls-bulk-actions-buttons" style={{ display: 'flex', gap: 'var(--space-12)' }}>
-            <button className="btn btn-secondary" onClick={handleBulkSchedule} style={{ minHeight: '44px' }}>
-              SCHEDULE FOR ALL
-            </button>
-            <button className="btn btn-primary" onClick={handleBulkStart} style={{ minHeight: '44px' }}>
-              START FOR ALL
-            </button>
+            {/* Show SCHEDULE if any call is not scheduled */}
+            {unscheduledCallsData.length > 0 && (
+              <button className="btn btn-secondary" onClick={handleBulkSchedule} style={{ minHeight: '44px' }}>
+                SCHEDULE ({unscheduledCallsData.length})
+              </button>
+            )}
+            {/* Show RESCHEDULE if any call is already scheduled */}
+            {scheduledCallsData.length > 0 && (
+              <button className="btn btn-outline" onClick={() => onBulkSchedule(scheduledCallsData)} style={{ minHeight: '44px' }}>
+                RESCHEDULE ({scheduledCallsData.length})
+              </button>
+            )}
+            {/* Show START only if ALL calls are scheduled */}
+            {unscheduledCallsData.length === 0 && (
+              <button className="btn btn-primary" onClick={handleBulkStart} style={{ minHeight: '44px' }}>
+                START FOR ALL
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* Data Table */}
       <div className="pending-calls-table-container">
-        <DataTable
-          columns={columns}
-          data={filteredCalls}
-          actions={actions}
-          selectable={true}
-          selectedRows={selectedRows}
-          onSelectionChange={handleSelectionChange}
-        />
+        {isLoading ? (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 'var(--space-48)',
+            color: 'var(--color-text-secondary)'
+          }}>
+            <span>Loading inspection calls...</span>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredCalls}
+            actions={actions}
+            selectable={true}
+            selectedRows={selectedRows}
+            onSelectionChange={handleSelectionChange}
+          />
+        )}
       </div>
     </div>
   );

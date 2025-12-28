@@ -119,6 +119,28 @@ const VisualInspectionPage = ({ onBack, heats = [], onNavigateSubmodule, inspect
           <p className="card-subtitle">Check for material defects per heat</p>
         </div>
 
+        {/* Acceptance Criteria Info Box */}
+        <div style={{
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px'
+        }}>
+          <span style={{ fontSize: '18px' }}>ℹ️</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, color: '#0369a1', fontSize: '0.9rem' }}>Acceptance Criteria</p>
+            <p style={{ margin: '4px 0 0', color: '#0c4a6e', fontSize: '0.85rem' }}>
+              <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ OK</span> — "No Defect" is selected
+              <span style={{ margin: '0 12px', color: '#94a3b8' }}>|</span>
+              <span style={{ color: '#dc2626', fontWeight: 600 }}>✗ NOT OK</span> — Any defect is selected
+            </p>
+          </div>
+        </div>
+
         {/* Heat selector buttons */}
         <div className="visual-heat-selector">
           {heats.map((h, idx) => (

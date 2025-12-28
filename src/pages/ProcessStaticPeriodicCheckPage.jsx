@@ -1,10 +1,53 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ProcessLineToggle from '../components/ProcessLineToggle';
 import ProcessSubmoduleNav from '../components/ProcessSubmoduleNav';
+import {
+  getStaticCheckByPoLine,
+  saveStaticPeriodicCheck
+} from '../services/processMaterialService';
+import {
+  saveToLocalStorage,
+  loadFromLocalStorage
+} from '../services/processLocalStorageService';
 
-const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [], onNavigateSubmodule }) => {
-  // Active line + per-line state store
+const ProcessStaticPeriodicCheckPage = ({ call, onBack, selectedLines = [], onNavigateSubmodule, productionLines = [], allCallOptions = [] }) => {
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Get line index for active line
+  const activeLineIndex = useMemo(() => {
+    return parseInt(activeLine.replace('Line-', '')) - 1;
+  }, [activeLine]);
+
+  // Get current production line data (has icNumber, poNumber structure from dashboard)
+  const currentProductionLine = useMemo(() => {
+    return productionLines[activeLineIndex] || null;
+  }, [activeLineIndex, productionLines]);
+
+  // Get the call data from allCallOptions based on the icNumber selected in production line
+  const currentCallData = useMemo(() => {
+    if (currentProductionLine?.icNumber) {
+      return allCallOptions.find(c => c.call_no === currentProductionLine.icNumber) || null;
+    }
+    return null;
+  }, [currentProductionLine, allCallOptions]);
+
+  // Get PO number for active line
+  const activeLinePoNo = useMemo(() => {
+    if (currentProductionLine?.poNumber) {
+      return currentProductionLine.poNumber;
+    }
+    if (currentCallData?.po_no) {
+      return currentCallData.po_no;
+    }
+    return call?.po_no || '';
+  }, [currentProductionLine, currentCallData, call]);
+
+  const inspectionCallNo = currentCallData?.call_no || call?.call_no || '';
+  const poNo = activeLinePoNo;
+
   const defaultLineState = {
     shearingPress: true,
     forgingPress: true,
@@ -17,7 +60,100 @@ const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [], onNavigate
 
   const current = perLineState[activeLine] || defaultLineState;
 
+  // Track previous line for saving data before switching
+  const prevLineRef = useRef(activeLine);
+  const prevPoNoRef = useRef(poNo);
+
+  // Flags to prevent saving during initial load
+  const isInitialLoadComplete = useRef(false);
+  const hasDataBeenModified = useRef(false);
+
+  // Save current data to localStorage (only if modified)
+  const saveToLocal = useCallback(() => {
+    if (!inspectionCallNo || !poNo || !perLineState[activeLine]) return;
+    if (!isInitialLoadComplete.current || !hasDataBeenModified.current) return;
+    saveToLocalStorage('staticCheck', inspectionCallNo, poNo, activeLine, perLineState[activeLine]);
+  }, [inspectionCallNo, poNo, activeLine, perLineState]);
+
+  // Load data from localStorage
+  const loadFromLocal = useCallback(() => {
+    if (!inspectionCallNo || !poNo) return false;
+    const stored = loadFromLocalStorage('staticCheck', inspectionCallNo, poNo, activeLine);
+    if (stored) {
+      setPerLineState(prev => ({ ...prev, [activeLine]: stored }));
+      return true;
+    }
+    return false;
+  }, [inspectionCallNo, poNo, activeLine]);
+
+  // Save to localStorage when line changes
+  useEffect(() => {
+    if (prevLineRef.current !== activeLine || prevPoNoRef.current !== poNo) {
+      // Save previous line's data if modified
+      if (prevPoNoRef.current && prevLineRef.current && perLineState[prevLineRef.current] && hasDataBeenModified.current) {
+        saveToLocalStorage('staticCheck', inspectionCallNo, prevPoNoRef.current, prevLineRef.current, perLineState[prevLineRef.current]);
+      }
+      prevLineRef.current = activeLine;
+      prevPoNoRef.current = poNo;
+      // Reset flags for new line
+      isInitialLoadComplete.current = false;
+      hasDataBeenModified.current = false;
+    }
+  }, [activeLine, poNo, inspectionCallNo, perLineState]);
+
+  // Save on unmount
+  useEffect(() => {
+    return () => saveToLocal();
+  }, [saveToLocal]);
+
+  /**
+   * Fetch static periodic check data - first from localStorage, then backend
+   */
+  const fetchStaticCheckData = useCallback(async () => {
+    if (!inspectionCallNo || !poNo) return;
+
+    // Try localStorage first
+    if (loadFromLocal()) {
+      console.log('Static check data loaded from localStorage');
+      // Mark initial load complete after a short delay
+      setTimeout(() => { isInitialLoadComplete.current = true; }, 100);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await getStaticCheckByPoLine(inspectionCallNo, poNo, activeLine);
+      if (response?.responseData) {
+        const data = response.responseData;
+        setPerLineState(prev => ({
+          ...prev,
+          [activeLine]: {
+            shearingPress: data.shearingPressCapacityOk ?? true,
+            forgingPress: data.forgingPressCapacityOk ?? true,
+            reheatingFurnace: data.reheatingFurnaceInductionType ?? true,
+            quenchingTime: data.quenchingWithin20Seconds ?? true,
+            oilTankCounter: data.oilTankCounterValue ?? 45000,
+            cleaningDone: false
+          }
+        }));
+      }
+    } catch (err) {
+      console.log('Using default static check data:', err.message);
+    } finally {
+      setIsLoading(false);
+      // Mark initial load complete after a short delay
+      setTimeout(() => { isInitialLoadComplete.current = true; }, 100);
+    }
+  }, [inspectionCallNo, poNo, activeLine, loadFromLocal]);
+
+  useEffect(() => {
+    fetchStaticCheckData();
+  }, [fetchStaticCheckData]);
+
+  // Wrapper to mark data as modified when user changes data
   const updateLine = (patch) => {
+    hasDataBeenModified.current = true;
     setPerLineState((prev) => ({
       ...prev,
       [activeLine]: { ...(prev[activeLine] || defaultLineState), ...patch },
@@ -37,8 +173,48 @@ const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [], onNavigate
     }
   };
 
+  /**
+   * Save static periodic check data to backend
+   */
+  const handleSave = async () => {
+    if (!inspectionCallNo || !poNo) {
+      alert('Missing call or PO information');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        inspectionCallNo,
+        poNo,
+        lineNo: activeLine,
+        shearingPressCapacityOk: current.shearingPress,
+        forgingPressCapacityOk: current.forgingPress,
+        reheatingFurnaceInductionType: current.reheatingFurnace,
+        quenchingWithin20Seconds: current.quenchingTime,
+        oilTankCounterValue: current.oilTankCounter,
+        allChecksPassed
+      };
+
+      await saveStaticPeriodicCheck(payload);
+      alert('Static periodic check saved successfully!');
+      onBack();
+    } catch (err) {
+      setError(err.message);
+      alert('Failed to save: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div>
+      {/* Submodule Navigation - Above everything */}
+      <ProcessSubmoduleNav
+        currentSubmodule="process-static-periodic-check"
+        onNavigate={onNavigateSubmodule}
+      />
+
       {/* Line selector bar */}
       {selectedLines.length > 0 && (
         <ProcessLineToggle
@@ -51,7 +227,7 @@ const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [], onNavigate
       <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
         <div>
-          <h1 className="page-title">Static Periodic Check</h1>
+          <h1 className="page-title">Static Periodic Check {poNo && <span style={{ color: '#0d9488', fontSize: 'var(--font-size-lg)' }}>- PO: {poNo}</span>}</h1>
           <p className="page-subtitle">Process Material Inspection - Required field - All checks must be completed</p>
         </div>
         <button className="btn btn-outline" onClick={onBack}>
@@ -59,11 +235,17 @@ const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [], onNavigate
         </button>
       </div>
 
-      {/* Submodule Navigation */}
-      <ProcessSubmoduleNav
-        currentSubmodule="process-static-periodic-check"
-        onNavigate={onNavigateSubmodule}
-      />
+      {isLoading && (
+        <div className="alert alert-info" style={{ marginBottom: 'var(--space-16)' }}>
+          Loading static check data...
+        </div>
+      )}
+
+      {error && (
+        <div className="alert alert-error" style={{ marginBottom: 'var(--space-16)' }}>
+          {error}
+        </div>
+      )}
 
       {/* Equipment Verification Checks */}
       <div className="card">
@@ -184,10 +366,10 @@ const ProcessStaticPeriodicCheckPage = ({ onBack, selectedLines = [], onNavigate
         <button className="btn btn-outline" onClick={onBack}>Cancel</button>
         <button
           className="btn btn-primary"
-          onClick={() => { alert('Static periodic check saved!'); onBack(); }}
-          disabled={isCounterLocked}
+          onClick={handleSave}
+          disabled={isCounterLocked || isSaving}
         >
-          Save & Continue
+          {isSaving ? 'Saving...' : 'Save & Continue'}
         </button>
       </div>
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 // Responsive styles for Heat Number Details
 const heatResponsiveStyles = `
@@ -153,56 +153,95 @@ const heatResponsiveStyles = `
   }
 `;
 
+// Default mock data - used when no heats are provided from database
+const DEFAULT_HEATS = [
+  {
+    id: 1,
+    heatNo: 'H001',
+    tcNo: 'TC-2025-001',
+    tcDate: '2025-11-10',
+    manufacturerName: 'Steel Authority of India',
+    invoiceNumber: 'INV-2025-0012',
+    invoiceDate: '2025-11-05',
+    subPoNumber: 'SPO-2025-001',
+    subPoDate: '2025-10-15',
+    subPoQty: '5.0',
+    totalValueOfPo: '₹ 25,00,000',
+    tcQuantity: '2.5',
+    offeredQty: '2.5',
+    colorCode: ''
+  },
+  {
+    id: 2,
+    heatNo: 'H002',
+    tcNo: 'TC-2025-002',
+    tcDate: '2025-11-12',
+    manufacturerName: 'Steel Authority of India',
+    invoiceNumber: 'INV-2025-0012',
+    invoiceDate: '2025-11-05',
+    subPoNumber: 'SPO-2025-001',
+    subPoDate: '2025-10-15',
+    subPoQty: '5.0',
+    totalValueOfPo: '₹ 25,00,000',
+    tcQuantity: '3.0',
+    offeredQty: '3.0',
+    colorCode: ''
+  }
+];
+
 /**
  * Heat Number Details Component
  * Displays heat data auto-fetched from vendor call with Color Code as manual entry
  */
 const HeatNumberDetails = ({ heats: propHeats, onHeatsChange }) => {
-  // Mock data simulating vendor call data - will be replaced with API data
-  const [heats, setHeats] = useState(propHeats || [
-    {
-      id: 1,
-      heatNo: 'H001',
-      tcNo: 'TC-2025-001',
-      tcDate: '2025-11-10',
-      manufacturerName: 'Steel Authority of India',
-      invoiceNumber: 'INV-2025-0012',
-      invoiceDate: '2025-11-05',
-      subPoNumber: 'SPO-2025-001',
-      subPoDate: '2025-10-15',
-      subPoQty: '5.0',
-      totalValueOfPo: '₹ 25,00,000',
-      tcQuantity: '2.5',
-      offeredQty: '2.5',
-      colorCode: ''
-    },
-    {
-      id: 2,
-      heatNo: 'H002',
-      tcNo: 'TC-2025-002',
-      tcDate: '2025-11-12',
-      manufacturerName: 'Steel Authority of India',
-      invoiceNumber: 'INV-2025-0012',
-      invoiceDate: '2025-11-05',
-      subPoNumber: 'SPO-2025-001',
-      subPoDate: '2025-10-15',
-      subPoQty: '5.0',
-      totalValueOfPo: '₹ 25,00,000',
-      tcQuantity: '3.0',
-      offeredQty: '3.0',
-      colorCode: ''
+  // Use heats from props (database) or fall back to default mock data
+  const heatsData = propHeats && propHeats.length > 0 ? propHeats : DEFAULT_HEATS;
+
+  // Local state for color codes (editable field)
+  // Initialize from props so color codes persist across navigation
+  const [localColorCodes, setLocalColorCodes] = useState(() => {
+    const initial = {};
+    if (propHeats && propHeats.length > 0) {
+      propHeats.forEach((heat, idx) => {
+        if (heat.colorCode) {
+          initial[idx] = heat.colorCode;
+        }
+      });
     }
-  ]);
+    return initial;
+  });
+
+  // Sync localColorCodes when propHeats changes (e.g., restored from localStorage)
+  useEffect(() => {
+    if (propHeats && propHeats.length > 0) {
+      const updated = {};
+      propHeats.forEach((heat, idx) => {
+        if (heat.colorCode) {
+          updated[idx] = heat.colorCode;
+        }
+      });
+      // Only update if there are actual color codes to restore
+      if (Object.keys(updated).length > 0) {
+        setLocalColorCodes(prev => ({ ...prev, ...updated }));
+      }
+    }
+  }, [propHeats]);
 
   // Update color code (only manual field)
   const updateColorCode = useCallback((heatIndex, value) => {
-    setHeats(prev => {
-      const updated = [...prev];
-      updated[heatIndex] = { ...updated[heatIndex], colorCode: value };
-      if (onHeatsChange) onHeatsChange(updated);
-      return updated;
-    });
-  }, [onHeatsChange]);
+    setLocalColorCodes(prev => ({
+      ...prev,
+      [heatIndex]: value
+    }));
+    // Notify parent of the change
+    if (onHeatsChange) {
+      const updatedHeats = heatsData.map((h, idx) => ({
+        ...h,
+        colorCode: idx === heatIndex ? value : (localColorCodes[idx] || h.colorCode || '')
+      }));
+      onHeatsChange(updatedHeats);
+    }
+  }, [onHeatsChange, heatsData, localColorCodes]);
 
   return (
     <div style={{ marginTop: '24px' }}>
@@ -210,10 +249,10 @@ const HeatNumberDetails = ({ heats: propHeats, onHeatsChange }) => {
 
       <div className="heat-section-header">
         <h4 className="heat-section-title">Heat Number Details</h4>
-        {/* <span className="heat-auto-fetched-badge">📥 Auto-fetched from Vendor Call</span> */}
+        <span className="heat-auto-fetched-badge">📥 {propHeats && propHeats.length > 0 ? 'From Database' : 'Mock Data'}</span>
       </div>
 
-      {heats.map((heat, heatIndex) => (
+      {heatsData.map((heat, heatIndex) => (
         <div key={heat.id} className="heat-card">
           <div className="heat-card-header">
             <span className="heat-card-title">Heat {heatIndex + 1}: {heat.heatNo}</span>
@@ -281,7 +320,7 @@ const HeatNumberDetails = ({ heats: propHeats, onHeatsChange }) => {
               <input
                 type="text"
                 className="heat-form-input"
-                value={heat.colorCode}
+                value={localColorCodes[heatIndex] !== undefined ? localColorCodes[heatIndex] : (heat.colorCode || '')}
                 onChange={(e) => updateColorCode(heatIndex, e.target.value)}
                 placeholder="Enter color code"
                 style={{ backgroundColor: '#ffffff' }}

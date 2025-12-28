@@ -19,6 +19,7 @@ const AppLayout = () => {
 
   useEffect(() => {
     const user = getStoredUser();
+    console.log('🔍 AppLayout - Current User:', user);
     setCurrentUser(user);
   }, []);
 
@@ -60,6 +61,16 @@ const AppLayout = () => {
       setIsSidebarOpen(false);
       navigate(ROUTES.FINAL_PRODUCT);
     }
+  };
+
+  const handleNavigateToCMDashboard = () => {
+    setIsSidebarOpen(false);
+    navigate(ROUTES.CM_DASHBOARD);
+  };
+
+  const handleNavigateToCallDesk = () => {
+    setIsSidebarOpen(false);
+    navigate(ROUTES.CALL_DESK);
   };
 
   const isActivePage = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
@@ -111,15 +122,19 @@ const AppLayout = () => {
           </button>
           <nav>
             <ul className="sidebar-nav">
-              <li
-                className={`sidebar-item ${isActivePage(ROUTES.LANDING) ? 'active' : ''}`}
-                onClick={handleNavigateToLanding}
-                title="Landing Page"
-              >
-                <span className="sidebar-icon">🏠</span>
-                <span className="sidebar-text">Landing Page</span>
-              </li>
-              {(activeInspectionType === 'raw-material' || activeInspectionType === null) && (
+              {/* Landing Page - Only show for IE users (not CM or CALL_DESK) */}
+              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && (
+                <li
+                  className={`sidebar-item ${isActivePage(ROUTES.LANDING) ? 'active' : ''}`}
+                  onClick={handleNavigateToLanding}
+                  title="Landing Page"
+                >
+                  <span className="sidebar-icon">🏠</span>
+                  <span className="sidebar-text">Landing Page</span>
+                </li>
+              )}
+              {/* Inspection modules - Only show for IE users (not CM or CALL_DESK) */}
+              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && (activeInspectionType === 'raw-material' || activeInspectionType === null) && (
                 <li
                   className={`sidebar-item ${isActivePage(ROUTES.RAW_MATERIAL) ? 'active' : ''}`}
                   onClick={handleNavigateToRawMaterial}
@@ -130,7 +145,7 @@ const AppLayout = () => {
                   <span className="sidebar-text">Raw Material Inspection</span>
                 </li>
               )}
-              {(activeInspectionType === 'process' || activeInspectionType === null) && (
+              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && (activeInspectionType === 'process' || activeInspectionType === null) && (
                 <li
                   className={`sidebar-item ${isActivePage(ROUTES.PROCESS) ? 'active' : ''}`}
                   onClick={handleNavigateToProcess}
@@ -141,7 +156,7 @@ const AppLayout = () => {
                   <span className="sidebar-text">Process Inspection</span>
                 </li>
               )}
-              {(activeInspectionType === 'final-product' || activeInspectionType === null) && (
+              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && (activeInspectionType === 'final-product' || activeInspectionType === null) && (
                 <li
                   className={`sidebar-item ${isActivePage(ROUTES.FINAL_PRODUCT) ? 'active' : ''}`}
                   onClick={handleNavigateToFinalProduct}
@@ -150,6 +165,28 @@ const AppLayout = () => {
                 >
                   <span className="sidebar-icon">✅</span>
                   <span className="sidebar-text">Final Product Inspection</span>
+                </li>
+              )}
+              {/* CM Dashboard - Only show for CM role */}
+              {currentUser?.roleName === 'CM' && (
+                <li
+                  className={`sidebar-item ${isActivePage(ROUTES.CM_DASHBOARD) ? 'active' : ''}`}
+                  onClick={handleNavigateToCMDashboard}
+                  title="CM Dashboard"
+                >
+                  <span className="sidebar-icon">👔</span>
+                  <span className="sidebar-text">CM Dashboard</span>
+                </li>
+              )}
+              {/* Call Desk - Only show for CALL_DESK role */}
+              {currentUser?.roleName === 'CALL_DESK' && (
+                <li
+                  className={`sidebar-item ${isActivePage(ROUTES.CALL_DESK) ? 'active' : ''}`}
+                  onClick={handleNavigateToCallDesk}
+                  title="Call Desk"
+                >
+                  <span className="sidebar-icon">📞</span>
+                  <span className="sidebar-text">Call Desk</span>
                 </li>
               )}
             </ul>

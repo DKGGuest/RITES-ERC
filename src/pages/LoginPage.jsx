@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { loginUser, storeAuthData, isAuthenticated } from '../services/authService';
+import { loginUser, storeAuthData, isAuthenticated, getStoredUser } from '../services/authService';
 import { ROUTES } from '../routes';
 import './LoginPage.css';
 
@@ -17,10 +17,20 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - based on role
   if (isAuthenticated()) {
-    const from = location.state?.from?.pathname || ROUTES.LANDING;
-    navigate(from, { replace: true });
+    const currentUser = getStoredUser();
+    let redirectPath = ROUTES.LANDING;
+
+    if (currentUser?.roleName === 'CM') {
+      redirectPath = ROUTES.CM_DASHBOARD;
+    } else if (currentUser?.roleName === 'CALL_DESK') {
+      redirectPath = ROUTES.CALL_DESK;
+    } else {
+      redirectPath = location.state?.from?.pathname || ROUTES.LANDING;
+    }
+
+    navigate(redirectPath, { replace: true });
     return null;
   }
 
@@ -41,15 +51,25 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await loginUser(userId, password);
-
-      // Store auth data (response.data contains the user info)
-      const userData = response.data || response;
+      // loginUser returns responseData directly (userId, userName, roleName, token)
+      const userData = await loginUser(userId, password);
       storeAuthData(userData);
 
-      // Navigate to the intended destination or landing page
-      const from = location.state?.from?.pathname || ROUTES.LANDING;
-      navigate(from, { replace: true });
+      // Redirect based on user role
+      let redirectPath = ROUTES.LANDING;
+
+      if (userData.roleName === 'CM') {
+        // CM user - redirect to CM Dashboard
+        redirectPath = ROUTES.CM_DASHBOARD;
+      } else if (userData.roleName === 'CALL_DESK') {
+        // Call Desk user - redirect to Call Desk
+        redirectPath = ROUTES.CALL_DESK;
+      } else {
+        // IE user - redirect to landing page or intended destination
+        redirectPath = location.state?.from?.pathname || ROUTES.LANDING;
+      }
+
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {

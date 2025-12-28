@@ -1,25 +1,13 @@
 /**
  * Service for Inspection Form APIs (Sections A, B, C, D)
  * All endpoints require JWT authentication
- * TODO: Uncomment API calls for production with backend
  */
 
-// TODO: Uncomment for production with backend
-// const API_BASE_URL = 'http://localhost:8081/sarthi-backend/api/inspection-form';
-
-// Mock storage for form data (persists in memory during session)
-const mockFormData = {
-  poDetails: {},
-  callDetails: {},
-  subPoDetails: {},
-  productionLines: {}
-};
+const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend/api/inspection-form';
 
 /**
  * Get auth headers with JWT token
  */
-// TODO: Uncomment for production with backend
-/*
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
   return {
@@ -27,269 +15,135 @@ const getAuthHeaders = () => {
     'Authorization': token ? `Bearer ${token}` : ''
   };
 };
-*/
 
 // ==================== Combined Form Data ====================
 
+// Helper to parse response and surface errors
+const handleResponse = async (response) => {
+  let body = null;
+  try {
+    body = await response.json();
+  } catch (e) {
+    // non-JSON response
+    const text = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status} ${response.statusText} - ${text}`);
+  }
+  if (!response.ok) {
+    const serverMsg = body && (body.message || body.error || JSON.stringify(body));
+    throw new Error(`HTTP ${response.status} ${response.statusText} - ${serverMsg}`);
+  }
+  return body;
+};
 /**
  * Get all form data (Sections A, B, C) by inspection call number
  */
 export const getFormDataByCallNo = async (callNo) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/${callNo}`, {
     method: 'GET',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        poDetails: mockFormData.poDetails[callNo] || null,
-        callDetails: mockFormData.callDetails[callNo] || null,
-        subPoDetails: mockFormData.subPoDetails[callNo] || null
-      });
-    }, 200);
-  });
+  return data.responseData;
 };
 
 // ==================== Section A: PO Details ====================
 
 export const getPoDetailsByCallNo = async (callNo) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/po-details/${callNo}`, {
     method: 'GET',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockFormData.poDetails[callNo] || null);
-    }, 200);
-  });
+  return data.responseData;
 };
 
 export const savePoDetails = async (poDetails) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/po-details`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(poDetails)
   });
-  const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      mockFormData.poDetails[poDetails.inspectionCallNo] = {
-        ...poDetails,
-        id: Date.now(),
-        createdAt: new Date().toISOString()
-      };
-      resolve(mockFormData.poDetails[poDetails.inspectionCallNo]);
-    }, 300);
-  });
+  const data = await handleResponse(response);
+  return data.responseData;
 };
 
 export const verifyPoDetails = async (callNo, verifiedBy) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/po-details/verify/${callNo}?verifiedBy=${verifiedBy}`, {
     method: 'PUT',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (mockFormData.poDetails[callNo]) {
-        mockFormData.poDetails[callNo].isVerified = true;
-        mockFormData.poDetails[callNo].verifiedBy = verifiedBy;
-        mockFormData.poDetails[callNo].verifiedAt = new Date().toISOString();
-      }
-      resolve(mockFormData.poDetails[callNo]);
-    }, 200);
-  });
+  return data.responseData;
 };
 
 // ==================== Section B: Inspection Call ====================
 
 export const getCallDetailsByCallNo = async (callNo) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/call-details/${callNo}`, {
     method: 'GET',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockFormData.callDetails[callNo] || null);
-    }, 200);
-  });
+  return data.responseData;
 };
 
 export const saveCallDetails = async (callDetails) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/call-details`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(callDetails)
   });
-  const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      mockFormData.callDetails[callDetails.inspectionCallNo] = {
-        ...callDetails,
-        id: Date.now(),
-        createdAt: new Date().toISOString()
-      };
-      resolve(mockFormData.callDetails[callDetails.inspectionCallNo]);
-    }, 300);
-  });
+  const data = await handleResponse(response);
+  return data.responseData;
 };
 
 export const updateCallDetails = async (callDetails) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/call-details`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(callDetails)
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      mockFormData.callDetails[callDetails.inspectionCallNo] = {
-        ...mockFormData.callDetails[callDetails.inspectionCallNo],
-        ...callDetails,
-        updatedAt: new Date().toISOString()
-      };
-      resolve(mockFormData.callDetails[callDetails.inspectionCallNo]);
-    }, 300);
-  });
+  return data.responseData;
 };
 
 export const verifyCallDetails = async (callNo, verifiedBy) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/call-details/verify/${callNo}?verifiedBy=${verifiedBy}`, {
     method: 'PUT',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (mockFormData.callDetails[callNo]) {
-        mockFormData.callDetails[callNo].isVerified = true;
-        mockFormData.callDetails[callNo].verifiedBy = verifiedBy;
-        mockFormData.callDetails[callNo].verifiedAt = new Date().toISOString();
-      }
-      resolve(mockFormData.callDetails[callNo]);
-    }, 200);  
-  });
+  return data.responseData;
 };
 
 // ==================== Section C: Sub PO Details ====================
 
 export const getSubPoDetailsByCallNo = async (callNo) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/sub-po-details/${callNo}`, {
     method: 'GET',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockFormData.subPoDetails[callNo] || null);
-    }, 200);
-  });
+  return data.responseData;
 };
 
 export const saveSubPoDetails = async (subPoDetails) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/sub-po-details`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(subPoDetails)
   });
-  const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      mockFormData.subPoDetails[subPoDetails.inspectionCallNo] = {
-        ...subPoDetails,
-        id: Date.now(),
-        createdAt: new Date().toISOString()
-      };
-      resolve(mockFormData.subPoDetails[subPoDetails.inspectionCallNo]);
-    }, 300);
-  });
+  const data = await handleResponse(response);
+  return data.responseData;
 };
 
 export const verifySubPoDetails = async (callNo, verifiedBy) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/sub-po-details/verify/${callNo}?verifiedBy=${verifiedBy}`, {
     method: 'PUT',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (mockFormData.subPoDetails[callNo]) {
-        mockFormData.subPoDetails[callNo].isVerified = true;
-        mockFormData.subPoDetails[callNo].verifiedBy = verifiedBy;
-        mockFormData.subPoDetails[callNo].verifiedAt = new Date().toISOString();
-      }
-      resolve(mockFormData.subPoDetails[callNo]);
-    }, 200);
-  });
+  return data.responseData;
 };
 
 // ==================== Section D: Production Lines (Process Inspection) ====================
@@ -298,78 +152,64 @@ export const verifySubPoDetails = async (callNo, verifiedBy) => {
  * Get all production lines by inspection call number
  */
 export const getProductionLinesByCallNo = async (callNo) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/production-lines/${callNo}`, {
     method: 'GET',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockFormData.productionLines[callNo] || []);
-    }, 200);
-  });
+  return data.responseData;
 };
 
 /**
  * Save production lines for an inspection call
  */
 export const saveProductionLines = async (callNo, lines) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/production-lines/${callNo}`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(lines)
   });
-  const data = await response.json();
-  return data.data;
-  */
-
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      mockFormData.productionLines[callNo] = lines.map((line, index) => ({
-        ...line,
-        id: Date.now() + index,
-        createdAt: new Date().toISOString()
-      }));
-      resolve(mockFormData.productionLines[callNo]);
-    }, 300);
-  });
+  const data = await handleResponse(response);
+  return data.responseData;
 };
 
 /**
  * Verify all production lines for an inspection call
  */
 export const verifyProductionLines = async (callNo, verifiedBy) => {
-  // TODO: Uncomment for production with backend
-  /*
   const response = await fetch(`${API_BASE_URL}/production-lines/verify/${callNo}?verifiedBy=${verifiedBy}`, {
     method: 'PUT',
     headers: getAuthHeaders()
   });
   const data = await response.json();
-  return data.data;
-  */
+  return data.responseData;
+};
 
-  // Mock implementation for Vercel deployment
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (mockFormData.productionLines[callNo]) {
-        mockFormData.productionLines[callNo] = mockFormData.productionLines[callNo].map(line => ({
-          ...line,
-          isVerified: true,
-          verifiedBy: verifiedBy,
-          verifiedAt: new Date().toISOString()
-        }));
-      }
-      resolve(mockFormData.productionLines[callNo] || []);
-    }, 200);
+// ==================== Vendor API Data Ingestion ====================
+
+/**
+ * Ingest PO data from vendor API (simulated)
+ * This function sends PO data to the backend for storage
+ */
+export const ingestVendorPoData = async (vendorData) => {
+  const response = await fetch(`${API_BASE_URL}/vendor/ingest`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(vendorData)
   });
+  const data = await handleResponse(response);
+  return data.responseData;
+};
+
+/**
+ * Get all pending inspection calls (not yet verified)
+ * Used to populate the inspection call selection dropdown
+ */
+export const getAllPendingInspectionCalls = async () => {
+  const response = await fetch(`${API_BASE_URL}/pending-calls`, {
+    method: 'GET',
+    headers: getAuthHeaders()
+  });
+  const data = await response.json();
+  return data.responseData;
 };

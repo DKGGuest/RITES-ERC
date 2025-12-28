@@ -3,6 +3,7 @@ import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
 import './MaterialTestingPage.css';
 
 const STORAGE_KEY = 'material_testing_draft_data';
+const CALIBRATION_STORAGE_KEY = 'calibration_draft_data';
 
 /**
  * Specification limits for raw material testing
@@ -97,6 +98,34 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
   const currentHeat = heats[activeHeatTab] || {};
   const heatIndex = activeHeatTab;
 
+  // Load ladle values from calibration draft data
+  const getLadleValues = useCallback(() => {
+    const calStorageKey = `${CALIBRATION_STORAGE_KEY}_${inspectionCallNo}`;
+    const calDraft = localStorage.getItem(calStorageKey);
+    if (calDraft) {
+      try {
+        const parsed = JSON.parse(calDraft);
+        if (parsed.heats && Array.isArray(parsed.heats)) {
+          return parsed.heats;
+        }
+      } catch (e) {
+        console.error('Error parsing calibration data:', e);
+      }
+    }
+    return [];
+  }, [inspectionCallNo]);
+
+  const ladleHeats = getLadleValues();
+  const currentLadleHeat = ladleHeats[heatIndex] || {};
+
+  // Format ladle value for display
+  const formatLadleValue = (value) => {
+    if (value === '' || value === null || value === undefined) return '-';
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return '-';
+    return numValue.toFixed(3);
+  };
+
   return (
     <div className="material-testing-page-container">
       <div className="material-testing-page-header">
@@ -116,8 +145,29 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
           <h3 className="card-title">Material Testing (2 samples per Heat)</h3>
           <p className="card-subtitle">Chemical Analysis &amp; Mechanical Properties</p>
         </div>
-        <div className="alert alert-info" style={{ marginBottom: '24px' }}>
+        <div className="alert alert-info" style={{ marginBottom: '16px' }}>
           ℹ️ Calibration status of testing instruments is verified and valid
+        </div>
+
+        {/* Specification Limits Info Box */}
+        <div style={{
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '24px'
+        }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#0369a1', fontSize: '0.9rem' }}>📋 Specification Limits (Green = Pass, Red = Fail)</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.85rem', color: '#0c4a6e' }}>
+            <span><strong>%C:</strong> 0.50-0.60</span>
+            <span><strong>%Si:</strong> 1.50-2.00</span>
+            <span><strong>%Mn:</strong> 0.80-1.00</span>
+            <span><strong>%P:</strong> ≤0.030</span>
+            <span><strong>%S:</strong> ≤0.030</span>
+            <span><strong>Grain Size:</strong> ≥6</span>
+            <span><strong>Decarb:</strong> ≤0.25mm</span>
+            <span><strong>Inclusions (A/B/C/D):</strong> ≤2.0 each</span>
+          </div>
         </div>
 
         {/* Heat Toggle */}
@@ -158,6 +208,18 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Ladle Values Row - Reference from Calibration */}
+                  <tr style={{ background: '#fffbeb' }}>
+                    <td style={{ fontWeight: 600, color: '#92400e' }}>Ladle Values</td>
+                    <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentC)}</td>
+                    <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentSi)}</td>
+                    <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentMn)}</td>
+                    <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentP)}</td>
+                    <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentS)}</td>
+                    <td style={{ color: '#94a3b8' }}>—</td>
+                    <td style={{ color: '#94a3b8' }}>—</td>
+                    <td style={{ color: '#94a3b8' }}>—</td>
+                  </tr>
                   {[0, 1].map(sampleIndex => {
                     const sample = materialData[heatIndex]?.samples[sampleIndex] || {};
                     return (

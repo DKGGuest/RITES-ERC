@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { MOCK_INSPECTION_CALLS } from '../data/mockData';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { MOCK_INSPECTION_CALLS, MOCK_PENDING_PROCESS_FINAL_CALLS } from '../data/mockData';
 import Tabs from '../components/Tabs';
 import PendingCallsTab from '../components/PendingCallsTab';
 import CompletedCallsTab from '../components/CompletedCallsTab';
@@ -11,6 +11,7 @@ import Notification from '../components/Notification';
 import { scheduleInspection, rescheduleInspection, getScheduleByCallNo, validateScheduleLimit, MAX_CALLS_PER_DAY } from '../services/scheduleService';
 import { raiseBill, updateBillingStatus, approvePayment, BILLING_STATUS } from '../services/billingService';
 import { getStoredUser } from '../services/authService';
+import { fetchUserPendingCalls, performTransitionAction } from '../services/workflowService';
 
 const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending' }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -26,7 +27,47 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   const [previousSchedule, setPreviousSchedule] = useState(null);
   const [notification, setNotification] = useState({ message: '', type: 'error' });
 
-  const pendingCount = MOCK_INSPECTION_CALLS.filter(call => call.status === 'Pending').length;
+  // State for unscheduled calls popup when trying to start
+  const [showUnscheduledPopup, setShowUnscheduledPopup] = useState(false);
+  const [unscheduledCallsInfo, setUnscheduledCallsInfo] = useState({ scheduledCalls: [], unscheduledCalls: [], refreshSchedules: null });
+  const [, setAllSelectedForStart] = useState([]);
+
+  // State for API-fetched pending calls from Azure workflow API
+  const [pendingCalls, setPendingCalls] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch pending workflow transitions for logged-in user from Azure API
+  const fetchPendingData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const apiCalls = await fetchUserPendingCalls();
+      setPendingCalls(apiCalls);
+    } catch (error) {
+      console.error('Error fetching pending calls from Azure API:', error);
+      setPendingCalls([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingData();
+  }, [fetchPendingData]);
+
+  // Combine Real Raw Material calls from API with Mock Process/Final Product calls
+  const combinedPendingCalls = useMemo(() => {
+    console.log('🔄 Combining pending calls:');
+    console.log('  📦 Raw Material calls from API:', pendingCalls.length);
+    console.log('  🏭 Process/Final mock calls:', MOCK_PENDING_PROCESS_FINAL_CALLS.length);
+
+    const combined = [...pendingCalls, ...MOCK_PENDING_PROCESS_FINAL_CALLS];
+    console.log('  ✅ Total combined calls:', combined.length);
+
+    return combined;
+  }, [pendingCalls]);
+
+  // Azure API data for pending tab; mock data for other tabs (completed, billing, etc.)
+  const pendingCount = combinedPendingCalls.length;
   const completedCount = MOCK_INSPECTION_CALLS.filter(call => call.status === 'Completed').length;
   const billingCount = MOCK_INSPECTION_CALLS.filter(call =>
     call.ic_issued === true &&
@@ -86,13 +127,20 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     setShowScheduleModal(true);
   };
 
-  const handleBulkSchedule = (calls) => {
+  // State for already scheduled calls info (to display in modal)
+  const [alreadyScheduledCallsInfo, setAlreadyScheduledCallsInfo] = useState([]);
+
+  const handleBulkSchedule = (calls, options = {}) => {
+    const { scheduledCallsWithInfo = [], refreshSchedules } = options;
     setSelectedCalls(calls);
+    setAlreadyScheduledCallsInfo(scheduledCallsWithInfo);
     setIsBulkSchedule(true);
     setIsReschedule(false);
     setPreviousSchedule(null);
     setScheduleDate('');
     setRemarks('');
+    // Store the refresh callback to call after successful scheduling
+    setRefreshCallback(() => refreshSchedules);
     setShowScheduleModal(true);
   };
 
@@ -110,17 +158,17 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
     setIsSubmitting(true);
     const currentUser = getStoredUser();
-    const userName = currentUser?.userName || 'System';
+    const userId = currentUser?.userId || 0;
 
     try {
-      // Validate scheduled date is before or on desired inspection date
+      // Validate scheduled date is on or after desired inspection date
       const callsToValidate = isBulkSchedule ? selectedCalls : [selectedCallLocal];
       for (const call of callsToValidate) {
         if (call?.desired_inspection_date) {
           const scheduledDateObj = new Date(scheduleDate);
           const desiredDateObj = new Date(call.desired_inspection_date);
-          if (scheduledDateObj > desiredDateObj) {
-            showNotification(`Scheduled date cannot be after the Desired Inspection Date (${call.desired_inspection_date}) for call ${call.call_no}. Please select an earlier date.`, 'error');
+          if (scheduledDateObj < desiredDateObj) {
+            showNotification(`Scheduled date cannot be before the Desired Inspection Date (${call.desired_inspection_date}) for call ${call.call_no}. Please select a later date.`, 'error');
             setIsSubmitting(false);
             return;
           }
@@ -146,7 +194,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
             callNo: call.call_no,
             scheduleDate: scheduleDate,
             reason: remarks,
-            createdBy: userName
+            createdBy: userId
           };
           await scheduleInspection(scheduleData);
         }
@@ -156,8 +204,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
           callNo: selectedCallLocal?.call_no,
           scheduleDate: scheduleDate,
           reason: remarks,
-          createdBy: userName,
-          updatedBy: userName
+          createdBy: userId,
+          updatedBy: userId
         };
 
         if (isReschedule) {
@@ -190,12 +238,90 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     }
   };
 
-  const handleStart = (call) => {
-    onStartInspection(call);
+  // Handle Start button - calls Azure API when status is IE_SCHEDULED
+  const handleStart = async (call) => {
+    // Only call Azure API if status is IE_SCHEDULED
+    if (call.status === 'IE_SCHEDULED') {
+      try {
+        const currentUser = getStoredUser();
+        const userId = currentUser?.userId || 0;
+
+        const actionData = {
+          workflowTransitionId: call.workflowTransitionId || call.id,
+          requestId: call.call_no,
+          action: 'INITIATE_INSPECTION',
+          remarks: 'Starting inspection',
+          actionBy: userId,
+          pincode: '560001'
+        };
+
+        await performTransitionAction(actionData);
+        showNotification('Inspection initiated successfully!', 'success');
+
+        // Refresh the pending calls list
+        fetchPendingData();
+
+        // Proceed to inspection page
+        onStartInspection(call);
+      } catch (error) {
+        showNotification(error.message || 'Failed to initiate inspection', 'error');
+      }
+    } else {
+      // For other statuses, just navigate (legacy behavior - commented out local API)
+      // Local API call would go here
+      onStartInspection(call);
+    }
   };
 
-  const handleBulkStart = (calls) => {
+  const handleBulkStart = (calls, scheduleInfo) => {
+    const { unscheduledCalls, scheduledCalls, refreshSchedules } = scheduleInfo || {};
+
+    // If there are unscheduled calls, show the popup
+    if (unscheduledCalls && unscheduledCalls.length > 0) {
+      setUnscheduledCallsInfo({ scheduledCalls, unscheduledCalls, refreshSchedules });
+      setAllSelectedForStart(calls);
+      setShowUnscheduledPopup(true);
+      return;
+    }
+
+    // All calls are scheduled, proceed with start
     onStartMultipleInspections(calls);
+  };
+
+  // Handle scheduling from unscheduled popup
+  const handleScheduleFromPopup = (callToSchedule) => {
+    setSelectedCallLocal(callToSchedule);
+    setSelectedCalls([callToSchedule]);
+    setIsBulkSchedule(false);
+    setIsReschedule(false);
+    setPreviousSchedule(null);
+    setScheduleDate('');
+    setRemarks('');
+    setRefreshCallback(() => unscheduledCallsInfo.refreshSchedules);
+    setShowScheduleModal(true);
+  };
+
+  // Handle scheduling all unscheduled from popup
+  const handleScheduleAllFromPopup = () => {
+    setSelectedCalls(unscheduledCallsInfo.unscheduledCalls);
+    setIsBulkSchedule(true);
+    setIsReschedule(false);
+    setPreviousSchedule(null);
+    setScheduleDate('');
+    setRemarks('');
+    setRefreshCallback(() => unscheduledCallsInfo.refreshSchedules);
+    setShowUnscheduledPopup(false);
+    setShowScheduleModal(true);
+  };
+
+  // Proceed with all scheduled calls (ignore unscheduled)
+  const handleProceedWithScheduledOnly = () => {
+    if (unscheduledCallsInfo.scheduledCalls.length > 0) {
+      setShowUnscheduledPopup(false);
+      onStartMultipleInspections(unscheduledCallsInfo.scheduledCalls);
+    } else {
+      showNotification('No scheduled calls to start. Please schedule the calls first.', 'error');
+    }
   };
 
   // Billing Stage Handlers
@@ -265,15 +391,16 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
       
-      {/* 1. List of Calls Pending - First */}
+      {/* 1. List of Calls Pending - Combined: Real RM calls + Mock Process/Final calls */}
       {activeTab === 'pending' && (
         <PendingCallsTab
-          calls={MOCK_INSPECTION_CALLS}
+          calls={combinedPendingCalls}
           onSchedule={handleSchedule}
           onReschedule={handleReschedule}
           onStart={handleStart}
           onBulkSchedule={handleBulkSchedule}
           onBulkStart={handleBulkStart}
+          isLoading={isLoading}
         />
       )}
 
@@ -334,13 +461,108 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         }
       >
         {isBulkSchedule && (
-          <div style={{ marginBottom: 'var(--space-16)', padding: 'var(--space-12)', background: 'var(--color-bg-1)', borderRadius: 'var(--radius-base)' }}>
-            <strong>Selected Calls:</strong> {selectedCalls.map(c => c.call_no).join(', ')}
-          </div>
+          <>
+            {/* Already Scheduled Calls - Show first for reference */}
+            {alreadyScheduledCallsInfo.length > 0 && (
+              <div style={{
+                marginBottom: 'var(--space-16)',
+                padding: 'var(--space-12)',
+                background: '#ecfdf5',
+                borderRadius: 'var(--radius-base)',
+                border: '1px solid #10b981'
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: 'var(--space-12)', color: '#059669' }}>
+                  ✓ Already Scheduled ({alreadyScheduledCallsInfo.length})
+                </div>
+                {alreadyScheduledCallsInfo.map((call, idx) => (
+                  <div
+                    key={call.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: 'var(--space-8) 0',
+                      borderBottom: idx < alreadyScheduledCallsInfo.length - 1 ? '1px solid #6ee7b7' : 'none'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: '500' }}>{call.call_no}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                        PO: {call.po_no}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Scheduled Date</div>
+                      <div style={{ fontWeight: '500', color: '#059669' }}>
+                        {call.scheduleInfo?.scheduleDate
+                          ? new Date(call.scheduleInfo.scheduleDate).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })
+                          : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Unscheduled Calls - To be scheduled (shown below) */}
+            <div style={{
+              marginBottom: 'var(--space-16)',
+              padding: 'var(--space-12)',
+              background: '#fff8e1',
+              borderRadius: 'var(--radius-base)',
+              border: '1px solid #f59e0b'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: 'var(--space-12)', color: '#b45309' }}>
+                ⚠️ Scheduling For: {selectedCalls.map(c => c.call_no).join(', ')}
+              </div>
+              {selectedCalls.map((call, idx) => (
+                <div
+                  key={call.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--space-8) 0',
+                    borderBottom: idx < selectedCalls.length - 1 ? '1px solid #fcd34d' : 'none'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: '500' }}>{call.call_no}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      PO: {call.po_no}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Desired Date</div>
+                    <div style={{ fontWeight: '500', color: '#f59e0b' }}>
+                      {call.desired_inspection_date || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
         {!isBulkSchedule && (
           <div style={{ marginBottom: 'var(--space-16)', padding: 'var(--space-12)', background: 'var(--color-bg-1)', borderRadius: 'var(--radius-base)' }}>
-            <strong>Call Number:</strong> {selectedCallLocal?.call_no}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: '600' }}>{selectedCallLocal?.call_no}</div>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                  PO: {selectedCallLocal?.po_no}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Desired Date</div>
+                <div style={{ fontWeight: '500', color: '#f59e0b' }}>
+                  {selectedCallLocal?.desired_inspection_date || 'N/A'}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -384,16 +606,48 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         )}
 
         <div className="form-group">
-          <label className="form-label required">{isReschedule ? 'New Schedule Date' : 'Schedule Date'}</label>
+          <label className="form-label required">
+            {isReschedule ? 'New Schedule Date' : 'Schedule Date'}
+            {isBulkSchedule && selectedCalls.length > 0 && (
+              <span style={{ fontWeight: 'normal', color: '#b45309', marginLeft: '8px' }}>
+                for {selectedCalls.map(c => c.call_no).join(', ')}
+              </span>
+            )}
+            {!isBulkSchedule && selectedCallLocal && (
+              <span style={{ fontWeight: 'normal', color: '#b45309', marginLeft: '8px' }}>
+                for {selectedCallLocal.call_no}
+              </span>
+            )}
+          </label>
           <input
             type="date"
             className="form-control"
             value={scheduleDate}
             onChange={(e) => setScheduleDate(e.target.value)}
             disabled={isSubmitting}
+            min={isBulkSchedule
+              ? selectedCalls.reduce((maxDate, call) => {
+                  if (call.desired_inspection_date && call.desired_inspection_date > maxDate) {
+                    return call.desired_inspection_date;
+                  }
+                  return maxDate;
+                }, '')
+              : (selectedCallLocal?.desired_inspection_date || '')}
           />
           <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
             {isReschedule ? 'Select new date for inspection' : 'Select the date for inspection'}
+            {(isBulkSchedule ? selectedCalls[0]?.desired_inspection_date : selectedCallLocal?.desired_inspection_date) && (
+              <span style={{ color: '#f59e0b', marginLeft: '8px' }}>
+                (Min: {isBulkSchedule
+                  ? selectedCalls.reduce((maxDate, call) => {
+                      if (call.desired_inspection_date && call.desired_inspection_date > maxDate) {
+                        return call.desired_inspection_date;
+                      }
+                      return maxDate;
+                    }, selectedCalls[0]?.desired_inspection_date || '')
+                  : selectedCallLocal?.desired_inspection_date})
+              </span>
+            )}
           </small>
         </div>
         <div className="form-group">
@@ -406,6 +660,115 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
             placeholder={isReschedule ? "Enter reason for rescheduling..." : "Enter remarks for scheduling..."}
             disabled={isSubmitting}
           />
+        </div>
+      </Modal>
+
+      {/* Unscheduled Calls Popup */}
+      <Modal
+        isOpen={showUnscheduledPopup}
+        onClose={() => setShowUnscheduledPopup(false)}
+        title="Some Calls Are Not Scheduled"
+        footer={
+          <div style={{ display: 'flex', gap: 'var(--space-12)', flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowUnscheduledPopup(false)}
+            >
+              Cancel
+            </button>
+            {unscheduledCallsInfo.scheduledCalls.length > 0 && (
+              <button
+                className="btn btn-outline"
+                onClick={handleProceedWithScheduledOnly}
+              >
+                Start with Scheduled Only ({unscheduledCallsInfo.scheduledCalls.length})
+              </button>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={handleScheduleAllFromPopup}
+            >
+              Schedule All ({unscheduledCallsInfo.unscheduledCalls.length})
+            </button>
+          </div>
+        }
+      >
+        <div style={{ marginBottom: 'var(--space-16)' }}>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-16)' }}>
+            The following calls need to be scheduled before starting inspection:
+          </p>
+
+          {/* Unscheduled Calls List */}
+          <div style={{
+            background: '#fff8e1',
+            padding: 'var(--space-16)',
+            borderRadius: 'var(--radius-base)',
+            border: '1px solid #f59e0b',
+            marginBottom: 'var(--space-16)'
+          }}>
+            <div style={{ fontWeight: '600', marginBottom: 'var(--space-12)', color: '#b45309' }}>
+              ⚠️ Unscheduled Calls ({unscheduledCallsInfo.unscheduledCalls.length})
+            </div>
+            {unscheduledCallsInfo.unscheduledCalls.map((call, idx) => (
+              <div
+                key={call.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: 'var(--space-8) 0',
+                  borderBottom: idx < unscheduledCallsInfo.unscheduledCalls.length - 1 ? '1px solid #fcd34d' : 'none'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: '500' }}>{call.call_no}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                    PO: {call.po_no} | Desired: {call.desired_inspection_date || 'N/A'}
+                  </div>
+                </div>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => handleScheduleFromPopup(call)}
+                >
+                  Schedule
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Scheduled Calls List */}
+          {unscheduledCallsInfo.scheduledCalls.length > 0 && (
+            <div style={{
+              background: '#ecfdf5',
+              padding: 'var(--space-16)',
+              borderRadius: 'var(--radius-base)',
+              border: '1px solid #10b981'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: 'var(--space-12)', color: '#059669' }}>
+                ✓ Scheduled Calls ({unscheduledCallsInfo.scheduledCalls.length})
+              </div>
+              {unscheduledCallsInfo.scheduledCalls.map((call, idx) => (
+                <div
+                  key={call.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: 'var(--space-8) 0',
+                    borderBottom: idx < unscheduledCallsInfo.scheduledCalls.length - 1 ? '1px solid #6ee7b7' : 'none'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: '500' }}>{call.call_no}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      PO: {call.po_no}
+                    </div>
+                  </div>
+                  <span style={{ color: '#059669', fontWeight: '500' }}>Ready</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Modal>
     </div>

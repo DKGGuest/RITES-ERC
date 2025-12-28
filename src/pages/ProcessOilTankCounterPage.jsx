@@ -1,13 +1,131 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ProcessLineToggle from '../components/ProcessLineToggle';
 import ProcessSubmoduleNav from '../components/ProcessSubmoduleNav';
+import {
+  getOilTankByPoLine,
+  saveOilTankCounter,
+  markOilTankCleaningDone
+} from '../services/processMaterialService';
+import {
+  saveToLocalStorage,
+  loadFromLocalStorage
+} from '../services/processLocalStorageService';
 
-const ProcessOilTankCounterPage = ({ onBack, selectedLines = [], onNavigateSubmodule }) => {
+const ProcessOilTankCounterPage = ({ call, onBack, selectedLines = [], onNavigateSubmodule, productionLines = [], allCallOptions = [] }) => {
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Get line index for active line
+  const activeLineIndex = useMemo(() => {
+    return parseInt(activeLine.replace('Line-', '')) - 1;
+  }, [activeLine]);
+
+  // Get current production line data (has icNumber, poNumber structure from dashboard)
+  const currentProductionLine = useMemo(() => {
+    return productionLines[activeLineIndex] || null;
+  }, [activeLineIndex, productionLines]);
+
+  // Get the call data from allCallOptions based on the icNumber selected in production line
+  const currentCallData = useMemo(() => {
+    if (currentProductionLine?.icNumber) {
+      return allCallOptions.find(c => c.call_no === currentProductionLine.icNumber) || null;
+    }
+    return null;
+  }, [currentProductionLine, allCallOptions]);
+
+  // Get PO number for active line
+  const activeLinePoNo = useMemo(() => {
+    if (currentProductionLine?.poNumber) {
+      return currentProductionLine.poNumber;
+    }
+    if (currentCallData?.po_no) {
+      return currentCallData.po_no;
+    }
+    return call?.po_no || '';
+  }, [currentProductionLine, currentCallData, call]);
+
+  const inspectionCallNo = currentCallData?.call_no || call?.call_no || '';
+  const poNo = activeLinePoNo;
+
   const defaultLineState = { oilTankCounter: 45000, cleaningDone: false };
   const [perLineState, setPerLineState] = useState({});
 
   const current = perLineState[activeLine] || defaultLineState;
+
+  // Track previous line for saving data before switching
+  const prevLineRef = useRef(activeLine);
+  const prevPoNoRef = useRef(poNo);
+
+  // Save current data to localStorage
+  const saveToLocal = useCallback(() => {
+    if (!inspectionCallNo || !poNo || !perLineState[activeLine]) return;
+    saveToLocalStorage('oilTank', inspectionCallNo, poNo, activeLine, perLineState[activeLine]);
+  }, [inspectionCallNo, poNo, activeLine, perLineState]);
+
+  // Load data from localStorage
+  const loadFromLocal = useCallback(() => {
+    if (!inspectionCallNo || !poNo) return false;
+    const stored = loadFromLocalStorage('oilTank', inspectionCallNo, poNo, activeLine);
+    if (stored) {
+      setPerLineState(prev => ({ ...prev, [activeLine]: stored }));
+      return true;
+    }
+    return false;
+  }, [inspectionCallNo, poNo, activeLine]);
+
+  // Save to localStorage when line changes
+  useEffect(() => {
+    if (prevLineRef.current !== activeLine || prevPoNoRef.current !== poNo) {
+      if (prevPoNoRef.current && prevLineRef.current && perLineState[prevLineRef.current]) {
+        saveToLocalStorage('oilTank', inspectionCallNo, prevPoNoRef.current, prevLineRef.current, perLineState[prevLineRef.current]);
+      }
+      prevLineRef.current = activeLine;
+      prevPoNoRef.current = poNo;
+    }
+  }, [activeLine, poNo, inspectionCallNo, perLineState]);
+
+  // Save on unmount
+  useEffect(() => {
+    return () => saveToLocal();
+  }, [saveToLocal]);
+
+  /**
+   * Fetch oil tank counter data - first from localStorage, then backend
+   */
+  const fetchOilTankData = useCallback(async () => {
+    if (!inspectionCallNo || !poNo) return;
+
+    // Try localStorage first
+    if (loadFromLocal()) {
+      console.log('Oil tank data loaded from localStorage');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await getOilTankByPoLine(inspectionCallNo, poNo, activeLine);
+      if (response?.responseData) {
+        const data = response.responseData;
+        setPerLineState(prev => ({
+          ...prev,
+          [activeLine]: {
+            oilTankCounter: data.counterValue ?? 45000,
+            cleaningDone: data.cleaningDoneInCurrentShift ?? false
+          }
+        }));
+      }
+    } catch (err) {
+      console.log('Using default oil tank data:', err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [inspectionCallNo, poNo, activeLine, loadFromLocal]);
+
+  useEffect(() => {
+    fetchOilTankData();
+  }, [fetchOilTankData]);
+
   const updateLine = (patch) => {
     setPerLineState(prev => ({
       ...prev,
@@ -15,16 +133,57 @@ const ProcessOilTankCounterPage = ({ onBack, selectedLines = [], onNavigateSubmo
     }));
   };
 
-  const handleCleaningDone = (checked) => {
+  const handleCleaningDone = async (checked) => {
     if (checked && window.confirm('Are you sure the oil tank cleaning is complete? This will reset the counter to 0.')) {
-      updateLine({ cleaningDone: true, oilTankCounter: 0 });
+      try {
+        await markOilTankCleaningDone(inspectionCallNo, poNo, activeLine);
+        updateLine({ cleaningDone: true, oilTankCounter: 0 });
+      } catch (err) {
+        updateLine({ cleaningDone: true, oilTankCounter: 0 });
+      }
     } else {
       updateLine({ cleaningDone: false });
     }
   };
 
+  /**
+   * Save oil tank counter data to backend
+   */
+  const handleSave = async () => {
+    if (!inspectionCallNo || !poNo) {
+      alert('Missing call or PO information');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        inspectionCallNo,
+        poNo,
+        lineNo: activeLine,
+        counterValue: current.oilTankCounter,
+        cleaningDoneInCurrentShift: current.cleaningDone,
+        counterStatus: current.oilTankCounter >= 99000 ? 'LOCKED' : current.oilTankCounter >= 90000 ? 'WARNING' : 'NORMAL'
+      };
+
+      await saveOilTankCounter(payload);
+      alert('Oil tank counter data saved successfully!');
+      onBack();
+    } catch (err) {
+      alert('Failed to save: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div>
+      {/* Submodule Navigation - Above everything */}
+      <ProcessSubmoduleNav
+        currentSubmodule="process-oil-tank-counter"
+        onNavigate={onNavigateSubmodule}
+      />
+
       {/* Line selector bar */}
       {selectedLines.length > 0 && (
         <ProcessLineToggle selectedLines={selectedLines} activeLine={activeLine} onChange={setActiveLine} />
@@ -33,19 +192,13 @@ const ProcessOilTankCounterPage = ({ onBack, selectedLines = [], onNavigateSubmo
       <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
         <div>
-          <h1 className="page-title">Oil Tank Counter</h1>
+          <h1 className="page-title">Oil Tank Counter {poNo && <span style={{ color: '#0d9488', fontSize: 'var(--font-size-lg)' }}>- PO: {poNo}</span>}</h1>
           <p className="page-subtitle">Process Material Inspection - No. of ERC quenched since last Cleaning of Oil Tank</p>
         </div>
         <button className="btn btn-outline" onClick={onBack}>
           ← Back to Process Dashboard
         </button>
       </div>
-
-      {/* Submodule Navigation */}
-      <ProcessSubmoduleNav
-        currentSubmodule="process-oil-tank-counter"
-        onNavigate={onNavigateSubmodule}
-      />
 
       <div className="card">
         <div className="card-header">
@@ -89,9 +242,21 @@ const ProcessOilTankCounterPage = ({ onBack, selectedLines = [], onNavigateSubmo
         )}
       </div>
 
+      {isLoading && (
+        <div className="alert alert-info" style={{ marginBottom: 'var(--space-16)' }}>
+          Loading oil tank data...
+        </div>
+      )}
+
       <div style={{ marginTop: 'var(--space-24)', display: 'flex', gap: 'var(--space-16)', justifyContent: 'flex-end' }}>
         <button className="btn btn-outline" onClick={onBack}>Cancel</button>
-        <button className="btn btn-primary" onClick={() => { alert('Oil tank counter data saved!'); onBack(); }}>Save & Continue</button>
+        <button
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? 'Saving...' : 'Save & Continue'}
+        </button>
       </div>
     </div>
   </div>

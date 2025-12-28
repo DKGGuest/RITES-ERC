@@ -1,26 +1,34 @@
 /**
  * Service for Inspection Schedule API calls
- * TODO: Uncomment API calls for production with backend
  */
 
-// TODO: Uncomment for production with backend
+import { getAuthToken } from './authService';
+
+// Azure API URL
+const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend/api/inspection-schedule';
+
+// Local API URL (commented out)
 // const API_BASE_URL = 'http://localhost:8081/sarthi-backend/api/inspection-schedule';
 
-// Mock storage for schedules (persists in memory during session)
-const mockSchedules = {};
+/**
+ * Get auth headers with JWT token
+ */
+const getAuthHeaders = () => {
+    const token = getAuthToken();
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+    };
+};
 
 /**
  * Schedule an inspection call
  * @param {Object} scheduleData - { callNo, scheduleDate, reason, createdBy }
  */
 export const scheduleInspection = async (scheduleData) => {
-    // TODO: Uncomment for production with backend
-    /*
     const response = await fetch(`${API_BASE_URL}/schedule`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(scheduleData),
     });
 
@@ -31,20 +39,6 @@ export const scheduleInspection = async (scheduleData) => {
 
     const data = await response.json();
     return data.responseData;
-    */
-
-    // Mock implementation for Vercel deployment
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            mockSchedules[scheduleData.callNo] = {
-                ...scheduleData,
-                id: Date.now(),
-                status: 'Scheduled',
-                createdAt: new Date().toISOString()
-            };
-            resolve(mockSchedules[scheduleData.callNo]);
-        }, 300);
-    });
 };
 
 /**
@@ -52,13 +46,9 @@ export const scheduleInspection = async (scheduleData) => {
  * @param {Object} scheduleData - { callNo, scheduleDate, reason, updatedBy }
  */
 export const rescheduleInspection = async (scheduleData) => {
-    // TODO: Uncomment for production with backend
-    /*
     const response = await fetch(`${API_BASE_URL}/reschedule`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(scheduleData),
     });
 
@@ -69,20 +59,6 @@ export const rescheduleInspection = async (scheduleData) => {
 
     const data = await response.json();
     return data.responseData;
-    */
-
-    // Mock implementation for Vercel deployment
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            mockSchedules[scheduleData.callNo] = {
-                ...mockSchedules[scheduleData.callNo],
-                ...scheduleData,
-                status: 'Rescheduled',
-                updatedAt: new Date().toISOString()
-            };
-            resolve(mockSchedules[scheduleData.callNo]);
-        }, 300);
-    });
 };
 
 /**
@@ -90,13 +66,9 @@ export const rescheduleInspection = async (scheduleData) => {
  * @param {string} callNo - Call number
  */
 export const getScheduleByCallNo = async (callNo) => {
-    // TODO: Uncomment for production with backend
-    /*
     const response = await fetch(`${API_BASE_URL}/${callNo}`, {
         method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -105,14 +77,6 @@ export const getScheduleByCallNo = async (callNo) => {
 
     const data = await response.json();
     return data.responseData;
-    */
-
-    // Mock implementation for Vercel deployment
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve(mockSchedules[callNo] || null);
-        }, 200);
-    });
 };
 
 /**
@@ -120,13 +84,9 @@ export const getScheduleByCallNo = async (callNo) => {
  * @param {string} callNo - Call number
  */
 export const isCallScheduled = async (callNo) => {
-    // TODO: Uncomment for production with backend
-    /*
     const response = await fetch(`${API_BASE_URL}/check/${callNo}`, {
         method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -135,27 +95,15 @@ export const isCallScheduled = async (callNo) => {
 
     const data = await response.json();
     return data.responseData === true;
-    */
-
-    // Mock implementation for Vercel deployment
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve(!!mockSchedules[callNo]);
-        }, 200);
-    });
 };
 
 /**
  * Get all schedules
  */
 export const getAllSchedules = async () => {
-    // TODO: Uncomment for production with backend
-    /*
     const response = await fetch(API_BASE_URL, {
         method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -164,14 +112,6 @@ export const getAllSchedules = async () => {
 
     const data = await response.json();
     return data.responseData || [];
-    */
-
-    // Mock implementation for Vercel deployment
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve(Object.values(mockSchedules));
-        }, 200);
-    });
 };
 
 /**
@@ -185,13 +125,9 @@ export const MAX_CALLS_PER_DAY = 5;
  * @returns {Promise<number>} - Count of calls scheduled for the date
  */
 export const getScheduleCountByDate = async (date) => {
-    // TODO: Uncomment for production with backend
-    /*
     const response = await fetch(`${API_BASE_URL}/count-by-date?date=${date}`, {
         method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -200,17 +136,6 @@ export const getScheduleCountByDate = async (date) => {
 
     const data = await response.json();
     return data.responseData || 0;
-    */
-
-    // Mock implementation for Vercel deployment
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const count = Object.values(mockSchedules).filter(
-                schedule => schedule.scheduleDate === date
-            ).length;
-            resolve(count);
-        }, 100);
-    });
 };
 
 /**

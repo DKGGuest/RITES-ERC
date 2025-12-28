@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
+import HeatToggle from '../components/HeatToggle';
 import './PackingStoragePage.css';
 
 const STORAGE_KEY = 'packing_storage_draft_data';
@@ -7,8 +8,12 @@ const STORAGE_KEY = 'packing_storage_draft_data';
 /**
  * Packing & Storage Verification Page - Raw Material Sub-module
  * Verification of packing conditions and storage requirements
+ * Now supports per-heat data entry with heat toggle
  */
 const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectionCallNo = '' }) => {
+
+  // Active heat index for toggle
+  const [activeHeatIndex, setActiveHeatIndex] = useState(0);
 
   // Load draft data from localStorage
   const loadDraftData = useCallback(() => {
@@ -24,32 +29,61 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
     return null;
   }, [inspectionCallNo]);
 
-  // Packing checklist state
-  const [packingChecklist, setPackingChecklist] = useState(() => {
+  // Packing checklist state - now per heat
+  const [packingDataByHeat, setPackingDataByHeat] = useState(() => {
     const draft = loadDraftData();
-    if (draft?.packingChecklist) {
-      return draft.packingChecklist;
+    if (draft?.packingDataByHeat) {
+      return draft.packingDataByHeat;
     }
-    return {
-      bundlingSecure: '',
-      tagsAttached: '',
-      labelsCorrect: '',
-      protectionAdequate: '',
-      storageCondition: '',
-      moistureProtection: '',
-      stackingProper: '',
-      remarks: ''
-    };
+    // Initialize empty data for each heat
+    const initialData = {};
+    heats.forEach((heat, idx) => {
+      initialData[idx] = {
+        bundlingSecure: '',
+        tagsAttached: '',
+        labelsCorrect: '',
+        protectionAdequate: '',
+        storageCondition: '',
+        moistureProtection: '',
+        stackingProper: '',
+        remarks: ''
+      };
+    });
+    return initialData;
   });
 
   // Auto-save to localStorage
   useEffect(() => {
     const storageKey = `${STORAGE_KEY}_${inspectionCallNo}`;
-    localStorage.setItem(storageKey, JSON.stringify({ packingChecklist }));
-  }, [packingChecklist, inspectionCallNo]);
+    localStorage.setItem(storageKey, JSON.stringify({ packingDataByHeat }));
+  }, [packingDataByHeat, inspectionCallNo]);
 
+  // Update checklist for current heat
   const updateChecklist = (field, value) => {
-    setPackingChecklist(prev => ({ ...prev, [field]: value }));
+    setPackingDataByHeat(prev => ({
+      ...prev,
+      [activeHeatIndex]: {
+        ...prev[activeHeatIndex],
+        [field]: value
+      }
+    }));
+  };
+
+  // Handle heat change
+  const handleHeatChange = (newIndex) => {
+    setActiveHeatIndex(newIndex);
+  };
+
+  // Get current heat's data
+  const currentHeatData = packingDataByHeat[activeHeatIndex] || {
+    bundlingSecure: '',
+    tagsAttached: '',
+    labelsCorrect: '',
+    protectionAdequate: '',
+    storageCondition: '',
+    moistureProtection: '',
+    stackingProper: '',
+    remarks: ''
   };
 
   const checklistItems = [
@@ -82,16 +116,36 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
           <p className="card-subtitle">Verify packing conditions and storage requirements</p>
         </div>
 
-        {/* Heat Summary */}
+        {/* Acceptance Criteria Info Box */}
+        <div style={{
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px'
+        }}>
+          <span style={{ fontSize: '18px' }}>ℹ️</span>
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, color: '#0369a1', fontSize: '0.9rem' }}>Acceptance Criteria</p>
+            <p style={{ margin: '4px 0 0', color: '#0c4a6e', fontSize: '0.85rem' }}>
+              <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ OK</span> — All checklist items are "Yes"
+              <span style={{ margin: '0 12px', color: '#94a3b8' }}>|</span>
+              <span style={{ color: '#dc2626', fontWeight: 600 }}>✗ NOT OK</span> — Any checklist item is "No"
+            </p>
+          </div>
+        </div>
+
+        {/* Heat Toggle */}
         <div className="packing-heat-summary">
           <h4 className="packing-summary-title">Heats Being Inspected:</h4>
-          <div className="packing-heat-tags">
-            {heats.map((heat, idx) => (
-              <span key={idx} className="packing-heat-tag">
-                {heat.heatNo || `Heat #${idx + 1}`}
-              </span>
-            ))}
-          </div>
+          <HeatToggle
+            heats={heats}
+            activeHeatIndex={activeHeatIndex}
+            onHeatChange={handleHeatChange}
+          />
         </div>
 
         {/* Checklist */}
@@ -105,9 +159,9 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
                 <label className="packing-radio-label">
                   <input
                     type="radio"
-                    name={item.id}
+                    name={`${item.id}_${activeHeatIndex}`}
                     value="Yes"
-                    checked={packingChecklist[item.id] === 'Yes'}
+                    checked={currentHeatData[item.id] === 'Yes'}
                     onChange={(e) => updateChecklist(item.id, e.target.value)}
                   />
                   <span className="packing-radio-text packing-radio-yes">Yes</span>
@@ -115,9 +169,9 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
                 <label className="packing-radio-label">
                   <input
                     type="radio"
-                    name={item.id}
+                    name={`${item.id}_${activeHeatIndex}`}
                     value="No"
-                    checked={packingChecklist[item.id] === 'No'}
+                    checked={currentHeatData[item.id] === 'No'}
                     onChange={(e) => updateChecklist(item.id, e.target.value)}
                   />
                   <span className="packing-radio-text packing-radio-no">No</span>
@@ -125,9 +179,9 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
                 <label className="packing-radio-label">
                   <input
                     type="radio"
-                    name={item.id}
+                    name={`${item.id}_${activeHeatIndex}`}
                     value="NA"
-                    checked={packingChecklist[item.id] === 'NA'}
+                    checked={currentHeatData[item.id] === 'NA'}
                     onChange={(e) => updateChecklist(item.id, e.target.value)}
                   />
                   <span className="packing-radio-text packing-radio-na">N/A</span>
@@ -144,7 +198,7 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
             className="form-control packing-remarks-textarea"
             rows="4"
             placeholder="Enter any additional remarks or observations..."
-            value={packingChecklist.remarks}
+            value={currentHeatData.remarks || ''}
             onChange={(e) => updateChecklist('remarks', e.target.value)}
           />
         </div>

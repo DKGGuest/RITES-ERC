@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
-import { MOCK_PO_DATA } from '../data/mockData';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { formatDate } from '../utils/helpers';
+// import { getInspectionInitiationByCallNo } from '../services/vendorInspectionService'; // Disabled for mock mode
+import { finishProcessInspection } from '../services/processMaterialService';
+import { getAllProcessData, clearAllProcessData } from '../services/processLocalStorageService';
+import { MOCK_PO_DATA } from '../data/mockData';
+
+// localStorage key for dashboard draft data
+const DASHBOARD_DRAFT_KEY = 'process_dashboard_draft_';
 
 // Styles for the static data section and submodule session
 const staticDataStyles = `
@@ -381,51 +387,401 @@ const staticDataStyles = `
 `;
 
 
-// Mock data for each manufacturing line
-const LINE_DATA = {
-  'Line-1': {
-    lotNumbers: ['LOT-001', 'LOT-002'],
-    heatNumbersMap: { 'LOT-001': 'H001', 'LOT-002': 'H002' },
-    oilTankCounter: 45000,
-    shearingPress: true,
-    forgingPress: true,
-    reheatingFurnace: true,
-    quenchingTime: true
-  },
-  'Line-2': {
-    lotNumbers: ['LOT-003'],
-    heatNumbersMap: { 'LOT-003': 'H003' },
-    oilTankCounter: 32000,
-    shearingPress: true,
-    forgingPress: false,
-    reheatingFurnace: true,
-    quenchingTime: true
-  },
-  'Line-3': {
-    lotNumbers: ['LOT-004', 'LOT-005', 'LOT-006'],
-    heatNumbersMap: { 'LOT-004': 'H004', 'LOT-005': 'H005', 'LOT-006': '' },
-    oilTankCounter: 28500,
-    shearingPress: true,
-    forgingPress: true,
-    reheatingFurnace: false,
-    quenchingTime: true
-  }
-};
 
-const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] }) => {
-  // Get PO data for header
-  const poData = MOCK_PO_DATA["PO-2025-1001"];
-  const initialLine = (selectedLines && selectedLines[0]) || 'Line-1';
-  const [selectedLine, setSelectedLine] = useState(initialLine);
 
-  // State that changes based on selected line
-  const [lotNumbers, setLotNumbers] = useState(LINE_DATA[initialLine]?.lotNumbers || []);
-  const [heatNumbersMap, setHeatNumbersMap] = useState(LINE_DATA[initialLine]?.heatNumbersMap || {});
+const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines: initialProductionLines = [], availableCalls = [] }) => {
+  // State for fetched data from backend
+  const [fetchedCallData, setFetchedCallData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Lot data is now auto-fetched from vendor call (read-only)
+  // State for production lines section
+  const [productionLinesExpanded, setProductionLinesExpanded] = useState(true);
+
+  // State for editable production lines - persisted in sessionStorage
+  const [localProductionLines, setLocalProductionLines] = useState(() => {
+    // First check sessionStorage for persisted data
+    const savedLines = sessionStorage.getItem('processProductionLinesData');
+    if (savedLines) {
+      try {
+        const parsed = JSON.parse(savedLines);
+        if (parsed && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.log('Error parsing saved production lines:', e);
+      }
+    }
+
+    if (initialProductionLines && initialProductionLines.length > 0) {
+      return initialProductionLines;
+    }
+    // If multiple calls available, create rows for each but leave unselected
+    if (availableCalls && availableCalls.length > 0) {
+      return availableCalls.map((_, idx) => ({
+        lineNumber: idx + 1,
+        icNumber: '',
+        poNumber: '',
+        rawMaterialICs: '',
+        productType: ''
+      }));
+    }
+    // Default first line with empty fields - user must select from dropdown
+    return [{
+      lineNumber: 1,
+      icNumber: '',
+      poNumber: '',
+      rawMaterialICs: '',
+      productType: ''
+    }];
+  });
+
+  // Persist production lines to sessionStorage whenever they change
+  useEffect(() => {
+    if (localProductionLines && localProductionLines.length > 0) {
+      sessionStorage.setItem('processProductionLinesData', JSON.stringify(localProductionLines));
+    }
+  }, [localProductionLines]);
+
+  // Available call numbers for dropdown - use passed availableCalls or build from current call
+  const callNumberOptions = availableCalls.length > 0 ? availableCalls : [];
+
+  // Add current call to options if not present
+  const currentCallOption = call?.call_no ? {
+    call_no: call.call_no,
+    po_no: call.po_no,
+    rawMaterialICs: call.rm_heat_tc_mapping?.map(m => m.subPoNumber).filter(Boolean).join(', ') || '',
+    productType: call.product_type || 'ERC Process'
+  } : null;
+
+  const allCallOptions = currentCallOption && !callNumberOptions.find(c => c.call_no === call.call_no)
+    ? [currentCallOption, ...callNumberOptions]
+    : callNumberOptions.length > 0 ? callNumberOptions : (currentCallOption ? [currentCallOption] : []);
+
+  // Handle call number change for a production line
+  const handleCallNumberChange = (lineIndex, selectedCallNo) => {
+    const selectedCall = allCallOptions.find(c => c.call_no === selectedCallNo);
+    setLocalProductionLines(prev => {
+      const updated = [...prev];
+      updated[lineIndex] = {
+        ...updated[lineIndex],
+        icNumber: selectedCallNo,
+        poNumber: selectedCall?.po_no || '',
+        rawMaterialICs: selectedCall?.rawMaterialICs || '',
+        productType: selectedCall?.productType || 'MK-V'
+      };
+      return updated;
+    });
+  };
+
+  // Add new production line
+  const handleAddProductionLine = () => {
+    setLocalProductionLines(prev => [
+      ...prev,
+      {
+        lineNumber: prev.length + 1,
+        icNumber: '',
+        poNumber: '',
+        rawMaterialICs: '',
+        productType: ''
+      }
+    ]);
+  };
+
+  // Remove production line
+  const handleRemoveProductionLine = (lineIndex) => {
+    if (localProductionLines.length <= 1) {
+      alert('At least one production line is required');
+      return;
+    }
+    setLocalProductionLines(prev => {
+      const updated = prev.filter((_, idx) => idx !== lineIndex);
+      // Renumber remaining lines
+      return updated.map((line, idx) => ({ ...line, lineNumber: idx + 1 }));
+    });
+  };
+
+  // Load mock data for Process Material (no API calls)
+  useEffect(() => {
+    const loadMockData = async () => {
+      if (!call?.call_no) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        setIsLoading(true);
+
+        console.log('🏭 Process Dashboard: Using MOCK data (no API calls)');
+
+        // Use mock PO data instead of API call
+        const mockPoData = MOCK_PO_DATA["PO-2025-1002"] || MOCK_PO_DATA["PO-2025-1001"];
+
+        // Set mock initiation data
+        setFetchedCallData({
+          inspectionCallNo: call.call_no,
+          shiftOfInspection: 'Day Shift',
+          dateOfInspection: new Date().toISOString().split('T')[0]
+        });
+
+        // Set mock production lines if not already set
+        if (initialProductionLines && initialProductionLines.length > 0) {
+          // Use provided production lines from wrapper
+          setLocalProductionLines(initialProductionLines);
+        } else if (availableCalls.length > 0) {
+          // Multi-call mode: create empty rows for each available call
+          setLocalProductionLines(availableCalls.map((_, idx) => ({
+            lineNumber: idx + 1,
+            icNumber: '',
+            poNumber: '',
+            rawMaterialICs: '',
+            productType: ''
+          })));
+        } else {
+          // Single call mode: create one production line with mock data
+          setLocalProductionLines([{
+            lineNumber: 1,
+            icNumber: call.call_no || '',
+            poNumber: call.po_no || mockPoData.po_no || '',
+            rawMaterialICs: 'RM-IC-001, RM-IC-002',
+            productType: 'ERC Process'
+          }]);
+        }
+      } catch (error) {
+        console.log('⚠️ Error loading mock data:', error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadMockData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call?.call_no, call?.po_no, availableCalls]);
+
+  // Selected line tab - persisted in sessionStorage
+  const [selectedLine, setSelectedLine] = useState(() => {
+    return sessionStorage.getItem('processSelectedLineTab') || 'Line-1';
+  });
+
+  // Persist selected line tab
+  useEffect(() => {
+    sessionStorage.setItem('processSelectedLineTab', selectedLine);
+  }, [selectedLine]);
+
+  // Lot data is now auto-fetched from the call's rm_heat_tc_mapping (read-only)
 
   // Final Inspection Results - Remarks (manual entry, required)
-  const [finalInspectionRemarks, setFinalInspectionRemarks] = useState('');
+  const [finalInspectionRemarks, setFinalInspectionRemarks] = useState(() => {
+    return sessionStorage.getItem('processFinalInspectionRemarks') || '';
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Save Draft state
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftSaveMessage, setDraftSaveMessage] = useState({ type: '', text: '' });
+  const draftMessageTimeoutRef = useRef(null);
+
+  // Persist final inspection remarks
+  useEffect(() => {
+    sessionStorage.setItem('processFinalInspectionRemarks', finalInspectionRemarks);
+  }, [finalInspectionRemarks]);
+
+  // Derive manufacturing lines from production lines table (moved up for use in callbacks)
+  const manufacturingLines = useMemo(() => {
+    return localProductionLines.length > 0
+      ? localProductionLines.map((_, idx) => `Line-${idx + 1}`)
+      : ['Line-1'];
+  }, [localProductionLines]);
+
+  // Clear all process inspection data (called on Finish or Withheld Inspection)
+  const clearProcessInspectionData = useCallback(() => {
+    sessionStorage.removeItem('processProductionLinesData');
+    sessionStorage.removeItem('processSelectedLineTab');
+    sessionStorage.removeItem('processFinalInspectionRemarks');
+
+    // Clear dashboard draft from localStorage
+    const inspectionCallNo = call?.call_no || '';
+    if (inspectionCallNo) {
+      localStorage.removeItem(`${DASHBOARD_DRAFT_KEY}${inspectionCallNo}`);
+    }
+
+    // Clear process submodule data from sessionStorage for all lines
+    manufacturingLines.forEach(line => {
+      localProductionLines.forEach((prodLine) => {
+        const poNo = prodLine.po_no || '';
+        if (poNo) {
+          clearAllProcessData(inspectionCallNo, poNo, line);
+        }
+      });
+    });
+  }, [call?.call_no, manufacturingLines, localProductionLines]);
+
+  /**
+   * Handle Save Draft - Save all dashboard data to localStorage
+   */
+  const handleSaveDraft = useCallback(() => {
+    const inspectionCallNo = call?.call_no;
+    if (!inspectionCallNo) {
+      setDraftSaveMessage({ type: 'error', text: 'Cannot save draft: No inspection call number found' });
+      return;
+    }
+
+    setIsSavingDraft(true);
+
+    // Clear any existing timeout
+    if (draftMessageTimeoutRef.current) {
+      clearTimeout(draftMessageTimeoutRef.current);
+    }
+
+    try {
+      // Collect all dashboard form data
+      const draftData = {
+        savedAt: new Date().toISOString(),
+        productionLines: localProductionLines,
+        selectedLine: selectedLine,
+        finalInspectionRemarks: finalInspectionRemarks,
+        productionLinesExpanded: productionLinesExpanded
+      };
+
+      // Save to localStorage with inspection call number as key
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo}`;
+      localStorage.setItem(storageKey, JSON.stringify(draftData));
+
+      // Show success message
+      setDraftSaveMessage({ type: 'success', text: `Draft saved successfully at ${new Date().toLocaleTimeString()}` });
+
+      // Clear message after 3 seconds
+      draftMessageTimeoutRef.current = setTimeout(() => {
+        setDraftSaveMessage({ type: '', text: '' });
+      }, 3000);
+
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      setDraftSaveMessage({ type: 'error', text: `Failed to save draft: ${error.message}` });
+
+      // Clear error message after 5 seconds
+      draftMessageTimeoutRef.current = setTimeout(() => {
+        setDraftSaveMessage({ type: '', text: '' });
+      }, 5000);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }, [call?.call_no, localProductionLines, selectedLine, finalInspectionRemarks, productionLinesExpanded]);
+
+  // Load draft data from localStorage on mount
+  useEffect(() => {
+    const inspectionCallNo = call?.call_no;
+    if (!inspectionCallNo) return;
+
+    try {
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo}`;
+      const savedDraft = localStorage.getItem(storageKey);
+
+      if (savedDraft) {
+        const draftData = JSON.parse(savedDraft);
+
+        // Restore production lines if they exist in draft
+        if (draftData.productionLines && draftData.productionLines.length > 0) {
+          // Only restore if current state is empty or default
+          const hasEmptyLines = localProductionLines.every(line => !line.icNumber);
+          if (hasEmptyLines) {
+            setLocalProductionLines(draftData.productionLines);
+          }
+        }
+
+        // Restore selected line
+        if (draftData.selectedLine) {
+          setSelectedLine(draftData.selectedLine);
+        }
+
+        // Restore remarks if empty
+        if (draftData.finalInspectionRemarks && !finalInspectionRemarks) {
+          setFinalInspectionRemarks(draftData.finalInspectionRemarks);
+        }
+
+        // Restore expanded state
+        if (typeof draftData.productionLinesExpanded === 'boolean') {
+          setProductionLinesExpanded(draftData.productionLinesExpanded);
+        }
+
+        console.log('Draft data restored from localStorage:', draftData.savedAt);
+      }
+    } catch (error) {
+      console.error('Error loading draft data:', error);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [call?.call_no]); // Only run on mount and when call changes
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (draftMessageTimeoutRef.current) {
+        clearTimeout(draftMessageTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  /**
+   * Handle Finish Inspection - collect all submodule data from localStorage and save to backend
+   */
+  const handleFinishInspection = useCallback(async () => {
+    const inspectionCallNo = call?.call_no;
+    if (!inspectionCallNo) {
+      alert('No inspection call number found');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to finish this inspection? All data will be saved to the database.')) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Collect all submodule data from localStorage for all lines
+      const allLinesData = [];
+
+      manufacturingLines.forEach((line, lineIdx) => {
+        const prodLine = localProductionLines[lineIdx];
+        if (!prodLine) return;
+
+        const poNo = prodLine.po_no || '';
+        if (!poNo) return;
+
+        // Get all process data from localStorage
+        const lineData = getAllProcessData(inspectionCallNo, poNo, line);
+
+        if (Object.keys(lineData).length > 0) {
+          allLinesData.push({
+            inspectionCallNo,
+            poNo,
+            lineNo: line,
+            ...lineData
+          });
+        }
+      });
+
+      // Build payload for backend
+      const payload = {
+        inspectionCallNo,
+        remarks: finalInspectionRemarks,
+        linesData: allLinesData
+      };
+
+      console.log('Finish Process Inspection Payload:', JSON.stringify(payload, null, 2));
+
+      // Call the backend API
+      await finishProcessInspection(payload);
+
+      // Clear localStorage after successful save
+      clearProcessInspectionData();
+
+      alert('Process Material Inspection completed successfully!');
+      onBack();
+    } catch (error) {
+      console.error('Error finishing inspection:', error);
+      alert(`Failed to save inspection data: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [call?.call_no, manufacturingLines, localProductionLines, finalInspectionRemarks, clearProcessInspectionData, onBack]);
 
   // Sample data - would be auto-fetched from sub-modules in real app
   const rawMaterialAccepted = 500; // Qty Accepted in Raw Material Stage
@@ -466,19 +822,79 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
     validationErrors.push('Qty Accepted in Final Inspection must be ≤ Qty Ordered in PO');
   }
 
-  // Handle line change - fetch data for selected line
+  // Handle line change - updates selected line tab
   const handleLineChange = (line) => {
     setSelectedLine(line);
-    const lineData = LINE_DATA[line];
-    if (lineData) {
-      setLotNumbers(lineData.lotNumbers);
-      setHeatNumbersMap(lineData.heatNumbersMap);
-    }
   };
 
-  const manufacturingLines = (selectedLines && selectedLines.length > 0) ? selectedLines : ['Line-1'];
+  // Get current line index from selectedLine (e.g., "Line-1" → 0)
+  const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
+
+  // Get the production line data for the selected line tab
+  const currentProductionLine = localProductionLines[currentLineIndex] || localProductionLines[0] || {};
+
+  // Get PO data based on the call selected in current production line
+  const currentCallData = allCallOptions.find(c => c.call_no === currentProductionLine.icNumber);
+
+  // Get lot/heat data from the selected call's rm_heat_tc_mapping (from database)
+  const currentLineLotHeatData = currentCallData?.rm_heat_tc_mapping || [];
+
+  // Build lot numbers array from rm_heat_tc_mapping (using subPoNumber as lot identifier)
+  const lineLotNumbers = currentLineLotHeatData.map((mapping, idx) =>
+    mapping.subPoNumber || `LOT-${idx + 1}`
+  );
+
+  // Build heat numbers map (lot -> heat)
+  const lineHeatNumbersMap = currentLineLotHeatData.reduce((acc, mapping, idx) => {
+    const lotKey = mapping.subPoNumber || `LOT-${idx + 1}`;
+    acc[lotKey] = mapping.heatNumber || '';
+    return acc;
+  }, {});
+
+  // Use current line's PO data from the selected call (from availableCalls which has full data)
+  // Safely extract rawMaterialICs - ensure it's a string before splitting
+  const rawMaterialICsStr = typeof currentProductionLine.rawMaterialICs === 'string'
+    ? currentProductionLine.rawMaterialICs
+    : '';
+  const linePoData = currentCallData ? {
+    po_no: currentCallData.po_no || '',
+    sub_po_no: currentCallData.sub_po_no || rawMaterialICsStr.split(',')[0]?.trim() || '',
+    po_date: currentCallData.po_date || '',
+    sub_po_date: currentCallData.sub_po_date || currentCallData.po_date || '',
+    contractor: currentCallData.contractor || currentCallData.vendor_name || '',
+    manufacturer: currentCallData.manufacturer || currentCallData.vendor_name || '',
+    place_of_inspection: currentCallData.place_of_inspection || ''
+  } : {
+    po_no: '',
+    sub_po_no: '',
+    po_date: '',
+    sub_po_date: '',
+    contractor: '',
+    manufacturer: '',
+    place_of_inspection: ''
+  };
 
   // removed unused hourly data and validators to satisfy lint rules
+
+  // Show loading indicator while fetching data
+  if (isLoading) {
+    return (
+      <div className="process-dashboard">
+        <style>{staticDataStyles}</style>
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--space-32)' }}>
+          <p>Loading inspection data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Get call details for display - show all PO numbers if multiple calls
+  const callNo = availableCalls.length > 1
+    ? availableCalls.map(c => c.po_no).join(', ')
+    : (fetchedCallData?.inspectionCallNo || call?.call_no || 'N/A');
+  // Read shift and date from sessionStorage (saved during Initiation) or fallback to fetched data
+  const shiftOfInspection = sessionStorage.getItem('inspectionShift') || fetchedCallData?.shiftOfInspection || 'N/A';
+  const dateOfInspection = sessionStorage.getItem('inspectionDate') || fetchedCallData?.dateOfInspection || 'N/A';
 
   return (
     <div className="process-dashboard">
@@ -492,8 +908,17 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         <div className="breadcrumb-item breadcrumb-active">ERC Process</div>
       </div>
 
+      {/* Inspection Call Info Banner */}
+      <div className="card" style={{ background: 'var(--color-primary-light)', marginBottom: 'var(--space-16)', padding: 'var(--space-16)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-24)', flexWrap: 'wrap' }}>
+          <div><strong>Call No:</strong> {callNo}</div>
+          <div><strong>Shift:</strong> {shiftOfInspection}</div>
+          <div><strong>Date of Inspection:</strong> {dateOfInspection}</div>
+        </div>
+      </div>
+
       <div className="process-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
-        <h1>ERC Process Inspection</h1>
+        <h1>ERC Process Inspection - {callNo}</h1>
         <button
           className="btn btn-secondary"
           onClick={onBack}
@@ -507,6 +932,143 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         >
           ← Back to Landing Page
         </button>
+      </div>
+
+      {/* Multiple Production Lines Section */}
+      <div className="card" style={{ marginBottom: 'var(--space-24)' }}>
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="card-title">Multiple Production Lines (if applicable)</h3>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setProductionLinesExpanded(!productionLinesExpanded)}
+            style={{ padding: '8px 16px', fontSize: '18px' }}
+          >
+            {productionLinesExpanded ? '-' : '+'}
+          </button>
+        </div>
+        {productionLinesExpanded && (
+          <>
+            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>All data points must be collected for each line number separately.</p>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Line Number</th>
+                    <th>Inspection Call Number <span style={{ color: '#ef4444' }}>*</span></th>
+                    <th>PO Number</th>
+                    <th>Raw Material IC Number(s)</th>
+                    <th>Product Type</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {localProductionLines.map((line, idx) => (
+                    <tr key={idx}>
+                      <td>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={line.lineNumber || idx + 1}
+                          readOnly
+                          disabled
+                          style={{ width: '80px', backgroundColor: '#f3f4f6', fontWeight: '500' }}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          className="form-input"
+                          value={line.icNumber || ''}
+                          onChange={(e) => handleCallNumberChange(idx, e.target.value)}
+                          style={{
+                            minWidth: '180px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            padding: '8px 12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="">Select Call Number</option>
+                          {allCallOptions.map((opt, optIdx) => (
+                            <option key={optIdx} value={opt.call_no}>{opt.call_no}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={line.poNumber || ''}
+                          readOnly
+                          disabled
+                          style={{ minWidth: '120px', backgroundColor: '#f3f4f6' }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={line.rawMaterialICs || '-'}
+                          readOnly
+                          disabled
+                          style={{ minWidth: '150px', backgroundColor: '#f3f4f6' }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={line.productType || ''}
+                          readOnly
+                          disabled
+                          style={{ minWidth: '100px', backgroundColor: '#f3f4f6' }}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => handleRemoveProductionLine(idx)}
+                          style={{
+                            padding: '6px 16px',
+                            fontSize: '13px',
+                            color: '#dc2626',
+                            borderColor: '#dc2626',
+                            backgroundColor: '#fff'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Add Production Line Button */}
+            <div style={{ marginTop: '16px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleAddProductionLine}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#1f2937',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px'
+                }}
+              >
+                + Add Production Line
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Line Number Toggle - At the top */}
@@ -540,32 +1102,32 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         ))}
       </div>
 
-      {/* Inspection Details (Static Data) - Same as Raw Material */}
+      {/* Inspection Details (Static Data) - Based on selected line */}
       <div className="card" style={{ background: 'var(--color-gray-100)', marginBottom: 'var(--space-24)' }}>
         <div className="card-header">
-          <h3 className="card-title">Inspection Details (Static Data)</h3>
-          <p className="card-subtitle">Auto-fetched from PO/Sub PO information</p>
+          <h3 className="card-title">Inspection Details (Static Data) - {selectedLine}</h3>
+          <p className="card-subtitle">Auto-fetched from PO/Sub PO information for selected line</p>
         </div>
         <div className="process-form-grid">
           <div className="process-form-group">
-            <label className="process-form-label">PO / Sub PO Number</label>
-            <input type="text" className="process-form-input" value={poData.sub_po_no || poData.po_no} disabled />
+            <label className="process-form-label">PO Number</label>
+            <input type="text" className="process-form-input" value={linePoData.po_no || linePoData.sub_po_no || ''} disabled />
           </div>
           <div className="process-form-group">
-            <label className="process-form-label">PO / Sub PO Date</label>
-            <input type="text" className="process-form-input" value={formatDate(poData.sub_po_date || poData.po_date)} disabled />
+            <label className="process-form-label">PO Date</label>
+            <input type="text" className="process-form-input" value={formatDate(linePoData.sub_po_date || linePoData.po_date)} disabled />
           </div>
           <div className="process-form-group">
             <label className="process-form-label">Contractor Name</label>
-            <input type="text" className="process-form-input" value={poData.contractor} disabled />
+            <input type="text" className="process-form-input" value={linePoData.contractor || ''} disabled />
           </div>
           <div className="process-form-group">
             <label className="process-form-label">Manufacturer</label>
-            <input type="text" className="process-form-input" value={poData.manufacturer} disabled />
+            <input type="text" className="process-form-input" value={linePoData.manufacturer || ''} disabled />
           </div>
           <div className="process-form-group">
             <label className="process-form-label">Place of Inspection</label>
-            <input type="text" className="process-form-input" value={poData.place_of_inspection} disabled />
+            <input type="text" className="process-form-input" value={linePoData.place_of_inspection || ''} disabled />
           </div>
           <div className="process-form-group">
             <label className="process-form-label">Stage of Inspection</label>
@@ -574,16 +1136,16 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         </div>
       </div>
 
-      {/* Pre-Inspection Data Entry - Auto-fetched from vendor call */}
+      {/* Pre-Inspection Data Entry - Fetched from backend based on selected call's rm_heat_tc_mapping */}
       <div className="card compact-card" style={{ marginBottom: 'var(--space-16)' }}>
         <div className="card-header" style={{ paddingBottom: '8px' }}>
           <h3 className="card-title" style={{ marginBottom: '4px' }}>Pre-Inspection Data Entry - {selectedLine}</h3>
-          {/* <span style={{ fontSize: '12px', color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>📥 Auto-fetched from Vendor Call</span> */}
+          {/* <span style={{ fontSize: '12px', color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>📥 Fetched from Backend (PO: {currentCallData?.po_no || 'N/A'})</span> */}
         </div>
 
         {/* Compact Lot-Heat Mapping Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
-          {lotNumbers.map(lot => (
+          {lineLotNumbers.length > 0 ? lineLotNumbers.map(lot => (
             <div key={lot} style={{
               background: '#fefce8',
               border: '1px solid #fef08a',
@@ -605,10 +1167,22 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
                   padding: '6px 10px',
                   borderRadius: '4px',
                   marginTop: '4px'
-                }}>{heatNumbersMap[lot] || 'H001'}</span>
+                }}>{lineHeatNumbersMap[lot] || '-'}</span>
               </div>
             </div>
-          ))}
+          )) : (
+            <div style={{
+              color: '#64748b',
+              fontSize: '14px',
+              padding: '20px',
+              textAlign: 'center',
+              background: '#f8fafc',
+              borderRadius: '6px',
+              border: '1px dashed #cbd5e1'
+            }}>
+              No lot/heat data available for selected call. Please ensure the call has rm_heat_tc_mapping data.
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: '12px', fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -617,34 +1191,37 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         </div>
       </div>
 
-      {/* Sub Module Session - Same design as Raw Material */}
+      {/* Sub Module Session - Shows for selected line */}
       <div className="process-submodule-session">
         <div className="process-submodule-session-header">
           <h3 className="process-submodule-session-title">📋 Sub Module Session</h3>
-          <p className="process-submodule-session-subtitle">Select a module to proceed with inspection</p>
+          <p className="process-submodule-session-subtitle">
+            Select a module to proceed with inspection
+            <span style={{ marginLeft: '8px', color: '#0d9488', fontWeight: 500 }}>({manufacturingLines.length} Production Lines)</span>
+          </p>
         </div>
         <div className="process-submodule-buttons">
-          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-calibration-documents')}>
+          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-calibration-documents', { selectedLine, productionLines: localProductionLines, allCallOptions })}>
             <span className="process-submodule-btn-icon">📄</span>
             <p className="process-submodule-btn-title">Calibration & Documents</p>
             <p className="process-submodule-btn-desc">Verify instrument calibration</p>
           </button>
-          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-static-periodic-check')}>
+          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-static-periodic-check', { selectedLine, productionLines: localProductionLines, allCallOptions })}>
             <span className="process-submodule-btn-icon">⚙️</span>
             <p className="process-submodule-btn-title">Static Periodic Check</p>
             <p className="process-submodule-btn-desc">Equipment verification</p>
           </button>
-          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-oil-tank-counter')}>
+          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-oil-tank-counter', { selectedLine, productionLines: localProductionLines, allCallOptions })}>
             <span className="process-submodule-btn-icon">🛢️</span>
             <p className="process-submodule-btn-title">Oil Tank Counter</p>
             <p className="process-submodule-btn-desc">Monitor quenching count</p>
           </button>
-          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-parameters-grid')}>
+          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-parameters-grid', { selectedLine, productionLines: localProductionLines, allCallOptions })}>
             <span className="process-submodule-btn-icon">🔬</span>
             <p className="process-submodule-btn-title">Process Parameters - 8 Hour Grid</p>
             <p className="process-submodule-btn-desc">Hourly production data entry</p>
           </button>
-          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-summary-reports')}>
+          <button className="process-submodule-btn" onClick={() => onNavigateToSubModule('process-summary-reports', { selectedLine, productionLines: localProductionLines, allCallOptions })}>
             <span className="process-submodule-btn-icon">📊</span>
             <p className="process-submodule-btn-title">Summary / Reports</p>
             <p className="process-submodule-btn-desc">View consolidated results</p>
@@ -819,14 +1396,62 @@ const ProcessDashboard = ({ onBack, onNavigateToSubModule, selectedLines = [] })
         </div> */}
       </div>
      
+        {/* Draft Save Feedback Message */}
+        {draftSaveMessage.text && (
+          <div
+            className={`alert ${draftSaveMessage.type === 'success' ? 'alert-success' : 'alert-error'}`}
+            style={{
+              marginTop: 'var(--space-16)',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: draftSaveMessage.type === 'success' ? '#dcfce7' : '#fef2f2',
+              border: `1px solid ${draftSaveMessage.type === 'success' ? '#22c55e' : '#ef4444'}`,
+              borderRadius: '8px',
+              color: draftSaveMessage.type === 'success' ? '#166534' : '#991b1b'
+            }}
+          >
+            <span>{draftSaveMessage.type === 'success' ? '✓' : '⚠️'}</span>
+            <span>{draftSaveMessage.text}</span>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="rm-action-buttons" style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '24px' }}>
-          <button className="btn btn-outline" style={{ minHeight: '44px', padding: '10px 20px' }}>Save Draft</button>
-          {/* <button className="btn btn-secondary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { if (window.confirm('Are you sure you want to reject this lot?')) { alert('Raw Material lot rejected'); } }}>Reject Lot</button>
-          <button className="btn btn-primary" style={{ minHeight: '44px', padding: '10px 20px' }} onClick={() => { alert('Raw Material lot accepted and inspection completed!'); onBack(); }}>Accept Lot &amp; Complete Inspection</button> */}
-           <button className="btn btn-outline">Pause Inspection</button>
-          <button className="btn btn-outline">Withheld Inspection</button>
-          <button className="btn btn-primary">Finish Inspection</button>
+          <button
+            className="btn btn-outline"
+            style={{
+              minHeight: '44px',
+              padding: '10px 20px',
+              backgroundColor: isSavingDraft ? '#f3f4f6' : '#fff',
+              cursor: isSavingDraft ? 'not-allowed' : 'pointer'
+            }}
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft}
+          >
+            {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
+          </button>
+          <button className="btn btn-outline">Pause Inspection</button>
+          <button
+            className="btn btn-outline"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to withhold this inspection? All unsaved data will be cleared.')) {
+                clearProcessInspectionData();
+                alert('Inspection has been withheld.');
+                onBack();
+              }
+            }}
+          >
+            Withheld Inspection
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleFinishInspection}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Saving...' : 'Finish Inspection'}
+          </button>
         </div>
         
       {/* Return button */}

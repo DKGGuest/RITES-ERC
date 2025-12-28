@@ -3,18 +3,51 @@
  * Handles login API calls and token management
  */
 
-// TODO: Uncomment for production with backend
-// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081/sarthi-backend';
+const API_BASE_URL = process.env.REACT_APP_API_URL ||
+  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+
+/**
+ * Hardcoded credentials for CM and CallDesk users
+ */
+const HARDCODED_USERS = {
+  'Cm': {
+    password: 'password',
+    userData: {
+      userId: 'Cm',
+      userName: 'Controlling Manager',
+      roleName: 'CM',
+      token: 'cm-mock-token-' + Date.now()
+    }
+  },
+  'CallDesk': {
+    password: 'password',
+    userData: {
+      userId: 'CallDesk',
+      userName: 'Call Desk Officer',
+      roleName: 'CALL_DESK',
+      token: 'calldesk-mock-token-' + Date.now()
+    }
+  }
+};
 
 /**
  * Login user with userId and password
- * @param {number} userId - User ID
+ * @param {string} userId - User ID
  * @param {string} password - User password
  * @returns {Promise<Object>} Login response with user data and token
  */
 export const loginUser = async (userId, password) => {
-  // TODO: Uncomment for production with backend
-  /*
+  // Check for hardcoded CM and CallDesk users first
+  if (HARDCODED_USERS[userId]) {
+    if (HARDCODED_USERS[userId].password === password) {
+      console.log(`✅ Hardcoded login successful for ${userId}`);
+      return HARDCODED_USERS[userId].userData;
+    } else {
+      throw new Error('Invalid password');
+    }
+  }
+
+  // For other users (IE), call the real API
   try {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
@@ -30,33 +63,19 @@ export const loginUser = async (userId, password) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Invalid login credentials');
+      throw new Error(data.responseStatus?.message || 'Invalid login credentials');
     }
 
-    return data;
+    // Check for successful status (statusCode === 0 means success)
+    if (data.responseStatus?.statusCode !== 0) {
+      throw new Error(data.responseStatus?.message || 'Login failed');
+    }
+
+    // Return the responseData containing user info and token
+    return data.responseData;
   } catch (error) {
     throw error;
   }
-  */
-
-  // Mock login for Vercel deployment (no backend)
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      // Accept any userId with password "password" or "123456" for demo
-      if (password === 'password' || password === '123456' || password === 'admin') {
-        resolve({
-          data: {
-            token: 'mock-jwt-token-for-vercel-deployment',
-            userId: userId,
-            userName: `User ${userId}`,
-            roleName: 'Inspector'
-          }
-        });
-      } else {
-        reject(new Error('Invalid credentials. Use password: "password" or "123456"'));
-      }
-    }, 500); // Simulate network delay
-  });
 };
 
 /**

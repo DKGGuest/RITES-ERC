@@ -14,7 +14,7 @@ import { ROUTES, RAW_MATERIAL_SUBMODULE_ROUTES } from '../../routes';
  */
 export const RawMaterialDashboardWrapper = () => {
   const navigate = useNavigate();
-  const { setRmHeats, setRmProductModel, setLandingActiveTab } = useInspection();
+  const { selectedCall, setRmHeats, setRmProductModel, setRmLadleValues, setLandingActiveTab } = useInspection();
 
   const handleBack = () => {
     setLandingActiveTab('pending');
@@ -30,10 +30,12 @@ export const RawMaterialDashboardWrapper = () => {
 
   return (
     <RawMaterialDashboard
+      call={selectedCall}
       onBack={handleBack}
       onNavigateToSubModule={handleNavigateToSubModule}
       onHeatsChange={setRmHeats}
       onProductModelChange={setRmProductModel}
+      onLadleValuesChange={setRmLadleValues}
     />
   );
 };
@@ -43,7 +45,7 @@ export const RawMaterialDashboardWrapper = () => {
  */
 export const CalibrationDocumentsWrapper = () => {
   const navigate = useNavigate();
-  const { rmHeats, selectedCall } = useInspection();
+  const { rmHeats, rmLadleValues, selectedCall } = useInspection();
 
   const handleBack = () => navigate(ROUTES.RAW_MATERIAL);
   const handleNavigateSubmodule = (subModule) => {
@@ -55,7 +57,8 @@ export const CalibrationDocumentsWrapper = () => {
     <CalibrationDocumentsPage
       onBack={handleBack}
       heats={rmHeats}
-      inspectionCallNo={selectedCall?.callNo || ''}
+      ladleValues={rmLadleValues}
+      inspectionCallNo={selectedCall?.call_no || ''}
       onNavigateSubmodule={handleNavigateSubmodule}
     />
   );
@@ -78,7 +81,7 @@ export const VisualInspectionWrapper = () => {
     <VisualInspectionPage
       onBack={handleBack}
       heats={rmHeats}
-      inspectionCallNo={selectedCall?.callNo || ''}
+      inspectionCallNo={selectedCall?.call_no || ''}
       onNavigateSubmodule={handleNavigateSubmodule}
     />
   );
@@ -102,7 +105,7 @@ export const DimensionalCheckWrapper = () => {
       onBack={handleBack}
       heats={rmHeats}
       productModel={rmProductModel}
-      inspectionCallNo={selectedCall?.callNo || ''}
+      inspectionCallNo={selectedCall?.call_no || ''}
       onNavigateSubmodule={handleNavigateSubmodule}
     />
   );
@@ -125,7 +128,7 @@ export const MaterialTestingWrapper = () => {
     <MaterialTestingPage
       onBack={handleBack}
       heats={rmHeats}
-      inspectionCallNo={selectedCall?.callNo || ''}
+      inspectionCallNo={selectedCall?.call_no || ''}
       onNavigateSubmodule={handleNavigateSubmodule}
     />
   );
@@ -148,7 +151,7 @@ export const PackingStorageWrapper = () => {
     <PackingStoragePage
       onBack={handleBack}
       heats={rmHeats}
-      inspectionCallNo={selectedCall?.callNo || ''}
+      inspectionCallNo={selectedCall?.call_no || ''}
       onNavigateSubmodule={handleNavigateSubmodule}
     />
   );
@@ -171,7 +174,7 @@ export const SummaryReportsWrapper = () => {
     <SummaryReportsPage
       onBack={handleBack}
       heats={rmHeats}
-      inspectionCallNo={selectedCall?.callNo || ''}
+      inspectionCallNo={selectedCall?.call_no || ''}
       onNavigateSubmodule={handleNavigateSubmodule}
     />
   );

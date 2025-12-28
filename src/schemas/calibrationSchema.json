@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Calibration & Document Verification Schema",
-  "description": "Schema for Calibration & Document Verification Sub Module inside ERC Raw Material Inspection Main Module",
+  "description": "Schema for Calibration & Document ",
   "type": "object",
   "required": ["heats", "gaugesAvailable"],
   "properties": {

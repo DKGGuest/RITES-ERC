@@ -210,7 +210,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       <div className="fp-card">
         <h2 className="fp-card-title">Inspection Details</h2>
         <div className="fp-grid">
-          <FormField label="PO / Sub PO Number">
+          <FormField label="PO Number">
             <input
               className="fp-input"
               value={poData.sub_po_no || poData.po_no}

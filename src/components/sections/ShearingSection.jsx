@@ -80,7 +80,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'lotNo', e.target.value)}
                         disabled={row.noProduction}
                       >
-                        <option value="">Dropdown</option>
+                        <option value="">Select Lot No.</option>
                         {availableLotNumbers.map(lot => (
                           <option key={lot} value={lot}>{lot}</option>
                         ))}

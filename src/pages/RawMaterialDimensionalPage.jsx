@@ -4,12 +4,26 @@ import './RawMaterialDimensionalPage.css';
 
 const STORAGE_KEY = 'dimensional_check_draft_data';
 
+// Standard Rod Diameter and Tolerance values based on Product Model
+const PRODUCT_SPECS = {
+  'MK-III': {
+    standardDiameter: 20.64,
+    toleranceMin: 20.47,
+    toleranceMax: 20.84
+  },
+  'MK-V': {
+    standardDiameter: 23,
+    toleranceMin: 22.81,
+    toleranceMax: 23.23
+  }
+};
+
 /**
  * Dimensional Check Page - Raw Material Sub-module
  * Handles dimensional samples (20 samples per heat)
  * Data persists while switching submodules until user submits
  */
-const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'ERC-12', onNavigateSubmodule, inspectionCallNo = '' }) => {
+const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'MK-III', onNavigateSubmodule, inspectionCallNo = '' }) => {
   const [activeHeatTab, setActiveHeatTab] = useState(0);
 
   // Load draft data from localStorage
@@ -60,12 +74,30 @@ const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'ERC-12
     });
   }, [activeHeatTab]);
 
-  // Standard diameter derived from product model
-  const standardDiameter = useMemo(() => {
-    const modelNum = productModel.match(/\d+/)?.[0];
-    const parsed = modelNum ? parseFloat(modelNum) : NaN;
-    return Number.isNaN(parsed) ? '' : parsed;
+  // Normalize product model to match keys (e.g., "MK-III" or "MK-V")
+  const normalizedModel = useMemo(() => {
+    const model = (productModel || '').toUpperCase();
+    if (model.includes('III') || model.includes('3')) return 'MK-III';
+    if (model.includes('V') || model.includes('5')) return 'MK-V';
+    return 'MK-III'; // Default to MK-III
   }, [productModel]);
+
+  // Get specs for current product model
+  const specs = PRODUCT_SPECS[normalizedModel] || PRODUCT_SPECS['MK-III'];
+
+  // Standard diameter derived from product model
+  const standardDiameter = specs.standardDiameter;
+
+  // Validate sample value against tolerance range
+  const validateSample = useCallback((value) => {
+    if (!value || value === '') return null; // No validation for empty values
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return null;
+    if (numValue >= specs.toleranceMin && numValue <= specs.toleranceMax) {
+      return 'valid'; // Within tolerance - green
+    }
+    return 'invalid'; // Outside tolerance - red
+  }, [specs.toleranceMin, specs.toleranceMax]);
 
   // Auto-save to localStorage (persist while switching submodules)
   useEffect(() => {
@@ -117,9 +149,40 @@ const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'ERC-12
             </div>
             <div className="dim-form-group">
               <label className="dim-form-label">Standard Rod Diameter (mm)</label>
-              <input type="text" className="dim-form-input" value={standardDiameter || 'NA'} disabled />
+              <input type="text" className="dim-form-input" value={standardDiameter} disabled />
+            </div>
+            <div className="dim-form-group">
+              <label className="dim-form-label">Tolerance Range (mm)</label>
+              <input
+                type="text"
+                className="dim-form-input"
+                value={`${specs.toleranceMin} - ${specs.toleranceMax}`}
+                disabled
+              />
             </div>
           </div>
+
+          {/* Acceptance Criteria Info Box */}
+          {/* <div style={{
+            background: '#f0f9ff',
+            border: '1px solid #bae6fd',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '18px' }}>ℹ️</span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, color: '#0369a1', fontSize: '0.9rem' }}>Acceptance Criteria</p>
+              <p style={{ margin: '4px 0 0', color: '#0c4a6e', fontSize: '0.85rem' }}>
+                <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Green</span> — Value within {specs.toleranceMin} - {specs.toleranceMax} mm
+                <span style={{ margin: '0 12px', color: '#94a3b8' }}>|</span>
+                <span style={{ color: '#dc2626', fontWeight: 600 }}>✗ Red</span> — Value outside tolerance range
+              </p>
+            </div>
+          </div> */}
 
           {/* Dimensional Samples Grid */}
           <h4 style={{ marginBottom: '16px', marginTop: '20px' }}>Dimensional Check (20 samples)</h4>
@@ -127,21 +190,25 @@ const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'ERC-12
             {(() => {
               const hd = heatDimData[activeHeatTab] || {};
               const samples = hd.dimSamples || [];
-              return samples.map((s, idx) => (
-                <div key={idx} className="dim-form-group dimensional-sample-card">
-                  <label className="dim-form-label" style={{ marginBottom: '8px' }}>
-                    Sample {idx + 1}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="dim-form-input"
-                    value={s.diameter}
-                    onChange={(e) => handleDimSampleChange(idx, e.target.value)}
-                    placeholder="Bar Diameter (mm)"
-                  />
-                </div>
-              ));
+              return samples.map((s, idx) => {
+                const validationStatus = validateSample(s.diameter);
+                const inputClassName = `dim-form-input${validationStatus === 'valid' ? ' dim-input--valid' : ''}${validationStatus === 'invalid' ? ' dim-input--invalid' : ''}`;
+                return (
+                  <div key={idx} className="dim-form-group dimensional-sample-card">
+                    <label className="dim-form-label" style={{ marginBottom: '8px' }}>
+                      Sample {idx + 1}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={inputClassName}
+                      value={s.diameter}
+                      onChange={(e) => handleDimSampleChange(idx, e.target.value)}
+                      placeholder="Bar Diameter (mm)"
+                    />
+                  </div>
+                );
+              });
             })()}
           </div>
         </div>
