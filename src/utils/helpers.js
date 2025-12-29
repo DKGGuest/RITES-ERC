@@ -17,8 +17,26 @@ export const calculateDaysLeft = (dueDate) => {
 };
 
 export const formatDate = (dateString) => {
+  if (!dateString || dateString === '-' || dateString === 'N/A') return '-';
+
+  // If already in dd/MM/yyyy format, return as-is
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    return dateString;
+  }
+
+  // Try to parse the date
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
+
+  // Format to dd/MM/yyyy
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 /**
