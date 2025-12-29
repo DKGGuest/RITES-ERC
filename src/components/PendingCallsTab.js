@@ -1259,12 +1259,32 @@ return (
         {isLoading ? (
           <div style={{
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
             padding: 'var(--space-48)',
-            color: 'var(--color-text-secondary)'
+            gap: 'var(--space-16)'
           }}>
-            <span>Loading inspection calls...</span>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              border: '4px solid #e5e7eb',
+              borderTop: '4px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }}></div>
+            <span style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
+              Loading inspection calls 
+            </span>
+            <span style={{ color: 'var(--color-text-tertiary)', fontSize: '12px' }}>
+              This may take a few seconds
+            </span>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
           </div>
         ) : (
           <DataTable

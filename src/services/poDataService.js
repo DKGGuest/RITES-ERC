@@ -198,6 +198,36 @@ export const cleanVendorName = (vendorName) => {
   return cleaned || vendorName; // Return original if cleaning results in empty string
 };
 
+// In-memory cache for PO data to prevent duplicate API calls
+const poDataCache = new Map();
+const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch PO data with caching to improve performance
+ * @param {string} poNo - PO Number
+ * @returns {Promise<Object>} PO data
+ */
+const fetchPoDataWithCache = async (poNo) => {
+  if (!poNo || poNo === '-') return null;
+
+  // Check cache first
+  const cached = poDataCache.get(poNo);
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY_MS) {
+    return cached.data;
+  }
+
+  // Fetch from API
+  const poData = await fetchPoDataForSections(poNo);
+
+  // Store in cache
+  poDataCache.set(poNo, {
+    data: poData,
+    timestamp: Date.now()
+  });
+
+  return poData;
+};
+
 /**
  * Fetch vendor name from PO data and return cleaned version
  *
@@ -208,7 +238,7 @@ export const fetchCleanedVendorName = async (poNo) => {
   try {
     if (!poNo || poNo === '-') return '-';
 
-    const poData = await fetchPoDataForSections(poNo);
+    const poData = await fetchPoDataWithCache(poNo);
     const vendorName = poData?.vendorName || '-';
 
     return cleanVendorName(vendorName);
@@ -216,5 +246,12 @@ export const fetchCleanedVendorName = async (poNo) => {
     console.error(`Error fetching vendor name for PO ${poNo}:`, error);
     return '-';
   }
+};
+
+/**
+ * Clear PO data cache (useful for testing or forcing refresh)
+ */
+export const clearPoDataCache = () => {
+  poDataCache.clear();
 };
 

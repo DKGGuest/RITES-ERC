@@ -3,6 +3,7 @@ import { formatDate } from '../utils/helpers';
 import HeatNumberDetails from '../components/HeatNumberDetails';
 import { fetchPoDataForSections, updateColorCode } from '../services/poDataService';
 import { finishInspection } from '../services/rmInspectionService';
+import { useInspection } from '../context/InspectionContext';
 import './RawMaterialDashboard.css';
 
 // LocalStorage keys for submodule data
@@ -16,11 +17,20 @@ const STORAGE_KEYS = {
 };
 
 const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChange, onProductModelChange, onLadleValuesChange }) => {
+  // Import cache functions from context
+  const {
+    getRmCachedData,
+    updateRmPoDataCache,
+    updateRmCallDataCache,
+    updateRmHeatDataCache
+  } = useInspection();
+
   // State for fetched data from backend
   const [fetchedPoData, setFetchedPoData] = useState(null);
   const [fetchedCallData, setFetchedCallData] = useState(null);
   const [fetchedHeatData, setFetchedHeatData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingFromCache, setIsLoadingFromCache] = useState(false);
 
   // Pre-Inspection Data Entry State
   const [sourceOfRawMaterial, setSourceOfRawMaterial] = useState('');
@@ -35,21 +45,47 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   // Structure: { heatNo: { calibration: 'OK', visual: 'Pending', ... }, ... }
   const [heatSubmoduleStatuses, setHeatSubmoduleStatuses] = useState({});
 
-  // Fetch data from new unified PO data API
+  // Fetch data from new unified PO data API with caching
   useEffect(() => {
     const fetchInspectionData = async () => {
-      // Get PO number from call object
+      // Get PO number and call number
       const poNo = call?.po_no;
+      const callNo = call?.call_no;
 
-      if (!poNo) {
-        console.log('No PO number found');
+      if (!poNo || !callNo) {
+        console.log('No PO number or call number found');
         setIsLoading(false);
         return;
       }
 
+      // ==================== PERFORMANCE OPTIMIZATION: Check Cache First ====================
+      const cachedData = getRmCachedData(callNo);
+
+      if (cachedData.isCached) {
+        console.log('✅ Using cached data for call:', callNo);
+        setIsLoadingFromCache(true);
+
+        // Immediately set cached data (instant load!)
+        if (cachedData.poData) setFetchedPoData(cachedData.poData);
+        if (cachedData.callData) setFetchedCallData(cachedData.callData);
+        if (cachedData.heatData) setFetchedHeatData(cachedData.heatData);
+
+        setIsLoading(false);
+        setIsLoadingFromCache(false);
+
+        // Notify parent components
+        if (cachedData.heatData && onHeatsChange) {
+          onHeatsChange(cachedData.heatData);
+        }
+
+        console.log('📦 Cache hit! Data loaded instantly.');
+        return;
+      }
+
+      // ==================== Cache Miss: Fetch from API ====================
       try {
         setIsLoading(true);
-        console.log('Fetching PO data for PO Number:', poNo);
+        console.log('🌐 Cache miss. Fetching PO data from API for PO Number:', poNo);
 
         const response = await fetchPoDataForSections(poNo);
         console.log('Fetched PO data:', response);
@@ -61,7 +97,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             : null;
 
           // Map PO data from new unified API
-          setFetchedPoData({
+          const poData = {
             po_no: response.poNo,
             po_date: response.poDate,
             po_description: response.itemDescription || response.itemDesc,
@@ -82,10 +118,12 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             sub_po_date: firstHeat?.subPoDate || response.poDate,
             sub_po_qty: firstHeat?.subPoQty || response.poQty,
             product_name: response.itemDescription || response.itemDesc
-          });
+          };
+          setFetchedPoData(poData);
+          updateRmPoDataCache(callNo, poData); // Cache it!
 
           // Map call details
-          setFetchedCallData({
+          const callData = {
             inspectionCallNo: call?.call_no,
             typeOfCall: call?.type_of_call || 'Regular',
             desiredInspectionDate: call?.desired_inspection_date,
@@ -94,7 +132,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             qtyAlreadyInspectedRm: 0,
             qtyAlreadyInspectedProcess: 0,
             qtyAlreadyInspectedFinal: 0
-          });
+          };
+          setFetchedCallData(callData);
+          updateRmCallDataCache(callNo, callData); // Cache it!
 
           // Map RM heat details to heat data format
           if (response.rmHeatDetails && response.rmHeatDetails.length > 0) {
@@ -133,6 +173,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
               };
             });
             setFetchedHeatData(heatsData);
+            updateRmHeatDataCache(callNo, heatsData); // Cache it!
 
             // Also restore numberOfBundles, sourceOfRawMaterial, and heatRemarks from localStorage
             if (savedData) {
@@ -169,8 +210,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     };
 
     fetchInspectionData();
+    // Only depend on call identifiers, not callbacks (prevents unnecessary re-fetches)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [call?.po_no, call?.call_no, onLadleValuesChange]);
+  }, [call?.po_no, call?.call_no]);
 
   // Use fetched data from backend (stabilized)
   const poData = useMemo(() => (fetchedPoData || {}), [fetchedPoData]);
@@ -788,7 +830,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     return (
       <div className="rm-dashboard-container">
         <div className="card" style={{ textAlign: 'center', padding: 'var(--space-32)' }}>
-          <p>Loading inspection data...</p>
+          <p>{isLoadingFromCache ? '📦 Loading from cache...' : '🌐 Loading inspection data...'}</p>
         </div>
       </div>
     );

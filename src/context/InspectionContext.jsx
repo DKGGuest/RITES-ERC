@@ -50,6 +50,31 @@ export const InspectionProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // ==================== PERFORMANCE OPTIMIZATION: Data Caching ====================
+  // Cache fetched PO data to avoid re-fetching on navigation
+  const [rmPoDataCache, setRmPoDataCache] = useState(() => {
+    const saved = sessionStorage.getItem('rmPoDataCache');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Cache fetched call data
+  const [rmCallDataCache, setRmCallDataCache] = useState(() => {
+    const saved = sessionStorage.getItem('rmCallDataCache');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Cache fetched heat data
+  const [rmHeatDataCache, setRmHeatDataCache] = useState(() => {
+    const saved = sessionStorage.getItem('rmHeatDataCache');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Cache timestamp to track when data was last fetched
+  const [rmDataCacheTimestamp, setRmDataCacheTimestamp] = useState(() => {
+    const saved = sessionStorage.getItem('rmDataCacheTimestamp');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   // Process shared state
   const [processShift, setProcessShift] = useState(() => {
     return sessionStorage.getItem('processShift') || 'A';
@@ -117,6 +142,113 @@ export const InspectionProvider = ({ children }) => {
     }
   }, []);
 
+  // ==================== Cache Management Functions ====================
+
+  /**
+   * Update RM PO data cache for a specific call
+   * @param {string} callNo - Inspection call number
+   * @param {object} poData - PO data to cache
+   */
+  const updateRmPoDataCache = useCallback((callNo, poData) => {
+    setRmPoDataCache(prev => {
+      const updated = { ...prev, [callNo]: poData };
+      sessionStorage.setItem('rmPoDataCache', JSON.stringify(updated));
+      return updated;
+    });
+    // Update timestamp
+    setRmDataCacheTimestamp(prev => {
+      const updated = { ...prev, [callNo]: Date.now() };
+      sessionStorage.setItem('rmDataCacheTimestamp', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  /**
+   * Update RM call data cache
+   */
+  const updateRmCallDataCache = useCallback((callNo, callData) => {
+    setRmCallDataCache(prev => {
+      const updated = { ...prev, [callNo]: callData };
+      sessionStorage.setItem('rmCallDataCache', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  /**
+   * Update RM heat data cache
+   */
+  const updateRmHeatDataCache = useCallback((callNo, heatData) => {
+    setRmHeatDataCache(prev => {
+      const updated = { ...prev, [callNo]: heatData };
+      sessionStorage.setItem('rmHeatDataCache', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  /**
+   * Get cached data for a specific call
+   * Returns null if cache is expired (older than 5 minutes)
+   */
+  const getRmCachedData = useCallback((callNo) => {
+    const timestamp = rmDataCacheTimestamp[callNo];
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    // Check if cache exists and is not expired
+    if (timestamp && (Date.now() - timestamp) < CACHE_DURATION) {
+      return {
+        poData: rmPoDataCache[callNo],
+        callData: rmCallDataCache[callNo],
+        heatData: rmHeatDataCache[callNo],
+        isCached: true
+      };
+    }
+
+    return { isCached: false };
+  }, [rmDataCacheTimestamp, rmPoDataCache, rmCallDataCache, rmHeatDataCache]);
+
+  /**
+   * Clear cache for a specific call or all caches
+   */
+  const clearRmCache = useCallback((callNo = null) => {
+    if (callNo) {
+      // Clear specific call cache
+      setRmPoDataCache(prev => {
+        const updated = { ...prev };
+        delete updated[callNo];
+        sessionStorage.setItem('rmPoDataCache', JSON.stringify(updated));
+        return updated;
+      });
+      setRmCallDataCache(prev => {
+        const updated = { ...prev };
+        delete updated[callNo];
+        sessionStorage.setItem('rmCallDataCache', JSON.stringify(updated));
+        return updated;
+      });
+      setRmHeatDataCache(prev => {
+        const updated = { ...prev };
+        delete updated[callNo];
+        sessionStorage.setItem('rmHeatDataCache', JSON.stringify(updated));
+        return updated;
+      });
+      setRmDataCacheTimestamp(prev => {
+        const updated = { ...prev };
+        delete updated[callNo];
+        sessionStorage.setItem('rmDataCacheTimestamp', JSON.stringify(updated));
+        return updated;
+      });
+    } else {
+      // Clear all caches
+      setRmPoDataCache({});
+      setRmCallDataCache({});
+      setRmHeatDataCache({});
+      setRmDataCacheTimestamp({});
+      sessionStorage.removeItem('rmPoDataCache');
+      sessionStorage.removeItem('rmCallDataCache');
+      sessionStorage.removeItem('rmHeatDataCache');
+      sessionStorage.removeItem('rmDataCacheTimestamp');
+    }
+  }, []);
+
   const updateProcessShift = useCallback((shift) => {
     setProcessShift(shift);
     sessionStorage.setItem('processShift', shift);
@@ -176,7 +308,10 @@ export const InspectionProvider = ({ children }) => {
     sessionStorage.removeItem('processShift');
     sessionStorage.removeItem('processSelectedLines');
     sessionStorage.removeItem('processProductionLines');
-  }, []);
+
+    // Clear all caches
+    clearRmCache();
+  }, [clearRmCache]);
 
   const value = {
     selectedCall,
@@ -205,6 +340,12 @@ export const InspectionProvider = ({ children }) => {
     setProcessProductionLines: updateProcessProductionLines,
     setLandingActiveTab,
     clearInspectionData,
+    // Cache management functions
+    updateRmPoDataCache,
+    updateRmCallDataCache,
+    updateRmHeatDataCache,
+    getRmCachedData,
+    clearRmCache,
   };
 
   return (

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
+import { getLadleValuesByCallNo } from '../services/rmInspectionService';
 import './MaterialTestingPage.css';
 
 const STORAGE_KEY = 'material_testing_draft_data';
-const CALIBRATION_STORAGE_KEY = 'calibration_draft_data';
 
 /**
  * Specification limits for raw material testing
@@ -51,6 +51,8 @@ const getValueStatus = (field, value) => {
  */
 const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspectionCallNo = '' }) => {
   const [activeHeatTab, setActiveHeatTab] = useState(0);
+  const [ladleValues, setLadleValues] = useState([]);
+  const [isLoadingLadle, setIsLoadingLadle] = useState(false);
 
   // Load draft data from localStorage
   const loadDraftData = useCallback(() => {
@@ -98,31 +100,67 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
   const currentHeat = heats[activeHeatTab] || {};
   const heatIndex = activeHeatTab;
 
-  // Load ladle values from calibration draft data
-  const getLadleValues = useCallback(() => {
-    const calStorageKey = `${CALIBRATION_STORAGE_KEY}_${inspectionCallNo}`;
-    const calDraft = localStorage.getItem(calStorageKey);
-    if (calDraft) {
+  // Fetch ladle values from RM Chemical Analysis table via API
+  useEffect(() => {
+    const fetchLadleValues = async () => {
+      if (!inspectionCallNo) return;
+
+      setIsLoadingLadle(true);
       try {
-        const parsed = JSON.parse(calDraft);
-        if (parsed.heats && Array.isArray(parsed.heats)) {
-          return parsed.heats;
-        }
-      } catch (e) {
-        console.error('Error parsing calibration data:', e);
+        console.log('🔬 Fetching ladle values from API for call:', inspectionCallNo);
+        const data = await getLadleValuesByCallNo(inspectionCallNo);
+        console.log('✅ Ladle values fetched:', data);
+        console.log('📊 Ladle heat numbers:', data?.map(l => l.heatNo));
+        setLadleValues(data || []);
+      } catch (error) {
+        console.error('❌ Error fetching ladle values:', error);
+        setLadleValues([]);
+      } finally {
+        setIsLoadingLadle(false);
       }
-    }
-    return [];
+    };
+
+    fetchLadleValues();
   }, [inspectionCallNo]);
 
-  const ladleHeats = getLadleValues();
-  const currentLadleHeat = ladleHeats[heatIndex] || {};
+  // Get ladle values for display
+  // BUSINESS RULE: Ladle values are same for all heats in an inspection call
+  // If any ladle data exists for this call, display it for all heats
+  const currentLadleHeat = useMemo(() => {
+    console.log('🔬 Ladle values available:', ladleValues);
+
+    // If we have any ladle values for this inspection call, use the first one
+    // Chemical analysis is done at call level, not per heat
+    if (ladleValues && ladleValues.length > 0) {
+      const ladleData = ladleValues[0];
+      console.log('✅ Using ladle values (same for all heats):', ladleData);
+      console.log('  percentC:', ladleData.percentC);
+      console.log('  percentSi:', ladleData.percentSi);
+      console.log('  percentMn:', ladleData.percentMn);
+      console.log('  percentP:', ladleData.percentP, '← Should be 0, not null/undefined');
+      console.log('  percentS:', ladleData.percentS);
+      return ladleData;
+    }
+
+    console.log('⚠️ No ladle values available for this inspection call');
+    return {};
+  }, [ladleValues]);
 
   // Format ladle value for display
+  // IMPORTANT: Must handle 0 as a valid value (not falsy)
   const formatLadleValue = (value) => {
-    if (value === '' || value === null || value === undefined) return '-';
+    // Only return '-' for truly missing values (null, undefined, empty string)
+    // DO NOT treat 0 as missing - it's a valid chemical composition value
+    if (value === '' || value === null || value === undefined) {
+      return '-';
+    }
+
     const numValue = parseFloat(value);
-    if (isNaN(numValue)) return '-';
+    if (isNaN(numValue)) {
+      return '-';
+    }
+
+    // Return formatted number (including 0.000 if value is 0)
     return numValue.toFixed(3);
   };
 
@@ -208,17 +246,20 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Ladle Values Row - Reference from Calibration */}
+                  {/* Ladle Values Row - Fetched from RM Chemical Analysis Table */}
                   <tr style={{ background: '#fffbeb' }}>
-                    <td style={{ fontWeight: 600, color: '#92400e' }}>Ladle Values</td>
+                    <td style={{ fontWeight: 600, color: '#92400e' }}>
+                      Ladle Values
+                      {isLoadingLadle && <span style={{ fontSize: '0.75rem', marginLeft: '8px', color: '#92400e' }}>(Loading...)</span>}
+                    </td>
                     <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentC)}</td>
                     <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentSi)}</td>
                     <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentMn)}</td>
                     <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentP)}</td>
                     <td style={{ color: '#92400e', fontWeight: 500 }}>{formatLadleValue(currentLadleHeat.percentS)}</td>
-                    <td style={{ color: '#94a3b8' }}>—</td>
-                    <td style={{ color: '#94a3b8' }}>—</td>
-                    <td style={{ color: '#94a3b8' }}>—</td>
+                    <td style={{ color: '#94a3b8', fontStyle: 'italic' }}>N/A</td>
+                    <td style={{ color: '#94a3b8', fontStyle: 'italic' }}>N/A</td>
+                    <td style={{ color: '#94a3b8', fontStyle: 'italic' }}>N/A</td>
                   </tr>
                   {[0, 1].map(sampleIndex => {
                     const sample = materialData[heatIndex]?.samples[sampleIndex] || {};

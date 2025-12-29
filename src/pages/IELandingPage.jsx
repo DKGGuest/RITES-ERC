@@ -11,7 +11,7 @@ import Notification from '../components/Notification';
 import { scheduleInspection, rescheduleInspection, getScheduleByCallNo, validateScheduleLimit, MAX_CALLS_PER_DAY } from '../services/scheduleService';
 import { raiseBill, updateBillingStatus, approvePayment, BILLING_STATUS } from '../services/billingService';
 import { getStoredUser } from '../services/authService';
-import { fetchUserPendingCalls, performTransitionAction } from '../services/workflowService';
+import { fetchUserPendingCalls, performTransitionAction, clearWorkflowCache } from '../services/workflowService';
 
 const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending' }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -37,15 +37,29 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch pending workflow transitions for logged-in user from Azure API
+  // PERFORMANCE OPTIMIZATION: Returns data immediately, fetches vendor names in background
   const fetchPendingData = useCallback(async () => {
+    const startTime = performance.now();
     setIsLoading(true);
+
     try {
+      console.log('🚀 Starting data fetch from Azure...');
+
+      // Fetch workflow transitions immediately (without waiting for vendor names)
       const apiCalls = await fetchUserPendingCalls();
+
+      const fetchTime = performance.now() - startTime;
+      console.log(`⚡ Data loaded in ${fetchTime.toFixed(0)}ms`);
+
       setPendingCalls(apiCalls);
+      setIsLoading(false);
+
+      // Vendor names are being fetched in background and cached
+      // They will be available on next refresh or when needed
+
     } catch (error) {
-      console.error('Error fetching pending calls from Azure API:', error);
+      console.error('❌ Error fetching pending calls from Azure API:', error);
       setPendingCalls([]);
-    } finally {
       setIsLoading(false);
     }
   }, []);
@@ -218,10 +232,16 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       // Show success notification
       showNotification('Inspection scheduled successfully!', 'success');
 
+      // Clear workflow cache to force fresh data on next fetch
+      clearWorkflowCache();
+
       // Refresh the schedule list
       if (refreshCallback) {
         refreshCallback();
       }
+
+      // Refresh the pending calls list to update status immediately
+      await fetchPendingData();
 
       // Reset modal state
       setShowScheduleModal(false);

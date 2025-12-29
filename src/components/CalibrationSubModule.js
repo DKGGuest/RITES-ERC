@@ -68,10 +68,17 @@ const CalibrationSubModule = ({ preInspectionHeats = [], vendorLadleValues: vend
   // Initialize heats from pre-inspection data and vendor ladle values from prop
   useEffect(() => {
     if (preInspectionHeats && preInspectionHeats.length > 0) {
+      // Filter out empty heats
+      const validHeats = preInspectionHeats.filter(heat => heat && (heat.heatNo || heat.heat_no));
+
+      if (validHeats.length === 0) {
+        return;
+      }
+
       // Use vendor ladle values from prop (fetched from database)
       // These are the same values for all heats as stored at PO level
-      const ladleData = preInspectionHeats.map(heat => ({
-        heatNo: heat.heatNo || heat,
+      const ladleData = validHeats.map(heat => ({
+        heatNo: heat.heatNo || heat.heat_no || heat,
         percentC: vendorLadleProp?.percentC ?? null,
         percentSi: vendorLadleProp?.percentSi ?? null,
         percentMn: vendorLadleProp?.percentMn ?? null,
@@ -82,8 +89,8 @@ const CalibrationSubModule = ({ preInspectionHeats = [], vendorLadleValues: vend
 
       // Initialize product values (IE input) only if no draft exists
       if (formData.heats.length === 0) {
-        const initialHeats = preInspectionHeats.map(heat => ({
-          heatNo: heat.heatNo || heat,
+        const initialHeats = validHeats.map(heat => ({
+          heatNo: heat.heatNo || heat.heat_no || heat,
           percentC: '',
           percentSi: '',
           percentMn: '',

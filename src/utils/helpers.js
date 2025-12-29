@@ -20,3 +20,49 @@ export const formatDate = (dateString) => {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
+
+/**
+ * Convert date from dd/MM/yyyy format to yyyy-MM-dd (ISO format) for backend
+ * @param {string} dateStr - Date in dd/MM/yyyy format
+ * @returns {string|null} Date in yyyy-MM-dd format or null if invalid
+ */
+export const convertDDMMYYYYtoISO = (dateStr) => {
+  if (!dateStr || dateStr === '-' || dateStr.trim() === '') return null;
+
+  // If already in ISO format (yyyy-MM-dd), return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+
+  // Convert dd/MM/yyyy to yyyy-MM-dd
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  return null;
+};
+
+/**
+ * Convert date from yyyy-MM-dd (ISO format) to dd/MM/yyyy for display
+ * @param {string} dateStr - Date in yyyy-MM-dd format
+ * @returns {string} Date in dd/MM/yyyy format
+ */
+export const convertISOtoDDMMYYYY = (dateStr) => {
+  if (!dateStr || dateStr === '-') return '-';
+
+  // If already in dd/MM/yyyy format, return as-is
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+    return dateStr;
+  }
+
+  // Convert yyyy-MM-dd to dd/MM/yyyy
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+  }
+
+  return dateStr;
+};
