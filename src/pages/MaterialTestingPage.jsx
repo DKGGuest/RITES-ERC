@@ -123,28 +123,35 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
     fetchLadleValues();
   }, [inspectionCallNo]);
 
-  // Get ladle values for display
-  // BUSINESS RULE: Ladle values are same for all heats in an inspection call
-  // If any ladle data exists for this call, display it for all heats
+  // Get ladle values for the currently selected heat
+  // BUSINESS RULE: Each heat has its own ladle values from vendor's chemical analysis
   const currentLadleHeat = useMemo(() => {
-    console.log('🔬 Ladle values available:', ladleValues);
+    const currentHeatNo = currentHeat?.heatNo;
 
-    // If we have any ladle values for this inspection call, use the first one
-    // Chemical analysis is done at call level, not per heat
-    if (ladleValues && ladleValues.length > 0) {
-      const ladleData = ladleValues[0];
-      console.log('✅ Using ladle values (same for all heats):', ladleData);
+    if (!currentHeatNo) {
+      console.log('⚠️ No heat number available for current heat');
+      return {};
+    }
+
+    console.log('🔬 Looking for ladle values for heat:', currentHeatNo);
+    console.log('📊 Available ladle values:', ladleValues);
+
+    // Find ladle values matching the current heat number
+    const ladleData = ladleValues.find(ladle => ladle.heatNo === currentHeatNo);
+
+    if (ladleData) {
+      console.log('✅ Found ladle values for heat', currentHeatNo, ':', ladleData);
       console.log('  percentC:', ladleData.percentC);
       console.log('  percentSi:', ladleData.percentSi);
       console.log('  percentMn:', ladleData.percentMn);
-      console.log('  percentP:', ladleData.percentP, '← Should be 0, not null/undefined');
+      console.log('  percentP:', ladleData.percentP);
       console.log('  percentS:', ladleData.percentS);
       return ladleData;
     }
 
-    console.log('⚠️ No ladle values available for this inspection call');
+    console.log('⚠️ No ladle values found for heat:', currentHeatNo);
     return {};
-  }, [ladleValues]);
+  }, [ladleValues, currentHeat?.heatNo]);
 
   // Format ladle value for display
   // IMPORTANT: Must handle 0 as a valid value (not falsy)
