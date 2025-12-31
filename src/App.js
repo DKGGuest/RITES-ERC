@@ -45,6 +45,7 @@ import {
 } from './pages/wrappers/OtherWrappers';
 import { CMDashboardWrapper } from './pages/wrappers/CMWrappers';
 import { CallDeskDashboardWrapper } from './pages/wrappers/CallDeskWrapper';
+import { FinanceDashboardWrapper } from './pages/wrappers/FinanceWrapper';
 
 /**
  * Role-based redirect component
@@ -56,9 +57,31 @@ const RoleBasedRedirect = () => {
     return <Navigate to={ROUTES.CM_DASHBOARD} replace />;
   } else if (currentUser?.roleName === 'CALL_DESK') {
     return <Navigate to={ROUTES.CALL_DESK} replace />;
+  } else if (currentUser?.roleName === 'Finance') {
+    return <Navigate to={ROUTES.FINANCE} replace />;
   } else {
     return <Navigate to={ROUTES.LANDING} replace />;
   }
+};
+
+/**
+ * Role-based Landing Page Guard
+ * Redirects non-IE users to their respective dashboards
+ */
+const LandingPageGuard = () => {
+  const currentUser = getStoredUser();
+
+  // Redirect Finance, CM, and Call Desk users to their dashboards
+  if (currentUser?.roleName === 'Finance') {
+    return <Navigate to={ROUTES.FINANCE} replace />;
+  } else if (currentUser?.roleName === 'CM') {
+    return <Navigate to={ROUTES.CM_DASHBOARD} replace />;
+  } else if (currentUser?.roleName === 'CALL_DESK') {
+    return <Navigate to={ROUTES.CALL_DESK} replace />;
+  }
+
+  // IE users can access Landing Page
+  return <LandingPageWrapper />;
 };
 
 /**
@@ -81,8 +104,8 @@ const App = () => {
               </ProtectedRoute>
             }
           >
-            {/* Landing Page */}
-            <Route path={ROUTES.LANDING} element={<LandingPageWrapper />} />
+            {/* Landing Page - with role-based guard */}
+            <Route path={ROUTES.LANDING} element={<LandingPageGuard />} />
 
             {/* Inspection Initiation */}
             <Route path={ROUTES.INITIATION} element={<InitiationPageWrapper />} />
@@ -126,6 +149,9 @@ const App = () => {
 
             {/* Call Desk Routes */}
             <Route path={ROUTES.CALL_DESK} element={<CallDeskDashboardWrapper />} />
+
+            {/* Finance Routes */}
+            <Route path={ROUTES.FINANCE} element={<FinanceDashboardWrapper />} />
           </Route>
 
           {/* Catch-all redirect - role-based */}

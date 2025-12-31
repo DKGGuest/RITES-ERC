@@ -45,6 +45,10 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   // Structure: { heatNo: { calibration: 'OK', visual: 'Pending', ... }, ... }
   const [heatSubmoduleStatuses, setHeatSubmoduleStatuses] = useState({});
 
+  // Ref to prevent duplicate API calls in React StrictMode
+  const hasFetchedRef = useRef(false);
+  const currentCallRef = useRef(null);
+
   // Fetch data from new unified PO data API with caching
   useEffect(() => {
     const fetchInspectionData = async () => {
@@ -57,6 +61,21 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         setIsLoading(false);
         return;
       }
+
+      // Reset fetch flag if call changes
+      if (currentCallRef.current !== callNo) {
+        hasFetchedRef.current = false;
+        currentCallRef.current = callNo;
+      }
+
+      // Prevent duplicate API calls (especially in React StrictMode)
+      if (hasFetchedRef.current) {
+        console.log('⏭️ Skipping duplicate API call (already fetched for this call)');
+        return;
+      }
+
+      // Mark as fetched
+      hasFetchedRef.current = true;
 
       // ==================== PERFORMANCE OPTIMIZATION: Check Cache First ====================
       const cachedData = getRmCachedData(callNo);
@@ -85,9 +104,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       // ==================== Cache Miss: Fetch from API ====================
       try {
         setIsLoading(true);
-        console.log('🌐 Cache miss. Fetching PO data from API for PO Number:', poNo);
+        console.log('🌐 Cache miss. Fetching PO data from API for PO Number:', poNo, 'Call Number:', callNo);
 
-        const response = await fetchPoDataForSections(poNo);
+        const response = await fetchPoDataForSections(poNo, callNo);
         console.log('Fetched PO data:', response);
 
         if (response) {
@@ -877,11 +896,11 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         <div className="rm-form-grid">
           <div className="rm-form-group">
             <label className="rm-form-label">PO Number</label>
-            <input type="text" className="rm-form-input" value={poData.sub_po_no || poData.po_no} disabled />
+            <input type="text" className="rm-form-input" value={poData.po_no || poData.sub_po_no} disabled />
           </div>
           <div className="rm-form-group">
             <label className="rm-form-label">PO Date</label>
-            <input type="text" className="rm-form-input" value={formatDate(poData.sub_po_date || poData.po_date)} disabled />
+            <input type="text" className="rm-form-input" value={formatDate(poData.po_date || poData.sub_po_date)} disabled />
           </div>
           <div className="rm-form-group">
             <label className="rm-form-label">Contractor Name</label>

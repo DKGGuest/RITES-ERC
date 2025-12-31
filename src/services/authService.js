@@ -7,7 +7,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL ||
   'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 
 /**
- * Hardcoded credentials for CM and CallDesk users
+ * Hardcoded credentials for CM, CallDesk, and Finance users
  */
 const HARDCODED_USERS = {
   'Cm': {
@@ -26,6 +26,15 @@ const HARDCODED_USERS = {
       userName: 'Call Desk Officer',
       roleName: 'CALL_DESK',
       token: 'calldesk-mock-token-' + Date.now()
+    }
+  },
+  'Finance': {
+    password: 'password',
+    userData: {
+      userId: 'Finance',
+      userName: 'Finance Officer',
+      roleName: 'Finance',
+      token: 'finance-mock-token-' + Date.now()
     }
   }
 };

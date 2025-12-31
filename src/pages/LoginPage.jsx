@@ -26,6 +26,8 @@ const LoginPage = () => {
       redirectPath = ROUTES.CM_DASHBOARD;
     } else if (currentUser?.roleName === 'CALL_DESK') {
       redirectPath = ROUTES.CALL_DESK;
+    } else if (currentUser?.roleName === 'Finance') {
+      redirectPath = ROUTES.FINANCE;
     } else {
       redirectPath = location.state?.from?.pathname || ROUTES.LANDING;
     }
@@ -64,6 +66,9 @@ const LoginPage = () => {
       } else if (userData.roleName === 'CALL_DESK') {
         // Call Desk user - redirect to Call Desk
         redirectPath = ROUTES.CALL_DESK;
+      } else if (userData.roleName === 'Finance') {
+        // Finance user - redirect to Finance Dashboard
+        redirectPath = ROUTES.FINANCE;
       } else {
         // IE user - redirect to landing page or intended destination
         redirectPath = location.state?.from?.pathname || ROUTES.LANDING;

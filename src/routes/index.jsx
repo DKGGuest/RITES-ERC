@@ -56,6 +56,9 @@ export const ROUTES = {
 
   // Call Desk Routes
   CALL_DESK: '/call-desk',
+
+  // Finance Routes
+  FINANCE: '/finance',
 };
 
 /**
