@@ -13,7 +13,7 @@ import {
   MOCK_DASHBOARD_KPIS,
   MOCK_VENDORS
 } from '../utils/mockData';
-import { PAYMENT_STATUS, BILL_STATUS } from '../utils/constants';
+// import { PAYMENT_STATUS, BILL_STATUS } from '../utils/constants'; // Not used yet - will be used for status filtering
 
 /**
  * Custom hook for Finance data management

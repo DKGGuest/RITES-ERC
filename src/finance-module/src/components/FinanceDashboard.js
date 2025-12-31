@@ -3,7 +3,7 @@
  * Main dashboard component with 5 tabs
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Tabs from '../../../components/Tabs';
 import VendorPaymentsTab from './VendorPaymentsTab';
 import PendingBillingTab from './PendingBillingTab';
@@ -29,7 +29,7 @@ const FinanceDashboard = () => {
     billsCleared,
     auditTrail,
     dashboardKPIs,
-    vendors,
+    // vendors, // Not used yet - will be used for vendor filtering in future
     loading,
     error,
     refreshData
@@ -38,14 +38,14 @@ const FinanceDashboard = () => {
   const {
     approvePayment,
     returnPayment,
-    loading: paymentActionLoading
+    // loading: paymentActionLoading // Not used yet - will be used for loading states
   } = usePaymentActions();
 
   const {
     generateBill,
     recordPayment,
     clearBill,
-    loading: billingActionLoading
+    // loading: billingActionLoading // Not used yet - will be used for loading states
   } = useBillingActions();
 
   // Tab configuration
