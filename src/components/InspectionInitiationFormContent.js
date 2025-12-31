@@ -116,8 +116,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       // This runs FIRST for Raw Material calls with a PO number
       if (call.po_no) {
         try {
-          console.log('🔍 Fetching PO data from database for PO:', call.po_no);
-          const poDataFromDb = await fetchPoDataForSections(call.po_no);
+          console.log('🔍 Fetching PO data from database for PO:', call.po_no, 'Request ID:', call.call_no);
+          const poDataFromDb = await fetchPoDataForSections(call.po_no, call.call_no);
 
           if (poDataFromDb) {
             console.log('✅ PO data fetched from database:', poDataFromDb);
@@ -126,6 +126,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             // Transform database response to match expected format
             const transformedPoData = {
               po_no: poDataFromDb.poNo,
+              rly_po_no: poDataFromDb.rlyPoNo, // NEW: RLY/PO_NO format
+              po_serial_no: poDataFromDb.poSerialNo, // NEW: PO Serial Number
+              rly_po_no_serial: poDataFromDb.rlyPoNoSerial, // NEW: RLY/PO_NO/PO_SR format
               po_date: poDataFromDb.poDate,
               po_amend_no: poDataFromDb.maNo || 'N/A',
               po_amend_dates: poDataFromDb.maDate || 'N/A',
@@ -292,7 +295,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       inspectionCallNo: call.call_no,
       inspectionCallDate: extractDateOnly(call.call_date || call.requested_date),
       inspectionDesiredDate: extractDateOnly(call.desired_inspection_date || call.requested_date),
-      rlyPoNoSr: `${call.po_no || ''} / ${call.po_sr || ''}`,
+      rlyPoNoSr: poData.rly_po_no_serial || `${call.po_no || ''} / ${call.po_sr || ''}`,
       itemDesc: poData.product_name || call.product_name,
       productType: call.product_type,
       poQty: poData.po_qty || call.po_qty,
@@ -706,7 +709,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         <div className="form-grid">
           <div className="form-group">
             <label className="form-label">RLY + PO_NO</label>
-            <input type="text" className="form-input" value={poData.po_no || call.po_no} disabled />
+            <input type="text" className="form-input" value={poData.rly_po_no || poData.po_no || call.po_no} disabled />
           </div>
           <div className="form-group">
             <label className="form-label">PO DATE</label>
@@ -809,7 +812,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           </div>
           <div className="form-group">
             <label className="form-label">RLY + PO_NO + PO_SR</label>
-            <input type="text" className="form-input" value={`${poData.po_no || call.po_no} / ${poData.pl_no || '1'}`} disabled />
+            <input type="text" className="form-input" value={poData.rly_po_no_serial || `${poData.po_no || call.po_no} / ${poData.pl_no || '1'}`} disabled />
           </div>
           <div className="form-group">
             <label className="form-label">ITEM DESC</label>

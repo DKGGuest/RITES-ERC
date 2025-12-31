@@ -66,7 +66,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
   useEffect(() => {
     fetchPendingData();
-  }, [fetchPendingData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Combine Real Raw Material calls from API with Mock Process/Final Product calls
   const combinedPendingCalls = useMemo(() => {

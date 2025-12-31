@@ -44,11 +44,12 @@ const handleResponse = async (response) => {
 };
 
 /**
- * Fetch PO data for all sections (A, B, C) by PO Number
- * 
+ * Fetch PO data for all sections (A, B, C) by PO Number and optionally Request ID
+ *
  * @param {string} poNo - PO Number (e.g., "AA195118100297")
+ * @param {string} requestId - Optional Request ID (Inspection Call Number) for filtering specific inspection call data
  * @returns {Promise<Object>} PO data object with all section fields
- * 
+ *
  * Response structure:
  * {
  *   rlyPoNo: "AA195118100297",
@@ -73,12 +74,18 @@ const handleResponse = async (response) => {
  *   ...
  * }
  */
-export const fetchPoDataForSections = async (poNo) => {
+export const fetchPoDataForSections = async (poNo, requestId = null) => {
   if (!poNo) {
     throw new Error('PO Number is required');
   }
 
-  const response = await fetch(`${API_BASE_URL}/sections?poNo=${encodeURIComponent(poNo)}`, {
+  // Build URL with optional requestId parameter
+  let url = `${API_BASE_URL}/sections?poNo=${encodeURIComponent(poNo)}`;
+  if (requestId) {
+    url += `&requestId=${encodeURIComponent(requestId)}`;
+  }
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: getAuthHeaders()
   });
@@ -205,22 +212,26 @@ const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 /**
  * Fetch PO data with caching to improve performance
  * @param {string} poNo - PO Number
+ * @param {string} requestId - Optional Request ID for cache key differentiation
  * @returns {Promise<Object>} PO data
  */
-const fetchPoDataWithCache = async (poNo) => {
+const fetchPoDataWithCache = async (poNo, requestId = null) => {
   if (!poNo || poNo === '-') return null;
 
+  // Create cache key with both poNo and requestId to differentiate inspection calls
+  const cacheKey = requestId ? `${poNo}_${requestId}` : poNo;
+
   // Check cache first
-  const cached = poDataCache.get(poNo);
+  const cached = poDataCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY_MS) {
     return cached.data;
   }
 
   // Fetch from API
-  const poData = await fetchPoDataForSections(poNo);
+  const poData = await fetchPoDataForSections(poNo, requestId);
 
   // Store in cache
-  poDataCache.set(poNo, {
+  poDataCache.set(cacheKey, {
     data: poData,
     timestamp: Date.now()
   });

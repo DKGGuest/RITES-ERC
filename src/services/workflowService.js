@@ -5,11 +5,11 @@
  * PERFORMANCE OPTIMIZATIONS:
  * - Request caching with TTL
  * - Timeout handling for slow Azure API
- * - Progressive loading (data first, vendor names later)
+ * - Uses vendor name directly from workflow API (no additional PO API calls)
  */
 
 import { getAuthToken, getStoredUser } from './authService';
-import { fetchCleanedVendorName } from './poDataService';
+import { cleanVendorName } from './poDataService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL ||
   'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
@@ -28,6 +28,9 @@ const getAuthHeaders = () => {
 // In-memory cache for workflow transitions
 const workflowCache = new Map();
 const WORKFLOW_CACHE_TTL = 2 * 60 * 1000; // 2 minutes (shorter than PO cache)
+
+// Request deduplication - prevent duplicate API calls (React StrictMode causes double renders)
+const pendingRequests = new Map();
 
 /**
  * Clear workflow cache (useful after scheduling or status changes)
@@ -84,41 +87,59 @@ export const fetchPendingWorkflowTransitions = async (roleName, forceRefresh = f
     }
   }
 
-  try {
-    console.log('🌐 Fetching workflow transitions from Azure API...');
-    const response = await fetchWithTimeout(
-      `${API_BASE_URL}/allPendingWorkflowTransition?roleName=${encodeURIComponent(roleName)}`,
-      {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      },
-      30000 // 30 second timeout
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.responseStatus?.message || 'Failed to fetch pending transitions');
-    }
-
-    // Check for successful status (statusCode === 0 means success)
-    if (data.responseStatus?.statusCode !== 0) {
-      throw new Error(data.responseStatus?.message || 'Failed to fetch pending transitions');
-    }
-
-    const transitions = data.responseData || [];
-
-    // Store in cache
-    workflowCache.set(cacheKey, {
-      data: transitions,
-      timestamp: Date.now()
-    });
-
-    return transitions;
-  } catch (error) {
-    console.error('Error fetching pending workflow transitions:', error);
-    throw error;
+  // Deduplication: If a request is already in progress, return the same promise
+  // This prevents React StrictMode from making duplicate API calls
+  if (pendingRequests.has(cacheKey)) {
+    console.log('⏳ Request already in progress, waiting for result...');
+    return pendingRequests.get(cacheKey);
   }
+
+  // Create the request promise
+  const requestPromise = (async () => {
+    try {
+      console.log('🌐 Fetching workflow transitions from Azure API...');
+      const response = await fetchWithTimeout(
+        `${API_BASE_URL}/allPendingWorkflowTransition?roleName=${encodeURIComponent(roleName)}`,
+        {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        },
+        30000 // 30 second timeout
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.responseStatus?.message || 'Failed to fetch pending transitions');
+      }
+
+      // Check for successful status (statusCode === 0 means success)
+      if (data.responseStatus?.statusCode !== 0) {
+        throw new Error(data.responseStatus?.message || 'Failed to fetch pending transitions');
+      }
+
+      const transitions = data.responseData || [];
+
+      // Store in cache
+      workflowCache.set(cacheKey, {
+        data: transitions,
+        timestamp: Date.now()
+      });
+
+      return transitions;
+    } catch (error) {
+      console.error('Error fetching pending workflow transitions:', error);
+      throw error;
+    } finally {
+      // Remove from pending requests after completion (success or failure)
+      pendingRequests.delete(cacheKey);
+    }
+  })();
+
+  // Store the promise in pending requests
+  pendingRequests.set(cacheKey, requestPromise);
+
+  return requestPromise;
 };
 
 /**
@@ -127,7 +148,7 @@ export const fetchPendingWorkflowTransitions = async (roleName, forceRefresh = f
  *
  * PERFORMANCE OPTIMIZATIONS:
  * - Uses caching to prevent duplicate API calls
- * - Batch fetches vendor names in parallel
+ * - Uses vendor name directly from workflow API (no additional PO API calls)
  * - Timeout handling for Azure API
  *
  * @returns {Promise<Array>} Filtered list of pending workflow transitions
@@ -156,67 +177,36 @@ export const fetchUserPendingCalls = async () => {
 
     console.log(`📊 Found ${userTransitions.length} transitions for user ${userId}`);
 
-    // Pre-fetch all unique PO vendor names in parallel to leverage caching
-    const uniquePoNumbers = [...new Set(
-      userTransitions
-        .map(t => t.poNo)
-        .filter(poNo => poNo && poNo !== '-')
-    )];
+    // Transform API response - use vendor name directly from workflow API
+    const transformedCalls = userTransitions.map((transition) => {
+      // Use vendor name from API response, clean it if available
+      let vendorName = transition.vendorName || '-';
+      if (vendorName && vendorName !== '-') {
+        vendorName = cleanVendorName(vendorName);
+      }
 
-    console.log(`🔄 Fetching ${uniquePoNumbers.length} vendor names...`);
-
-    // Batch fetch all vendor names (cache will prevent duplicate API calls)
-    const vendorNamePromises = uniquePoNumbers.map(poNo =>
-      fetchCleanedVendorName(poNo).catch(error => {
-        console.error(`Failed to fetch vendor name for PO ${poNo}:`, error);
-        return '-';
-      })
-    );
-
-    // Wait for all vendor names to be fetched
-    await Promise.all(vendorNamePromises);
-
-    const vendorFetchTime = performance.now() - startTime;
-    console.log(`✅ Vendor names fetched in ${vendorFetchTime.toFixed(0)}ms`);
-
-    // Transform API response - vendor names will be served from cache now
-    const transformedCalls = await Promise.all(
-      userTransitions.map(async (transition) => {
-        // Fetch cleaned vendor name from PO API (will use cache)
-        let cleanedVendorName = transition.vendorName || '-';
-        if (transition.poNo && transition.poNo !== '-') {
-          try {
-            cleanedVendorName = await fetchCleanedVendorName(transition.poNo);
-          } catch (error) {
-            console.error(`Failed to fetch vendor name for PO ${transition.poNo}:`, error);
-            // Fallback to original vendor name if API call fails
-            cleanedVendorName = transition.vendorName || '-';
-          }
-        }
-
-        return {
-          id: transition.workflowTransitionId,
-          call_no: transition.requestId,
-          workflowId: transition.workflowId,
-          transitionId: transition.transitionId,
-          status: transition.status, // Use actual workflow status from API
-          action: transition.action,
-          remarks: transition.remarks,
-          currentRole: transition.currentRole,
-          nextRole: transition.nextRole,
-          createdBy: transition.createdBy,
-          createdDate: transition.createdDate,
-          workflowSequence: transition.workflowSequence,
-          assignedToUser: transition.assignedToUser,
-          // Map API fields to table fields
-          po_no: transition.poNo || '-',
-          vendor_name: cleanedVendorName,
-          product_type: transition.productType || '-',
-          call_date: transition.createdDate ? transition.createdDate.split('T')[0] : null,
-          desired_inspection_date: transition.desiredInspectionDate || null,
-        };
-      })
-    );
+      return {
+        id: transition.workflowTransitionId,
+        call_no: transition.requestId,
+        workflowId: transition.workflowId,
+        transitionId: transition.transitionId,
+        status: transition.status, // Use actual workflow status from API
+        action: transition.action,
+        remarks: transition.remarks,
+        currentRole: transition.currentRole,
+        nextRole: transition.nextRole,
+        createdBy: transition.createdBy,
+        createdDate: transition.createdDate,
+        workflowSequence: transition.workflowSequence,
+        assignedToUser: transition.assignedToUser,
+        // Map API fields to table fields
+        po_no: transition.poNo || '-',
+        vendor_name: vendorName,
+        product_type: transition.productType || '-',
+        call_date: transition.createdDate ? transition.createdDate.split('T')[0] : null,
+        desired_inspection_date: transition.desiredInspectionDate || null,
+      };
+    });
 
     const totalTime = performance.now() - startTime;
     console.log(`⚡ Total fetch time: ${totalTime.toFixed(0)}ms`);
