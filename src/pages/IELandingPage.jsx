@@ -404,11 +404,11 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         onClose={() => setNotification({ message: '', type: 'error' })}
       />
 
-      <div className="breadcrumb">
+      {/* <div className="breadcrumb">
         <div className="breadcrumb-item breadcrumb-active">Landing Page</div>
-      </div>
+      </div> */}
 
-      <h1 style={{ marginBottom: 'var(--space-24)' }}>IE Landing Page</h1>
+      <h1 style={{ marginBottom: 'var(--space-24)' }}>IE Dashboard</h1>
       
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
       

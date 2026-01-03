@@ -84,12 +84,25 @@ const AppLayout = () => {
     <div>
       <header className="app-header">
         <div className="header-left">
-          <div className="app-logo">SARTHI</div>
-          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+          <div className="brand-block">
+          <img
+            src="/sarthi-logo1.png"
+            alt="SARTHI Logo"
+            className="brand-logo"
+          />
+        </div>         
+          {/* <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
             {currentUser?.roleName === 'CM' ? 'Controlling Manager Dashboard' :
              currentUser?.roleName === 'CALL_DESK' ? 'Call Desk Dashboard' :
              currentUser?.roleName === 'Finance' ? 'Finance Dashboard' :
              'Inspection Engineer Dashboard'}
+          </div> */}
+
+          <div className="brand-text">
+            <div className="brand-title">SARTHI</div>
+            <div className="brand-subtitle">
+              System for Automated Review, Tracking & Holistic Inspection
+            </div>
           </div>
         </div>
         <div className="header-right">

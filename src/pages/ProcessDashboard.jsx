@@ -523,27 +523,45 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         });
 
         // Set mock production lines if not already set
-        if (initialProductionLines && initialProductionLines.length > 0) {
-          // Use provided production lines from wrapper
-          setLocalProductionLines(initialProductionLines);
-        } else if (availableCalls.length > 0) {
-          // Multi-call mode: create empty rows for each available call
-          setLocalProductionLines(availableCalls.map((_, idx) => ({
-            lineNumber: idx + 1,
-            icNumber: '',
-            poNumber: '',
-            rawMaterialICs: '',
-            productType: ''
-          })));
-        } else {
-          // Single call mode: create one production line with mock data
-          setLocalProductionLines([{
-            lineNumber: 1,
-            icNumber: call.call_no || '',
-            poNumber: call.po_no || mockPoData.po_no || '',
-            rawMaterialICs: 'RM-IC-001, RM-IC-002',
-            productType: 'ERC Process'
-          }]);
+        // Check sessionStorage first to avoid overwriting user's added lines
+        const savedLines = sessionStorage.getItem('processProductionLinesData');
+        let shouldSetProductionLines = true;
+
+        if (savedLines) {
+          try {
+            const parsed = JSON.parse(savedLines);
+            if (parsed && parsed.length > 0) {
+              // Data already exists in sessionStorage, don't overwrite
+              shouldSetProductionLines = false;
+            }
+          } catch (e) {
+            console.log('Error parsing saved production lines:', e);
+          }
+        }
+
+        if (shouldSetProductionLines) {
+          if (initialProductionLines && initialProductionLines.length > 0) {
+            // Use provided production lines from wrapper
+            setLocalProductionLines(initialProductionLines);
+          } else if (availableCalls.length > 0) {
+            // Multi-call mode: create empty rows for each available call
+            setLocalProductionLines(availableCalls.map((_, idx) => ({
+              lineNumber: idx + 1,
+              icNumber: '',
+              poNumber: '',
+              rawMaterialICs: '',
+              productType: ''
+            })));
+          } else {
+            // Single call mode: create one production line with mock data
+            setLocalProductionLines([{
+              lineNumber: 1,
+              icNumber: call.call_no || '',
+              poNumber: call.po_no || mockPoData.po_no || '',
+              rawMaterialICs: 'RM-IC-001, RM-IC-002',
+              productType: 'ERC Process'
+            }]);
+          }
         }
       } catch (error) {
         console.log('⚠️ Error loading mock data:', error.message);
@@ -787,39 +805,163 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const rawMaterialAccepted = 500; // Qty Accepted in Raw Material Stage
   const poOrderedQty = 450; // Qty Ordered in PO
 
-  // Sample stage results - auto-populated from sub-modules
-  const stageResults = {
-    shearing: { manufactured: 120, accepted: 115, rejected: 5 },
-    turning: { manufactured: 115, accepted: 112, rejected: 3 },
-    mpiTesting: { manufactured: 112, accepted: 110, rejected: 2 },
-    forging: { manufactured: 110, accepted: 108, rejected: 2 },
-    tempering: { manufactured: 108, accepted: 106, rejected: 2 },
-    dimensionsCheck: { manufactured: 106, accepted: 104, rejected: 2 },
-    hardnessCheck: { manufactured: 104, accepted: 102, rejected: 2 },
-    toeLoadCheck: { manufactured: 102, accepted: 100, rejected: 2 },
-    visualInspection: { manufactured: 100, accepted: 98, rejected: 2 }
+  // Manual entry state for "Manufactured" column
+  const [manufacturedQty, setManufacturedQty] = useState({
+    shearing: '',
+    turning: '',
+    mpiTesting: '',
+    forging: '',
+    quenching: '',
+    tempering: ''
+  });
+
+  // Helper function to validate manufactured quantity against rejected quantity
+  const handleManufacturedChange = (field, value, rejectedValue) => {
+    const numValue = parseInt(value) || 0;
+    const numRejected = rejectedValue || 0;
+
+    // If user enters a value less than rejected, show alert and don't update
+    if (value !== '' && numValue < numRejected) {
+      alert(`Manufactured quantity cannot be less than rejected quantity (${numRejected})`);
+      return;
+    }
+
+    // Update the state
+    setManufacturedQty(prev => ({ ...prev, [field]: value }));
   };
 
-  // Calculate grand totals
-  const grandTotals = {
-    manufactured: Object.values(stageResults).reduce((sum, s) => sum + s.manufactured, 0),
-    accepted: Object.values(stageResults).reduce((sum, s) => sum + s.accepted, 0),
-    rejected: Object.values(stageResults).reduce((sum, s) => sum + s.rejected, 0)
-  };
+  // Calculate rejected quantities from submodule localStorage data
+  const calculateRejectedFromSubmodule = useCallback((submoduleName, rejectedField = null) => {
+    const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
+    const prodLine = localProductionLines[currentLineIndex] || localProductionLines[0] || {};
+
+    // Get PO number - check multiple possible field names
+    const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
+    const inspectionCallNo = call?.call_no || '';
+
+    const allData = getAllProcessData(inspectionCallNo, poNo, selectedLine);
+
+    if (!allData || !allData[submoduleName]) {
+      console.log(`[${submoduleName}] No data found. Call: ${inspectionCallNo}, PO: ${poNo}, Line: ${selectedLine}`);
+      return 0;
+    }
+
+    const submoduleData = allData[submoduleName];
+    let totalRejected = 0;
+
+    // For 8-hour grid modules (shearing, turning, mpi, forging, quenching, tempering, finalCheck)
+    if (Array.isArray(submoduleData)) {
+      submoduleData.forEach((hourData) => {
+        // For Final Check section with specific rejected field
+        if (rejectedField && hourData[rejectedField] !== undefined && hourData[rejectedField] !== null) {
+          const num = parseInt(hourData[rejectedField]) || 0;
+          totalRejected += num;
+        }
+        // For other sections with rejectedQty field
+        else if (!rejectedField && hourData.rejectedQty !== undefined && hourData.rejectedQty !== null) {
+          // Handle different rejected quantity formats
+          if (Array.isArray(hourData.rejectedQty)) {
+            // Sum all rejected quantities in array
+            hourData.rejectedQty.forEach((qty) => {
+              const num = parseInt(qty) || 0;
+              totalRejected += num;
+            });
+          } else {
+            // Single rejected quantity value
+            const num = parseInt(hourData.rejectedQty) || 0;
+            totalRejected += num;
+          }
+        }
+      });
+    }
+
+    return totalRejected;
+  }, [call?.call_no, call?.po_no, selectedLine, localProductionLines]);
+
+  // Calculate rejected quantities for Final Check section (special handling for array field)
+  const calculateFinalCheckRejected = useCallback((arrayIndex) => {
+    const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
+    const prodLine = localProductionLines[currentLineIndex] || localProductionLines[0] || {};
+    const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
+    const inspectionCallNo = call?.call_no || '';
+
+    const allData = getAllProcessData(inspectionCallNo, poNo, selectedLine);
+
+    if (!allData || !allData.finalCheck) {
+      return 0;
+    }
+
+    const finalCheckData = allData.finalCheck;
+    let totalRejected = 0;
+
+    if (Array.isArray(finalCheckData)) {
+      finalCheckData.forEach((hourData) => {
+        if (hourData.rejectedNo && Array.isArray(hourData.rejectedNo) && hourData.rejectedNo[arrayIndex]) {
+          const num = parseInt(hourData.rejectedNo[arrayIndex]) || 0;
+          totalRejected += num;
+        }
+      });
+    }
+
+    return totalRejected;
+  }, [call?.call_no, call?.po_no, selectedLine, localProductionLines]);
+
+  // Calculate rejected quantities for each section
+  const rejectedQty = useMemo(() => {
+    const visualCheckRejected = calculateFinalCheckRejected(0); // rejectedNo[0] - Visual Check
+    const dimensionsCheckRejected = calculateFinalCheckRejected(1); // rejectedNo[1] - Dimension Check
+    const hardnessCheckRejected = calculateFinalCheckRejected(2); // rejectedNo[2] - Hardness Check
+
+    // Tempering rejected = sum of all Final Check rejected (Visual + Dimension + Hardness)
+    const temperingRejected = visualCheckRejected + dimensionsCheckRejected + hardnessCheckRejected;
+
+    return {
+      shearing: calculateRejectedFromSubmodule('shearing'),
+      turning: calculateRejectedFromSubmodule('turning'),
+      mpiTesting: calculateRejectedFromSubmodule('mpi'),
+      forging: calculateRejectedFromSubmodule('forging'),
+      quenching: calculateRejectedFromSubmodule('quenching'),
+      tempering: temperingRejected, // Calculated from Final Check section
+      visualCheck: visualCheckRejected,
+      dimensionsCheck: dimensionsCheckRejected,
+      hardnessCheck: hardnessCheckRejected
+    };
+  }, [calculateRejectedFromSubmodule, calculateFinalCheckRejected]);
+
+  // Calculate accepted quantities (Manufactured - Rejected)
+  const acceptedQty = useMemo(() => {
+    const calc = (manufactured, rejected) => {
+      const mfg = parseInt(manufactured) || 0;
+      const rej = rejected || 0;
+      return mfg > 0 ? mfg - rej : 0;
+    };
+
+    return {
+      shearing: calc(manufacturedQty.shearing, rejectedQty.shearing),
+      turning: calc(manufacturedQty.turning, rejectedQty.turning),
+      mpiTesting: calc(manufacturedQty.mpiTesting, rejectedQty.mpiTesting),
+      forging: calc(manufacturedQty.forging, rejectedQty.forging),
+      quenching: calc(manufacturedQty.quenching, rejectedQty.quenching),
+      tempering: calc(manufacturedQty.tempering, rejectedQty.tempering),
+      dimensionsCheck: 0, // Blank
+      hardnessCheck: 0, // Blank
+      visualCheck: 0 // Blank
+    };
+  }, [manufacturedQty, rejectedQty]);
+
+  // Calculate process inspection accepted (sum of all accepted quantities)
+  const processInspectionAccepted = useMemo(() => {
+    return acceptedQty.shearing + acceptedQty.turning + acceptedQty.mpiTesting +
+           acceptedQty.forging + acceptedQty.quenching + acceptedQty.tempering;
+  }, [acceptedQty]);
 
   // Validation checks
-  const processInspectionAccepted = grandTotals.accepted;
-  const finalInspectionAccepted = stageResults.visualInspection.accepted; // Last stage accepted
-
   const validationErrors = [];
   if (rawMaterialAccepted < processInspectionAccepted) {
     validationErrors.push('Qty Accepted in Raw Material Stage must be ≥ Qty Accepted in Process Inspection');
   }
-  if (processInspectionAccepted < finalInspectionAccepted) {
-    validationErrors.push('Qty Accepted in Process Inspection must be ≥ Qty Accepted in Final Inspection');
-  }
-  if (finalInspectionAccepted > poOrderedQty) {
-    validationErrors.push('Qty Accepted in Final Inspection must be ≤ Qty Ordered in PO');
+  if (processInspectionAccepted > poOrderedQty) {
+    validationErrors.push('Qty Accepted in Process Inspection must be ≤ Qty Ordered in PO');
   }
 
   // Handle line change - updates selected line tab
@@ -1232,19 +1374,19 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       {/* Final Inspection Results – Main Module (Auto Populated) */}
       <div className="card" style={{ marginTop: 'var(--space-24)', border: '2px solid #0d9488' }}>
         <div className="card-header" style={{ backgroundColor: '#f0fdfa' }}>
-          <h3 className="card-title" style={{ color: '#0d9488' }}>📊 Final Inspection Results – Main Module (Auto Populated)</h3>
-          <p className="card-subtitle">Summary of all stage-wise inspection results (Line-wise / Lot-wise / PO-wise / Total)</p>
+          <h3 className="card-title" style={{ color: '#0d9488' }}>📊 Final Inspection Results</h3>
+          {/* <p className="card-subtitle">Summary of all stage-wise inspection results (Line-wise / Lot-wise / PO-wise / Total)</p> */}
         </div>
 
         {/* Validation Alerts */}
-        {validationErrors.length > 0 && (
+        {/* {validationErrors.length > 0 && (
           <div className="alert alert-danger" style={{ margin: 'var(--space-16)', backgroundColor: '#fef2f2', border: '1px solid #ef4444' }}>
             <strong>⚠️ Validation Errors:</strong>
             <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
               {validationErrors.map((err, i) => <li key={i}>{err}</li>)}
             </ul>
           </div>
-        )}
+        )} */}
 
         {/* Context Info */}
         <div className="process-context-info" style={{ padding: 'var(--space-16)', backgroundColor: '#f8fafc', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-16)' }}>
@@ -1266,95 +1408,175 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         <div className="final-inspection-table-wrapper" style={{ overflowX: 'auto', padding: 'var(--space-16)' }}>
           <table className="data-table final-inspection-table">
             <thead>
-              <tr style={{ backgroundColor: '#0d9488', color: 'white' }}>
-                <th style={{ color: 'white' }}>S.No.</th>
-                <th style={{ color: 'white' }}>Stage / Section</th>
-                <th style={{ color: 'white' }}>Manufactured (pcs)</th>
-                <th style={{ color: 'white' }}>Accepted (pcs)</th>
-                <th style={{ color: 'white' }}>Rejected (pcs)</th>
-                <th style={{ color: 'white' }}>Acceptance %</th>
+              <tr style={{ backgroundColor: '#90EE90', color: '#000' }}>
+                <th style={{ color: '#000', width: '80px' }}>S.No.</th>
+                <th style={{ color: '#000', width: '200px' }}>Stage / Section</th>
+                <th style={{ color: '#000', width: '150px' }}>Manufactured</th>
+                <th style={{ color: '#000', width: '150px' }}>Accepted</th>
+                <th style={{ color: '#000', width: '150px' }}>Rejected</th>
               </tr>
             </thead>
             <tbody>
+              {/* 1. Shearing */}
               <tr>
                 <td data-label="S.No.">1</td>
                 <td data-label="Stage"><strong>Shearing</strong></td>
-                <td data-label="Manufactured">{stageResults.shearing.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.shearing.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.shearing.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.shearing.manufactured > 0 ? ((stageResults.shearing.accepted / stageResults.shearing.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Manufactured">
+                  <input
+                    type="text"
+                    value={manufacturedQty.shearing}
+                    onChange={(e) => handleManufacturedChange('shearing', e.target.value, rejectedQty.shearing)}
+                    style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                  />
+                </td>
+                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>
+                  {acceptedQty.shearing || '-'}
+                </td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.shearing || '-'}
+                </td>
               </tr>
+
+              {/* 2. Turning (Hydro Coping) */}
               <tr>
                 <td data-label="S.No.">2</td>
                 <td data-label="Stage"><strong>Turning (Hydro Coping)</strong></td>
-                <td data-label="Manufactured">{stageResults.turning.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.turning.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.turning.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.turning.manufactured > 0 ? ((stageResults.turning.accepted / stageResults.turning.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Manufactured">
+                  <input
+                    type="text"
+                    value={manufacturedQty.turning}
+                    onChange={(e) => handleManufacturedChange('turning', e.target.value, rejectedQty.turning)}
+                    style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                  />
+                </td>
+                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>
+                  {acceptedQty.turning || '-'}
+                </td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.turning || '-'}
+                </td>
               </tr>
+
+              {/* 3. MPI Testing */}
               <tr>
                 <td data-label="S.No.">3</td>
                 <td data-label="Stage"><strong>MPI Testing</strong></td>
-                <td data-label="Manufactured">{stageResults.mpiTesting.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.mpiTesting.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.mpiTesting.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.mpiTesting.manufactured > 0 ? ((stageResults.mpiTesting.accepted / stageResults.mpiTesting.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Manufactured">
+                  <input
+                    type="text"
+                    value={manufacturedQty.mpiTesting}
+                    onChange={(e) => handleManufacturedChange('mpiTesting', e.target.value, rejectedQty.mpiTesting)}
+                    style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                  />
+                </td>
+                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>
+                  {acceptedQty.mpiTesting || '-'}
+                </td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.mpiTesting || '-'}
+                </td>
               </tr>
+
+              {/* 4. Forging (Visual) */}
               <tr>
                 <td data-label="S.No.">4</td>
-                <td data-label="Stage"><strong>Forging</strong></td>
-                <td data-label="Manufactured">{stageResults.forging.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.forging.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.forging.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.forging.manufactured > 0 ? ((stageResults.forging.accepted / stageResults.forging.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Stage"><strong>Forging (Visual)</strong></td>
+                <td data-label="Manufactured">
+                  <input
+                    type="text"
+                    value={manufacturedQty.forging}
+                    onChange={(e) => handleManufacturedChange('forging', e.target.value, rejectedQty.forging)}
+                    style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                  />
+                </td>
+                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>
+                  {acceptedQty.forging || '-'}
+                </td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.forging || '-'}
+                </td>
               </tr>
+
+              {/* 5. Quenching */}
               <tr>
                 <td data-label="S.No.">5</td>
-                <td data-label="Stage"><strong>Tempering</strong></td>
-                <td data-label="Manufactured">{stageResults.tempering.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.tempering.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.tempering.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.tempering.manufactured > 0 ? ((stageResults.tempering.accepted / stageResults.tempering.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Stage"><strong>Quenching</strong></td>
+                <td data-label="Manufactured">
+                  <input
+                    type="text"
+                    value={manufacturedQty.quenching}
+                    onChange={(e) => handleManufacturedChange('quenching', e.target.value, rejectedQty.quenching)}
+                    style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                  />
+                </td>
+                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>
+                  {acceptedQty.quenching || '-'}
+                </td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.quenching || '-'}
+                </td>
               </tr>
+
+              {/* 6. Tempering */}
               <tr>
                 <td data-label="S.No.">6</td>
-                <td data-label="Stage"><strong>Dimensions Check</strong></td>
-                <td data-label="Manufactured">{stageResults.dimensionsCheck.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.dimensionsCheck.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.dimensionsCheck.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.dimensionsCheck.manufactured > 0 ? ((stageResults.dimensionsCheck.accepted / stageResults.dimensionsCheck.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Stage"><strong>Tempering</strong></td>
+                <td data-label="Manufactured">
+                  <input
+                    type="text"
+                    value={manufacturedQty.tempering}
+                    onChange={(e) => handleManufacturedChange('tempering', e.target.value, rejectedQty.tempering)}
+                    style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+                  />
+                </td>
+                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>
+                  {acceptedQty.tempering || '-'}
+                </td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.tempering || '-'}
+                </td>
               </tr>
+
+              {/* 7. Dimensions Check */}
               <tr>
                 <td data-label="S.No.">7</td>
-                <td data-label="Stage"><strong>Hardness of Finished ERC</strong></td>
-                <td data-label="Manufactured">{stageResults.hardnessCheck.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.hardnessCheck.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.hardnessCheck.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.hardnessCheck.manufactured > 0 ? ((stageResults.hardnessCheck.accepted / stageResults.hardnessCheck.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Stage"><strong>Dimensions Check</strong></td>
+                <td data-label="Manufactured">-</td>
+                <td data-label="Accepted">-</td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.dimensionsCheck || '-'}
+                </td>
               </tr>
+
+              {/* 8. Hardness Check */}
               <tr>
                 <td data-label="S.No.">8</td>
-                <td data-label="Stage"><strong>Toe Load of Finished ERC</strong></td>
-                <td data-label="Manufactured">{stageResults.toeLoadCheck.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.toeLoadCheck.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.toeLoadCheck.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.toeLoadCheck.manufactured > 0 ? ((stageResults.toeLoadCheck.accepted / stageResults.toeLoadCheck.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Stage"><strong>Hardness Check</strong></td>
+                <td data-label="Manufactured">-</td>
+                <td data-label="Accepted">-</td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.hardnessCheck || '-'}
+                </td>
               </tr>
+
+              {/* 9. Visual Check */}
               <tr>
                 <td data-label="S.No.">9</td>
-                <td data-label="Stage"><strong>Visual Inspection</strong></td>
-                <td data-label="Manufactured">{stageResults.visualInspection.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#22c55e', fontWeight: 600 }}>{stageResults.visualInspection.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>{stageResults.visualInspection.rejected}</td>
-                <td data-label="Acceptance %">{stageResults.visualInspection.manufactured > 0 ? ((stageResults.visualInspection.accepted / stageResults.visualInspection.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+                <td data-label="Stage"><strong>Visual Check</strong></td>
+                <td data-label="Manufactured">-</td>
+                <td data-label="Accepted">-</td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.visualCheck || '-'}
+                </td>
               </tr>
-              {/* Total Results Row */}
-              <tr className="total-row" style={{ backgroundColor: '#0d9488', color: 'white', fontWeight: 700 }}>
-                <td colSpan="2" data-label="Total" style={{ color: 'white' }}>TOTAL RESULTS</td>
-                <td data-label="Manufactured" style={{ color: 'white' }}>{grandTotals.manufactured}</td>
-                <td data-label="Accepted" style={{ color: '#a7f3d0' }}>{grandTotals.accepted}</td>
-                <td data-label="Rejected" style={{ color: '#fecaca' }}>{grandTotals.rejected}</td>
-                <td data-label="Acceptance %" style={{ color: 'white' }}>{grandTotals.manufactured > 0 ? ((grandTotals.accepted / grandTotals.manufactured) * 100).toFixed(1) + '%' : '-'}</td>
+
+              {/* 10. Accepted - Completely Blank Row */}
+              <tr>
+                <td data-label="S.No.">10</td>
+                <td data-label="Stage"><strong>Accepted</strong></td>
+                <td data-label="Manufactured">-</td>
+                <td data-label="Accepted">-</td>
+                <td data-label="Rejected">-</td>
               </tr>
             </tbody>
           </table>
