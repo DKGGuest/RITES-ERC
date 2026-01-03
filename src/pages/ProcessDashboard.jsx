@@ -815,19 +815,16 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     tempering: ''
   });
 
-  // Helper function to validate manufactured quantity against rejected quantity
-  const handleManufacturedChange = (field, value, rejectedValue) => {
+  // Helper function to validate manufactured quantity against rejected quantity (on blur)
+  const handleManufacturedBlur = (field, value, rejectedValue) => {
     const numValue = parseInt(value) || 0;
     const numRejected = rejectedValue || 0;
 
-    // If user enters a value less than rejected, show alert and don't update
+    // If user enters a value less than rejected, show alert and clear the field
     if (value !== '' && numValue < numRejected) {
-      alert(`Manufactured quantity cannot be less than rejected quantity (${numRejected})`);
-      return;
+      alert(`Manufactured quantity (${numValue}) cannot be less than rejected quantity (${numRejected})`);
+      setManufacturedQty(prev => ({ ...prev, [field]: '' }));
     }
-
-    // Update the state
-    setManufacturedQty(prev => ({ ...prev, [field]: value }));
   };
 
   // Calculate rejected quantities from submodule localStorage data
@@ -1425,7 +1422,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.shearing}
-                    onChange={(e) => handleManufacturedChange('shearing', e.target.value, rejectedQty.shearing)}
+                    onChange={(e) => setManufacturedQty(prev => ({ ...prev, shearing: e.target.value }))}
+                    onBlur={(e) => handleManufacturedBlur('shearing', e.target.value, rejectedQty.shearing)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
                 </td>
@@ -1445,7 +1443,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.turning}
-                    onChange={(e) => handleManufacturedChange('turning', e.target.value, rejectedQty.turning)}
+                    onChange={(e) => setManufacturedQty(prev => ({ ...prev, turning: e.target.value }))}
+                    onBlur={(e) => handleManufacturedBlur('turning', e.target.value, rejectedQty.turning)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
                 </td>
@@ -1465,7 +1464,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.mpiTesting}
-                    onChange={(e) => handleManufacturedChange('mpiTesting', e.target.value, rejectedQty.mpiTesting)}
+                    onChange={(e) => setManufacturedQty(prev => ({ ...prev, mpiTesting: e.target.value }))}
+                    onBlur={(e) => handleManufacturedBlur('mpiTesting', e.target.value, rejectedQty.mpiTesting)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
                 </td>
@@ -1485,7 +1485,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.forging}
-                    onChange={(e) => handleManufacturedChange('forging', e.target.value, rejectedQty.forging)}
+                    onChange={(e) => setManufacturedQty(prev => ({ ...prev, forging: e.target.value }))}
+                    onBlur={(e) => handleManufacturedBlur('forging', e.target.value, rejectedQty.forging)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
                 </td>
@@ -1505,7 +1506,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.quenching}
-                    onChange={(e) => handleManufacturedChange('quenching', e.target.value, rejectedQty.quenching)}
+                    onChange={(e) => setManufacturedQty(prev => ({ ...prev, quenching: e.target.value }))}
+                    onBlur={(e) => handleManufacturedBlur('quenching', e.target.value, rejectedQty.quenching)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
                 </td>
@@ -1525,7 +1527,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.tempering}
-                    onChange={(e) => handleManufacturedChange('tempering', e.target.value, rejectedQty.tempering)}
+                    onChange={(e) => setManufacturedQty(prev => ({ ...prev, tempering: e.target.value }))}
+                    onBlur={(e) => handleManufacturedBlur('tempering', e.target.value, rejectedQty.tempering)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
                 </td>
