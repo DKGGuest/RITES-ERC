@@ -267,9 +267,10 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // Handle Start/Resume button - calls Azure API when status is IE_SCHEDULED
   const handleStart = async (call) => {
     console.log('🔍 handleStart called for:', call.call_no);
+    console.log('🔍 Call status:', call.status);
 
-    // Check if call is already initiated (has inspection data stored)
-    const alreadyInitiated = isCallInitiated(call.call_no);
+    // Check if call is already initiated (has inspection data stored OR status is VERIFY_PO_DETAILS)
+    const alreadyInitiated = isCallInitiated(call.call_no) || call.status === 'VERIFY_PO_DETAILS';
     console.log('📊 Already initiated?', alreadyInitiated);
 
     // If already initiated, navigate directly to dashboard (RESUME flow)
