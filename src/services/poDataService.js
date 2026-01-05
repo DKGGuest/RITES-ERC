@@ -6,11 +6,11 @@
  * All endpoints require JWT authentication
  */
 
-// // Local API URL for PO Data (fetching from local database)
+// LOCAL BACKEND URL - For Raw Material Inspection Initiation & Dashboard only
 // const API_ROOT = 'http://localhost:8080/sarthi-backend';
 // const API_BASE_URL = `${API_ROOT}/api/po-data`;
 
-// Azure API URL (commented out - uncomment for production)
+// AZURE BACKEND URL (Swagger) - Commented for temporary local development
 const API_ROOT = process.env.REACT_APP_API_URL || 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 const API_BASE_URL = `${API_ROOT}/api/po-data`;
 

@@ -10,6 +10,7 @@
 
 import { getAuthToken, getStoredUser } from './authService';
 import { cleanVendorName } from './poDataService';
+import { processVendorName } from '../utils/vendorMapper';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL ||
   'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
@@ -151,9 +152,10 @@ export const fetchPendingWorkflowTransitions = async (roleName, forceRefresh = f
  * - Uses vendor name directly from workflow API (no additional PO API calls)
  * - Timeout handling for Azure API
  *
+ * @param {boolean} forceRefresh - Force refresh from API (skip cache)
  * @returns {Promise<Array>} Filtered list of pending workflow transitions
  */
-export const fetchUserPendingCalls = async () => {
+export const fetchUserPendingCalls = async (forceRefresh = false) => {
   const startTime = performance.now();
 
   try {
@@ -166,7 +168,7 @@ export const fetchUserPendingCalls = async () => {
     const userId = parseInt(user.userId, 10);
 
     console.log('⏱️ Fetching workflow transitions from Azure...');
-    const allTransitions = await fetchPendingWorkflowTransitions(roleName);
+    const allTransitions = await fetchPendingWorkflowTransitions(roleName, forceRefresh);
     const fetchTime = performance.now() - startTime;
     console.log(`✅ Workflow transitions fetched in ${fetchTime.toFixed(0)}ms`);
 
@@ -179,9 +181,13 @@ export const fetchUserPendingCalls = async () => {
 
     // Transform API response - use vendor name directly from workflow API
     const transformedCalls = userTransitions.map((transition) => {
-      // Use vendor name from API response; if missing, show required fallback as-is
+      // Process vendor name - handle vendor codes (e.g., ":13104") and regular names
       let vendorName = transition.vendorName;
+
       if (vendorName && typeof vendorName === 'string' && vendorName.trim() !== '') {
+        // First, check if it's a vendor code and convert it
+        vendorName = processVendorName(vendorName);
+        // Then clean the vendor name (remove extra spaces, etc.)
         vendorName = cleanVendorName(vendorName);
       } else {
         // Explicit fallback when vendor name is null/empty per requirement

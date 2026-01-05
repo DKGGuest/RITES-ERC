@@ -149,7 +149,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               bpo: poDataFromDb.billPayingOfficer,
               cond_title: poDataFromDb.condTitle,
               cond_text: poDataFromDb.condText,
-              po_cond_sr_no: poDataFromDb.poCondSrNo
+              po_cond_sr_no: poDataFromDb.poCondSrNo,
+              erc_type: poDataFromDb.ercType, // NEW: Type of ERC from inspection_calls
+              total_offered_qty_mt: poDataFromDb.totalOfferedQtyMt // NEW: Call Qty from rm_inspection_details
             };
 
             setFetchedPoData(transformedPoData);
@@ -339,6 +341,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
 
   /* Handle Section A OK/Not OK - Azure API Integration */
   const handleSectionAApprove = async () => {
+    console.log('🟢 [Section A] OK Button Clicked');
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -350,6 +353,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         productType.includes('Process') ||
         productType.includes('Final');
 
+      console.log('📋 [Section A] Product Type:', productType);
+      console.log('📋 [Section A] Is Process/Final?', isProcessOrFinal);
+
       if (isProcessOrFinal) {
         console.log('🏭 Process/Final Product: Section A approved (no API call)');
         // Just update local state - no API calls
@@ -358,6 +364,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           setSectionBExpanded(true);
         }
       } else {
+        console.log('🔧 Raw Material: Calling Section A APIs...');
         // Raw Material: Call real APIs
         const currentUser = getStoredUser();
         const userId = currentUser?.userId || 0;
@@ -372,15 +379,22 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           pincode: '560001'
         };
 
+        console.log('📤 [Section A] Calling performTransitionAction...');
         await performTransitionAction(actionData);
+        console.log('✅ [Section A] performTransitionAction completed');
 
         // Persist Section A to backend and mark approved
         try {
           const payload = buildSectionAPayload();
+          console.log('📤 [Section A] Calling saveSectionA with payload:', payload);
           await saveSectionA(payload);
+          console.log('✅ [Section A] saveSectionA completed');
+
+          console.log('📤 [Section A] Calling approveSectionA...');
           await approveSectionA(call.call_no);
+          console.log('✅ [Section A] approveSectionA completed');
         } catch (e) {
-          console.warn('Section A save/approve failed:', e);
+          console.error('❌ [Section A] save/approve failed:', e);
         }
 
         onFormDataChange({ sectionAVerified: true, sectionAStatus: 'approved' });
@@ -389,10 +403,11 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         }
       }
     } catch (error) {
-      console.error('Error saving Section A:', error);
+      console.error('❌ [Section A] Error saving Section A:', error);
       setSaveError(error.message || 'Failed to save Section A. Please try again.');
     } finally {
       setIsSaving(false);
+      console.log('🏁 [Section A] handleSectionAApprove completed');
     }
   };
 
@@ -452,6 +467,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
 
   /* Handle Section B OK/Not OK - Azure API Integration */
   const handleSectionBApprove = async () => {
+    console.log('🟢 [Section B] OK Button Clicked');
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -463,6 +479,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         productType.includes('Process') ||
         productType.includes('Final');
 
+      console.log('📋 [Section B] Product Type:', productType);
+      console.log('📋 [Section B] Is Process/Final?', isProcessOrFinal);
+
       if (isProcessOrFinal) {
         console.log('🏭 Process/Final Product: Section B approved (no API call)');
         // Just update local state - no API calls
@@ -473,6 +492,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           setSectionCExpanded(true);
         }
       } else {
+        console.log('🔧 Raw Material: Calling Section B APIs...');
         // Raw Material: Call real APIs
         const currentUser = getStoredUser();
         const userId = currentUser?.userId || 0;
@@ -487,15 +507,22 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           pincode: '560001'
         };
 
+        console.log('📤 [Section B] Calling performTransitionAction...');
         await performTransitionAction(actionData);
+        console.log('✅ [Section B] performTransitionAction completed');
 
         // Persist Section B to backend and mark approved
         try {
           const payload = buildSectionBPayload();
+          console.log('📤 [Section B] Calling saveSectionB with payload:', payload);
           await saveSectionB(payload);
+          console.log('✅ [Section B] saveSectionB completed');
+
+          console.log('📤 [Section B] Calling approveSectionB...');
           await approveSectionB(call.call_no);
+          console.log('✅ [Section B] approveSectionB completed');
         } catch (e) {
-          console.warn('Section B save/approve failed:', e);
+          console.error('❌ [Section B] save/approve failed:', e);
         }
 
         onFormDataChange({ sectionBVerified: true, sectionBStatus: 'approved' });
@@ -569,6 +596,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
 
   /* Handle Section C OK/Not OK - Azure API Integration */
   const handleSectionCApprove = async () => {
+    console.log('🟢 [Section C] OK Button Clicked');
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -578,11 +606,15 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         productType === 'PROCESS_MATERIAL' ||
         productType.includes('Process');
 
+      console.log('📋 [Section C] Product Type:', productType);
+      console.log('📋 [Section C] Is Process Material?', isProcessMaterial);
+
       if (isProcessMaterial) {
         console.log('🏭 Process Material: Section C approved (no API call)');
         // Just update local state - no API calls
         onFormDataChange({ sectionCVerified: true, sectionCStatus: 'approved' });
       } else {
+        console.log('🔧 Raw Material: Calling Section C APIs...');
         // Raw Material: Call real APIs
         const currentUser = getStoredUser();
         const userId = currentUser?.userId || 0;
@@ -597,15 +629,22 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           pincode: '560001'
         };
 
+        console.log('📤 [Section C] Calling performTransitionAction...');
         await performTransitionAction(actionData);
+        console.log('✅ [Section C] performTransitionAction completed');
 
         // Persist Section C batch and mark approved
         try {
           const payload = buildSectionCPayload();
+          console.log('📤 [Section C] Calling saveSectionCBatch with payload:', payload);
           await saveSectionCBatch(payload);
+          console.log('✅ [Section C] saveSectionCBatch completed');
+
+          console.log('📤 [Section C] Calling approveAllSectionC...');
           await approveAllSectionC(call.call_no);
+          console.log('✅ [Section C] approveAllSectionC completed');
         } catch (e) {
-          console.warn('Section C save/approve failed:', e);
+          console.error('❌ [Section C] save/approve failed:', e);
         }
 
         onFormDataChange({ sectionCVerified: true, sectionCStatus: 'approved' });
@@ -822,10 +861,10 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             <label className="form-label">PRODUCT TYPE</label>
             <input type="text" className="form-input" value={getProductTypeDisplayName(call.product_type)} disabled />
           </div>
-          {/* New Field: Type of ERC (Vendor-entered / from DB). For now, show static value until API integration */}
+          {/* Type of ERC - fetched from inspection_calls.erc_type via API */}
           <div className="form-group">
             <label className="form-label">TYPE OF ERC</label>
-            <input type="text" className="form-input" value="MK- III" disabled />
+            <input type="text" className="form-input" value={poData.erc_type || 'N/A'} disabled />
           </div>
           <div className="form-group">
             <label className="form-label">PO_QTY + UNIT</label>
@@ -857,7 +896,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           </div>
           <div className="form-group">
             <label className="form-label">CALL QTY</label>
-            <input type="text" className="form-input" value={call.call_qty || 'N/A'} disabled />
+            <input type="text" className="form-input" value={poData.total_offered_qty_mt || call.call_qty || 'N/A'} disabled />
           </div>
           <div className="form-group">
             <label className="form-label">PLACE OF INSPECTION</label>
