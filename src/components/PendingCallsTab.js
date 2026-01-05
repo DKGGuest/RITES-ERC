@@ -5,6 +5,7 @@ import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import { createStageValidationHandler, stageReverseMapping } from '../utils/stageValidation';
 import { getAllSchedules } from '../services/scheduleService';
+import { getDisplayStatus, isCallPaused, isCallInitiated } from '../services/callStatusService';
 
 // Responsive styles for mobile
 const responsiveStyles = `
@@ -242,7 +243,14 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
     { key: 'call_date', label: 'Call Date', render: (val) => formatDate(val) },
     { key: 'desired_inspection_date', label: 'Desired Inspection Date', render: (val) => formatDate(val) },
     { key: 'scheduled_date', label: 'Scheduled Date', render: (val, row) => getScheduledDate(row.call_no) },
-    { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (val, row) => {
+        const displayStatus = getDisplayStatus(row.call_no, isScheduled(row.call_no));
+        return <StatusBadge status={displayStatus} />;
+      }
+    },
   ];
 
   const selectedCallsData = filteredCalls.filter(call => selectedRows.includes(call.id));
@@ -274,21 +282,25 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
 
   // Show individual actions only when exactly one row is selected
   // If not scheduled: show SCHEDULE only
-  // If scheduled: show RESCHEDULE and START
-  const actions = selectedRows.length === 1 ? (row) => (
-    selectedRows.includes(row.id) ? (
+  // If scheduled: show RESCHEDULE and START/RESUME
+  const actions = selectedRows.length === 1 ? (row) => {
+    const isPausedOrUnderInspection = isCallPaused(row.call_no) || isCallInitiated(row.call_no);
+
+    return selectedRows.includes(row.id) ? (
       <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
         {!isScheduled(row.call_no) ? (
           <button className="btn btn-sm btn-secondary" onClick={() => onSchedule(row, refreshSchedules)}>SCHEDULE</button>
         ) : (
           <>
             <button className="btn btn-sm btn-secondary" onClick={() => onReschedule(row, refreshSchedules)}>RESCHEDULE</button>
-            <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>START</button>
+            <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>
+              {isPausedOrUnderInspection ? 'RESUME' : 'START'}
+            </button>
           </>
         )}
       </div>
-    ) : null
-  ) : null;
+    ) : null;
+  } : null;
 
   // Separate selected calls into scheduled and unscheduled
   const scheduledCallsData = selectedCallsData.filter(call => isScheduled(call.call_no));

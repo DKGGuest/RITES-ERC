@@ -1,8 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import FormField from "../components/FormField";
 import { MOCK_PO_DATA } from "../data/mockData";
 import { formatDate } from "../utils/helpers";
+import { markAsWithheld } from '../services/callStatusService';
 import "./FinalProductDashboard.css";
+
+// Reason options for withheld inspection
+const WITHHELD_REASONS = [
+  { value: '', label: 'Select Reason *' },
+  { value: 'MATERIAL_NOT_AVAILABLE', label: 'Full quantity of material not available with firm at the time of inspection' },
+  { value: 'PLACE_NOT_AS_PER_PO', label: 'Place of inspection is not as per the PO' },
+  { value: 'VENDOR_WITHDRAWN', label: 'Vendor has withdrawn the inspection call' },
+  { value: 'ANY_OTHER', label: 'Any other' },
+];
+
+// localStorage key for dashboard draft data
+const DASHBOARD_DRAFT_KEY = 'fp_dashboard_draft_';
 
 export default function FinalProductDashboard({ onBack, onNavigateToSubModule }) {
   const poData = MOCK_PO_DATA["PO-2025-1001"];
@@ -123,6 +136,15 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   const [packedInHDPE, setPackedInHDPE] = useState(false);
   const [cleanedWithCoating, setCleanedWithCoating] = useState(false);
 
+  /* Save Draft state */
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  /* Withheld modal state */
+  const [showWithheldModal, setShowWithheldModal] = useState(false);
+  const [withheldReason, setWithheldReason] = useState('');
+  const [withheldRemarks, setWithheldRemarks] = useState('');
+  const [withheldError, setWithheldError] = useState('');
+
   /* -------------------- SUBMODULE LIST -------------------- */
   const SUBMODULES = [
     { key: "final-calibration-documents", icon: "📄", title: "Calibration & Documents", desc: "Verify calibration" },
@@ -192,6 +214,114 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       return { ...prev, [lotNo]: { ...prev[lotNo], holograms: arr } };
     });
   };
+
+  /* -------------------- WITHHELD MODAL HANDLERS -------------------- */
+  const handleOpenWithheldModal = () => {
+    setWithheldReason('');
+    setWithheldRemarks('');
+    setWithheldError('');
+    setShowWithheldModal(true);
+  };
+
+  const handleCloseWithheldModal = () => {
+    setShowWithheldModal(false);
+    setWithheldReason('');
+    setWithheldRemarks('');
+    setWithheldError('');
+  };
+
+  const handleSubmitWithheld = async () => {
+    if (!withheldReason) {
+      setWithheldError('Please select a reason');
+      return;
+    }
+    if (withheldReason === 'ANY_OTHER' && !withheldRemarks.trim()) {
+      setWithheldError('Please provide remarks for "Any other" reason');
+      return;
+    }
+
+    try {
+      // Note: FinalProductDashboard doesn't have call object, using mock data
+      const callNo = 'FP-MOCK-001'; // Replace with actual call number when available
+
+      const actionData = {
+        callNo: callNo,
+        actionType: 'WITHHELD',
+        reason: withheldReason,
+        remarks: withheldRemarks.trim(),
+        status: 'WITHHELD',
+        actionDate: new Date().toISOString()
+      };
+
+      console.log('🏭 Final Product: Withheld saved to localStorage only (no API call)');
+      console.log('Withheld Data:', actionData);
+
+      // Mark call as withheld in local storage
+      markAsWithheld(callNo, withheldRemarks.trim());
+
+      // Clear draft data
+      localStorage.removeItem(`${DASHBOARD_DRAFT_KEY}${callNo}`);
+
+      alert('✅ Inspection has been withheld successfully');
+      handleCloseWithheldModal();
+      onBack();
+    } catch (error) {
+      console.error('Error withholding inspection:', error);
+      setWithheldError('Failed to save. Please try again.');
+    }
+  };
+
+  /* -------------------- SAVE DRAFT HANDLER -------------------- */
+  const handleSaveDraft = useCallback(() => {
+    const callNo = 'FP-MOCK-001'; // Replace with actual call number when available
+
+    setIsSavingDraft(true);
+
+    try {
+      // Collect all dashboard form data
+      const draftData = {
+        savedAt: new Date().toISOString(),
+        lotInspectionData: lotInspectionData,
+        packedInHDPE: packedInHDPE,
+        cleanedWithCoating: cleanedWithCoating
+      };
+
+      // Save to localStorage with call number as key
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${callNo}`;
+      localStorage.setItem(storageKey, JSON.stringify(draftData));
+
+      alert(`✅ Draft saved successfully at ${new Date().toLocaleTimeString()}`);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert(`Failed to save draft: ${error.message}`);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }, [lotInspectionData, packedInHDPE, cleanedWithCoating]);
+
+  // Load draft data from localStorage on mount
+  useEffect(() => {
+    const callNo = 'FP-MOCK-001'; // Replace with actual call number when available
+
+    try {
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${callNo}`;
+      const savedDraft = localStorage.getItem(storageKey);
+
+      if (savedDraft) {
+        const draftData = JSON.parse(savedDraft);
+        console.log('📦 Loading draft data from localStorage:', draftData);
+
+        // Restore form data
+        if (draftData.lotInspectionData) setLotInspectionData(draftData.lotInspectionData);
+        if (draftData.packedInHDPE !== undefined) setPackedInHDPE(draftData.packedInHDPE);
+        if (draftData.cleanedWithCoating !== undefined) setCleanedWithCoating(draftData.cleanedWithCoating);
+
+        console.log('✅ Draft data loaded successfully');
+      }
+    } catch (error) {
+      console.error('Error loading draft data:', error);
+    }
+  }, []);
 
   /* -------------------- MAIN JSX -------------------- */
   return (
@@ -587,13 +717,68 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
 
         {/* ACTION BUTTONS */}
         <div className="fp-actions">
-          <button className="btn btn-outline">Save Draft</button>
+          <button
+            className="btn btn-outline"
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft}
+          >
+            {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
+          </button>
           <button className="btn btn-outline">Pause Inspection</button>
-          <button className="btn btn-outline">Withheld Inspection</button>
+          <button className="btn btn-outline" onClick={handleOpenWithheldModal}>Withheld Inspection</button>
           <button className="btn btn-primary">Finish Inspection</button>
         </div>
       </div>
 
+      {/* Withheld Modal */}
+      {showWithheldModal && (
+        <div className="modal-overlay" onClick={handleCloseWithheldModal}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Withheld Inspection</h3>
+              <button className="modal-close" onClick={handleCloseWithheldModal}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-field">
+                <label className="modal-label">Reason <span className="required">*</span></label>
+                <select
+                  className="modal-select"
+                  value={withheldReason}
+                  onChange={(e) => { setWithheldReason(e.target.value); setWithheldError(''); }}
+                >
+                  {WITHHELD_REASONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {withheldReason === 'ANY_OTHER' && (
+                <div className="modal-field">
+                  <label className="modal-label">Remarks <span className="required">*</span></label>
+                  <textarea
+                    className="modal-textarea"
+                    placeholder="Please provide details..."
+                    value={withheldRemarks}
+                    onChange={(e) => { setWithheldRemarks(e.target.value); setWithheldError(''); }}
+                  />
+                </div>
+              )}
+
+              {withheldError && <div className="modal-error">{withheldError}</div>}
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary modal-actions__btn" onClick={handleCloseWithheldModal}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-warning modal-actions__btn" onClick={handleSubmitWithheld}>
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* RETURN */}
       <button className="btn btn-secondary fp-return" onClick={onBack}>

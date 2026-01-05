@@ -12,6 +12,7 @@ import { scheduleInspection, rescheduleInspection, getScheduleByCallNo, validate
 import { raiseBill, updateBillingStatus, approvePayment, BILLING_STATUS } from '../services/billingService';
 import { getStoredUser } from '../services/authService';
 import { fetchUserPendingCalls, performTransitionAction, clearWorkflowCache } from '../services/workflowService';
+import { markAsScheduled, isCallInitiated, getCallStatusData } from '../services/callStatusService';
 
 const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending' }) => {
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -212,6 +213,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
             createdBy: userId
           };
           await scheduleInspection(scheduleData);
+          // Mark call as scheduled in local storage
+          markAsScheduled(call.call_no, scheduleDate);
         }
       } else {
         // Single call scheduling
@@ -228,6 +231,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         } else {
           await scheduleInspection(scheduleData);
         }
+        // Mark call as scheduled in local storage
+        markAsScheduled(selectedCallLocal?.call_no, scheduleDate);
       }
 
       // Show success notification
@@ -259,8 +264,92 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     }
   };
 
-  // Handle Start button - calls Azure API when status is IE_SCHEDULED
+  // Handle Start/Resume button - calls Azure API when status is IE_SCHEDULED
   const handleStart = async (call) => {
+    console.log('🔍 handleStart called for:', call.call_no);
+
+    // Check if call is already initiated (has inspection data stored)
+    const alreadyInitiated = isCallInitiated(call.call_no);
+    console.log('📊 Already initiated?', alreadyInitiated);
+
+    // If already initiated, navigate directly to dashboard (RESUME flow)
+    if (alreadyInitiated) {
+      console.log('✅ RESUME flow - navigating to dashboard');
+
+      // Try to get shift and date from various storage locations
+      let shiftOfInspection = sessionStorage.getItem('inspectionShift');
+      let dateOfInspection = sessionStorage.getItem('inspectionDate');
+
+      // If not in sessionStorage, try to get from initiation data
+      if (!shiftOfInspection || !dateOfInspection) {
+        const initiationKey = `inspection_initiation_${call.call_no}`;
+        const initiationData = sessionStorage.getItem(initiationKey);
+        if (initiationData) {
+          try {
+            const data = JSON.parse(initiationData);
+            shiftOfInspection = data.shiftOfInspection;
+            dateOfInspection = data.dateOfInspection;
+            console.log('📝 Found shift/date in initiation data:', { shiftOfInspection, dateOfInspection });
+          } catch (e) {
+            console.error('Error parsing initiation data:', e);
+          }
+        }
+      }
+
+      // If not found, try from call status metadata
+      if (!shiftOfInspection || !dateOfInspection) {
+        const callData = getCallStatusData(call.call_no);
+        if (callData?.metadata) {
+          shiftOfInspection = callData.metadata.shiftOfInspection;
+          dateOfInspection = callData.metadata.dateOfInspection;
+          console.log('📝 Found shift/date in call status metadata:', { shiftOfInspection, dateOfInspection });
+        }
+      }
+
+      // Store shift and date in sessionStorage for dashboard to use
+      if (shiftOfInspection && dateOfInspection) {
+        sessionStorage.setItem('inspectionShift', shiftOfInspection);
+        sessionStorage.setItem('inspectionDate', dateOfInspection);
+        console.log('💾 Stored shift/date in sessionStorage');
+      }
+
+      // Navigate directly to dashboard based on product type
+      const productType = call.product_type;
+      console.log('🚀 Navigating to dashboard for product type:', productType);
+      console.log('📞 Call object:', call);
+      console.log('🔧 setSelectedCall function:', typeof setSelectedCall);
+      console.log('🔧 setCurrentPage function:', typeof setCurrentPage);
+
+      // Set the selected call first
+      setSelectedCall(call);
+      console.log('✅ setSelectedCall called');
+
+      // Then navigate based on product type (handle both formats)
+      const productTypeLower = productType?.toLowerCase() || '';
+
+      if (productTypeLower.includes('raw') || productType === 'ERC-RAW MATERIAL') {
+        console.log('➡️ Calling setCurrentPage("rm-dashboard")');
+        setCurrentPage('rm-dashboard');
+        console.log('✅ setCurrentPage called for rm-dashboard');
+      } else if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
+        console.log('➡️ Calling setCurrentPage("process-dashboard")');
+        setCurrentPage('process-dashboard');
+        console.log('✅ setCurrentPage called for process-dashboard');
+      } else if (productTypeLower.includes('final') || productType === 'ERC-FINAL PRODUCT') {
+        console.log('➡️ Calling setCurrentPage("final-dashboard")');
+        setCurrentPage('final-dashboard');
+        console.log('✅ setCurrentPage called for final-dashboard');
+      } else {
+        console.error('❌ Unknown product type:', productType);
+      }
+      return;
+    }
+
+    console.log('🆕 START flow - navigating to initiation page');
+
+    // Not initiated yet - proceed with normal START flow
+    // DO NOT mark as under inspection here - it will be marked when user enters shift/date
+
     // Only call Azure API if status is IE_SCHEDULED
     if (call.status === 'IE_SCHEDULED') {
       try {

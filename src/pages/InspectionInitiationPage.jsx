@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
 import { saveInspectionInitiation } from '../services/vendorInspectionService';
+import { markAsUnderInspection, markAsWithheld } from '../services/callStatusService';
 import '../styles/inspectionInitiationPage.css';
 
 // Helper to check if call is Process or Final Product (mock mode)
@@ -262,6 +263,11 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
         alert(`Call ${callActionType === 'WITHHELD' ? 'withheld' : 'cancelled'} successfully`);
       }
 
+      // Mark call as withheld in local storage
+      if (callActionType === 'WITHHELD') {
+        markAsWithheld(call.call_no, callActionRemarks.trim());
+      }
+
       handleCloseCallActionModal();
       onBack();
     } catch (error) {
@@ -338,6 +344,9 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
         // Raw Material: Call real API
         await saveInspectionInitiation(initiationData);
       }
+
+      // Mark call as under inspection in local storage
+      markAsUnderInspection(call.call_no, { shiftOfInspection, dateOfInspection });
 
       handleCloseInitiateModal();
       onProceed(call.product_type, shiftOfInspection, dateOfInspection);

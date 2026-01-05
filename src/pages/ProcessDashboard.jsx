@@ -4,6 +4,16 @@ import { formatDate } from '../utils/helpers';
 import { finishProcessInspection } from '../services/processMaterialService';
 import { getAllProcessData, clearAllProcessData } from '../services/processLocalStorageService';
 import { MOCK_PO_DATA } from '../data/mockData';
+import { markAsPaused, markAsWithheld } from '../services/callStatusService';
+
+// Reason options for withheld call
+const WITHHELD_REASONS = [
+  { value: '', label: 'Select Reason *' },
+  { value: 'MATERIAL_NOT_AVAILABLE', label: 'Full quantity of material not available with firm at the time of inspection' },
+  { value: 'PLACE_NOT_AS_PER_PO', label: 'Place of inspection is not as per the PO' },
+  { value: 'VENDOR_WITHDRAWN', label: 'Vendor has withdrawn the inspection call' },
+  { value: 'ANY_OTHER', label: 'Any other' },
+];
 
 // localStorage key for dashboard draft data
 const DASHBOARD_DRAFT_KEY = 'process_dashboard_draft_';
@@ -597,6 +607,12 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const [draftSaveMessage, setDraftSaveMessage] = useState({ type: '', text: '' });
   const draftMessageTimeoutRef = useRef(null);
 
+  // Withheld modal state
+  const [showWithheldModal, setShowWithheldModal] = useState(false);
+  const [withheldReason, setWithheldReason] = useState('');
+  const [withheldRemarks, setWithheldRemarks] = useState('');
+  const [withheldError, setWithheldError] = useState('');
+
   // Persist final inspection remarks
   useEffect(() => {
     sessionStorage.setItem('processFinalInspectionRemarks', finalInspectionRemarks);
@@ -800,6 +816,65 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       setIsSaving(false);
     }
   }, [call?.call_no, manufacturingLines, localProductionLines, finalInspectionRemarks, clearProcessInspectionData, onBack]);
+
+  // Withheld modal handlers
+  const handleOpenWithheldModal = () => {
+    setWithheldReason('');
+    setWithheldRemarks('');
+    setWithheldError('');
+    setShowWithheldModal(true);
+  };
+
+  const handleCloseWithheldModal = () => {
+    setShowWithheldModal(false);
+    setWithheldReason('');
+    setWithheldRemarks('');
+    setWithheldError('');
+  };
+
+  const handleSubmitWithheld = async () => {
+    if (!withheldReason) {
+      setWithheldError('Please select a reason');
+      return;
+    }
+    if (withheldReason === 'ANY_OTHER' && !withheldRemarks.trim()) {
+      setWithheldError('Please provide remarks for "Any other" reason');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const actionData = {
+        inspectionRequestId: call?.api_id || null,
+        callNo: call?.call_no,
+        poNo: call?.po_no,
+        actionType: 'WITHHELD',
+        reason: withheldReason,
+        remarks: withheldRemarks.trim(),
+        status: 'WITHHELD',
+        actionDate: new Date().toISOString()
+      };
+
+      // Process Material: Save to localStorage only (no API call)
+      console.log('🏭 Process Material: Withheld saved to localStorage only (no API call)');
+      console.log('Withheld Data:', actionData);
+
+      // Mark call as withheld in local storage
+      markAsWithheld(call?.call_no, withheldRemarks.trim());
+
+      // Clear all inspection data
+      clearProcessInspectionData();
+
+      alert('✅ Inspection has been withheld successfully');
+      handleCloseWithheldModal();
+      onBack();
+    } catch (error) {
+      console.error('Error withholding inspection:', error);
+      setWithheldError('Failed to save. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Sample data - would be auto-fetched from sub-modules in real app
   const rawMaterialAccepted = 500; // Qty Accepted in Raw Material Stage
@@ -1657,16 +1732,21 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           >
             {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
           </button>
-          <button className="btn btn-outline">Pause Inspection</button>
           <button
             className="btn btn-outline"
             onClick={() => {
-              if (window.confirm('Are you sure you want to withhold this inspection? All unsaved data will be cleared.')) {
-                clearProcessInspectionData();
-                alert('Inspection has been withheld.');
+              if (window.confirm('Are you sure you want to pause this inspection? You can resume it later.')) {
+                markAsPaused(call?.call_no);
+                alert('Inspection has been paused. You can resume it from the landing page.');
                 onBack();
               }
             }}
+          >
+            Pause Inspection
+          </button>
+          <button
+            className="btn btn-outline"
+            onClick={handleOpenWithheldModal}
           >
             Withheld Inspection
           </button>
@@ -1683,6 +1763,56 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       <div style={{ marginTop: 'var(--space-24)' }}>
         <button className="btn btn-secondary" onClick={onBack}>Return to Landing Page</button>
       </div>
+
+      {/* Withheld Modal */}
+      {showWithheldModal && (
+        <div className="modal-overlay" onClick={handleCloseWithheldModal}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Withheld Inspection</h3>
+              <button className="modal-close" onClick={handleCloseWithheldModal}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-field">
+                <label className="modal-label">Reason <span className="required">*</span></label>
+                <select
+                  className="modal-select"
+                  value={withheldReason}
+                  onChange={(e) => { setWithheldReason(e.target.value); setWithheldError(''); }}
+                >
+                  {WITHHELD_REASONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {withheldReason === 'ANY_OTHER' && (
+                <div className="modal-field">
+                  <label className="modal-label">Remarks <span className="required">*</span></label>
+                  <textarea
+                    className="modal-textarea"
+                    placeholder="Please provide details..."
+                    value={withheldRemarks}
+                    onChange={(e) => { setWithheldRemarks(e.target.value); setWithheldError(''); }}
+                  />
+                </div>
+              )}
+
+              {withheldError && <div className="modal-error">{withheldError}</div>}
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary modal-actions__btn" onClick={handleCloseWithheldModal} disabled={isSaving}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-warning modal-actions__btn" onClick={handleSubmitWithheld} disabled={isSaving}>
+                {isSaving ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
