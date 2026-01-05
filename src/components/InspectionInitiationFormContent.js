@@ -744,7 +744,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             <label className="form-label">BILL PAYING OFFICER</label>
             <input type="text" className="form-input" value={poData.bpo || 'BPO-001'} disabled />
           </div>
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+          {/* <div className="form-group" style={{ gridColumn: '1 / -1' }}>
             <label className="form-label">PO_COND SR. NO.</label>
             <div className="form-grid" style={{ marginTop: 'var(--space-8)' }}>
               <div className="form-group">
@@ -756,7 +756,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 <input type="text" className="form-input" value={poData.cond_text || 'N/A'} disabled />
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Section A OK/Not OK Buttons */}
           <div className="section-action-buttons" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-16)', marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
