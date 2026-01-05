@@ -5,7 +5,7 @@ import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import { createStageValidationHandler, stageReverseMapping } from '../utils/stageValidation';
 import { getAllSchedules } from '../services/scheduleService';
-import { getDisplayStatus, isCallPaused, isCallInitiated } from '../services/callStatusService';
+import { CALL_STATUS, getDisplayStatus, isCallPaused, isCallInitiated } from '../services/callStatusService';
 
 // Responsive styles for mobile
 const responsiveStyles = `
@@ -285,6 +285,12 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
   // If scheduled: show RESCHEDULE and START/RESUME
   const actions = selectedRows.length === 1 ? (row) => {
     const isPausedOrUnderInspection = isCallPaused(row.call_no) || isCallInitiated(row.call_no);
+    const statusForRow = getDisplayStatus(row.call_no, isScheduled(row.call_no));
+
+    // No actions when WITHHELD or COMPLETED
+    if (statusForRow === CALL_STATUS.WITHHELD || statusForRow === CALL_STATUS.COMPLETED) {
+      return null;
+    }
 
     return selectedRows.includes(row.id) ? (
       <div style={{ display: 'flex', gap: 'var(--space-8)' }}>

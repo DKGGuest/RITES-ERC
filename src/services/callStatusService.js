@@ -134,7 +134,22 @@ export const markAsCompleted = (callNo) => {
  * @returns {boolean}
  */
 const hasInspectionData = (callNo) => {
-  // Check sessionStorage for inspection initiation data
+  // Check sessionStorage for inspection initiation data (call-specific)
+  // Newer key used by the Initiation page
+  const initiationFormKey = `inspection_initiation_form_${callNo}`;
+  const initiationFormData = sessionStorage.getItem(initiationFormKey);
+  if (initiationFormData) {
+    try {
+      const data = JSON.parse(initiationFormData);
+      if (data.shiftOfInspection && data.dateOfInspection) {
+        return true;
+      }
+    } catch (e) {
+      // Invalid JSON, continue checking
+    }
+  }
+
+  // Back-compat: older key name that may have been used earlier
   const initiationKey = `inspection_initiation_${callNo}`;
   const initiationData = sessionStorage.getItem(initiationKey);
   if (initiationData) {
@@ -146,13 +161,6 @@ const hasInspectionData = (callNo) => {
     } catch (e) {
       // Invalid JSON, continue checking
     }
-  }
-
-  // Check sessionStorage for shift and date
-  const shift = sessionStorage.getItem('inspectionShift');
-  const date = sessionStorage.getItem('inspectionDate');
-  if (shift && date) {
-    return true;
   }
 
   // Check localStorage for dashboard draft data

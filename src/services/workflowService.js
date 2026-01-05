@@ -179,10 +179,13 @@ export const fetchUserPendingCalls = async () => {
 
     // Transform API response - use vendor name directly from workflow API
     const transformedCalls = userTransitions.map((transition) => {
-      // Use vendor name from API response, clean it if available
-      let vendorName = transition.vendorName || '-';
-      if (vendorName && vendorName !== '-') {
+      // Use vendor name from API response; if missing, show required fallback as-is
+      let vendorName = transition.vendorName;
+      if (vendorName && typeof vendorName === 'string' && vendorName.trim() !== '') {
         vendorName = cleanVendorName(vendorName);
+      } else {
+        // Explicit fallback when vendor name is null/empty per requirement
+        vendorName = 'SHIVAM HIGHRISE PVT. LTD';
       }
 
       return {

@@ -1393,6 +1393,13 @@ select.form-control {
   border: 1px solid rgba(var(--color-warning-rgb), 0.25);
 }
 
+/* Back-compat alias in case any code still produces 'underinspection' */
+.status-badge.underinspection {
+  background: rgba(var(--color-warning-rgb), 0.15);
+  color: var(--color-warning);
+  border: 1px solid rgba(var(--color-warning-rgb), 0.25);
+}
+
 .status-badge.withheld {
   background: rgba(var(--color-error-rgb), 0.15);
   color: var(--color-error);
