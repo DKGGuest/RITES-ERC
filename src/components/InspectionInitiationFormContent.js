@@ -822,6 +822,11 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             <label className="form-label">PRODUCT TYPE</label>
             <input type="text" className="form-input" value={getProductTypeDisplayName(call.product_type)} disabled />
           </div>
+          {/* New Field: Type of ERC (Vendor-entered / from DB). For now, show static value until API integration */}
+          <div className="form-group">
+            <label className="form-label">TYPE OF ERC</label>
+            <input type="text" className="form-input" value="MK- III" disabled />
+          </div>
           <div className="form-group">
             <label className="form-label">PO_QTY + UNIT</label>
             <input type="text" className="form-input" value={`${poData.po_qty || call.po_qty} ${poData.unit || 'Nos'}`} disabled />

@@ -3,12 +3,12 @@ import React from 'react';
 const StatusBadge = ({ status }) => {
   if (!status) return null;
 
-  // Convert status to CSS class (handle spaces and special characters)
+  // Convert status to CSS class (handle spaces, underscores and special characters)
   const getStatusClass = (status) => {
     return status
       .toLowerCase()
-      .replace(/\s+/g, '-')     // Replace spaces with hyphens
-      .replace(/[^a-z0-9-]/g, ''); // Remove special characters
+      .replace(/[_\s]+/g, '-')   // Replace spaces/underscores with hyphens
+      .replace(/[^a-z0-9-]/g, ''); // Remove other special characters
   };
 
   // Format status text for display (convert underscores to spaces and title case)
