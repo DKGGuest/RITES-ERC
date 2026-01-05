@@ -61,16 +61,28 @@ export const useCallActions = () => {
         throw new Error('Remarks are mandatory for returning a call');
       }
 
+      // Validate flagged fields
+      if (!flaggedFields || flaggedFields.length === 0) {
+        throw new Error('At least one field must be flagged for correction');
+      }
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // In real implementation, this would call the API
-      console.log('Returning call:', callId, remarks, flaggedFields);
+      // Example: POST /api/call-desk/calls/{callId}/return
+      // Body: { remarks, flaggedFields }
+      console.log('Returning call for rectification:', {
+        callId,
+        remarks,
+        flaggedFields,
+        timestamp: new Date().toISOString()
+      });
 
       setLoading(false);
       return {
         success: true,
-        message: 'Call returned for rectification',
+        message: 'Call returned for rectification successfully',
         data: {
           callId,
           newStatus: CALL_STATUS.RETURNED,

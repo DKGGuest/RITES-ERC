@@ -10,7 +10,7 @@ import CallsFilterSection from '../../../components/common/CallsFilterSection';
 import { CALL_STATUS_CONFIG } from '../utils/constants';
 import { formatDateTime } from '../utils/helpers';
 
-const VerifiedOpenCallsTab = ({ calls = [], kpis = {} }) => {
+const VerifiedOpenCallsTab = ({ calls = [], kpis = {}, onViewHistory }) => {
   const [searchTerm] = useState('');
 
   // Filter state
@@ -122,6 +122,21 @@ const VerifiedOpenCallsTab = ({ calls = [], kpis = {} }) => {
       key: 'assignedIE',
       label: 'Assigned IE',
       render: (value) => value || '-'
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <div className="action-buttons">
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={() => onViewHistory(row)}
+            title="View Call History"
+          >
+            📜 History
+          </button>
+        </div>
+      )
     }
   ];
 
@@ -204,14 +219,24 @@ const VerifiedOpenCallsTab = ({ calls = [], kpis = {} }) => {
   };
 
   // Prepare data for CallsFilterSection - map Call Desk data structure to expected format
-  const callsForFilter = calls.map(call => ({
-    ...call,
+  const callsForFilter = useMemo(() => calls.map(call => ({
     product_type: call.product,
     vendor_name: call.vendor?.name,
     po_no: call.poNumber,
     call_no: call.callNumber,
-    requested_date: call.submissionDateTime
-  }));
+    requested_date: call.submissionDateTime,
+    stage: call.stage
+  })), [calls]);
+
+  // Map filtered calls for CallsFilterSection
+  const filteredCallsForFilter = useMemo(() => filteredCalls.map(call => ({
+    product_type: call.product,
+    vendor_name: call.vendor?.name,
+    po_no: call.poNumber,
+    call_no: call.callNumber,
+    requested_date: call.submissionDateTime,
+    stage: call.stage
+  })), [filteredCalls]);
 
   return (
     <div className="tab-content">
@@ -235,14 +260,7 @@ const VerifiedOpenCallsTab = ({ calls = [], kpis = {} }) => {
       {/* Filter Section */}
       <CallsFilterSection
         allCalls={callsForFilter}
-        filteredCalls={filteredCalls.map(call => ({
-          ...call,
-          product_type: call.product,
-          vendor_name: call.vendor?.name,
-          po_no: call.poNumber,
-          call_no: call.callNumber,
-          requested_date: call.submissionDateTime
-        }))}
+        filteredCalls={filteredCallsForFilter}
         filters={filters}
         setFilters={setFilters}
         showFilters={showFilters}

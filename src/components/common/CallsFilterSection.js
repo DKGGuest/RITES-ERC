@@ -1,4 +1,5 @@
 import React from 'react';
+// Fixed: Product Type filter now dynamically shows all product types instead of hardcoded "ERC"
 
 const responsiveStyles = `
   @media (max-width: 768px) {
@@ -182,7 +183,7 @@ const CallsFilterSection = ({
     activeFilters.push({
       key: `productType-${pt}`,
       label: 'Product Type',
-      value: 'ERC',
+      value: pt,
       color: '#10b981',
       onRemove: () => safeToggleMulti('productTypes', pt)
     });
@@ -503,75 +504,72 @@ const CallsFilterSection = ({
               }}>
                 {selectedCategory === 'Product Type' && (
                   <div>
-                    {(() => {
-                      if (filterSearch && !'erc'.includes(filterSearch.toLowerCase())) {
+                    {productTypesList
+                      .filter(pt => {
+                        if (!filterSearch) return true;
+                        return pt.toLowerCase().includes(filterSearch.toLowerCase());
+                      })
+                      .map(productType => {
+                        const checked = (filters?.productTypes || []).includes(productType);
                         return (
-                          <div style={{
-                            padding: '40px 20px',
-                            textAlign: 'center',
-                            color: '#9ca3af',
-                            fontSize: '14px'
-                          }}>
-                            No results found for "{filterSearch}"
-                          </div>
-                        );
-                      }
-
-                      const isERCSelected = (filters?.productTypes || []).length > 0;
-
-                      const handleERCToggle = () => {
-                        if (isERCSelected) {
-                          setFilters(prev => ({ ...prev, productTypes: [] }));
-                        } else {
-                          setFilters(prev => ({ ...prev, productTypes: [...productTypesList] }));
-                        }
-                      };
-
-                      return (
-                        <label
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '12px 0',
-                            borderBottom: '1px solid #f3f4f6',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            marginRight: '12px',
-                            backgroundColor: '#f3f4f6',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '18px'
-                          }}>📦</div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{
-                              fontSize: '14px',
-                              fontWeight: '500',
-                              color: '#1f2937'
-                            }}>ERC</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={isERCSelected}
-                            onChange={handleERCToggle}
+                          <label
+                            key={productType}
                             style={{
-                              width: '20px',
-                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: '12px 0',
+                              borderBottom: '1px solid #f3f4f6',
                               cursor: 'pointer',
-                              accentColor: '#16a34a'
+                              transition: 'background-color 0.2s'
                             }}
-                          />
-                        </label>
-                      );
-                    })()}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              marginRight: '12px',
+                              backgroundColor: '#f3f4f6',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '18px'
+                            }}>📦</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                color: '#1f2937'
+                              }}>{productType}</div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => safeToggleMulti('productTypes', productType)}
+                              style={{
+                                width: '20px',
+                                height: '20px',
+                                cursor: 'pointer',
+                                accentColor: '#16a34a'
+                              }}
+                            />
+                          </label>
+                        );
+                      })}
+                    {productTypesList.filter(pt => {
+                      if (!filterSearch) return true;
+                      return pt.toLowerCase().includes(filterSearch.toLowerCase());
+                    }).length === 0 && (
+                      <div style={{
+                        padding: '40px 20px',
+                        textAlign: 'center',
+                        color: '#9ca3af',
+                        fontSize: '14px'
+                      }}>
+                        No results found for "{filterSearch}"
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -630,6 +628,19 @@ const CallsFilterSection = ({
                           </label>
                         );
                       })}
+                    {vendorsList.filter(vendor => {
+                      if (!filterSearch) return true;
+                      return vendor.toLowerCase().includes(filterSearch.toLowerCase());
+                    }).length === 0 && (
+                      <div style={{
+                        padding: '40px 20px',
+                        textAlign: 'center',
+                        color: '#9ca3af',
+                        fontSize: '14px'
+                      }}>
+                        {filterSearch ? `No results found for "${filterSearch}"` : 'No vendors available'}
+                      </div>
+                    )}
                   </div>
                 )}
 

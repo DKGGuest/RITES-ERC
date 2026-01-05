@@ -97,6 +97,7 @@ export const useCMData = () => {
     dashboardKPIs,
     inspectionCalls,
     ies,
+    inspectionEngineers: ies, // Alias for consistency
     iePerformance,
     approvals,
     refreshData,

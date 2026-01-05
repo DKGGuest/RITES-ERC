@@ -50,7 +50,7 @@ src/finance-module/
 │   │   ├── FinanceDashboard.js          # Main dashboard with tabs
 │   │   ├── VendorPaymentsTab.js         # Section 1
 │   │   ├── PendingBillingTab.js         # Section 2
-│   │   ├── BillsGeneratedTab.js         # Section 3
+│   │   ├── PendingPaymentTab.js         # Section 3
 │   │   ├── BillsClearedTab.js           # Section 4
 │   │   └── HistoricalRecordsTab.js      # Section 5
 │   ├── hooks/
@@ -122,7 +122,7 @@ function CustomFinanceView() {
 2. Record appears in "Pending Billing" tab
 3. Finance generates bill with amount details
 4. System calculates GST automatically
-5. Bill moves to "Bills Generated" tab
+5. Bill moves to "Pending Payment" tab
 6. Payment recorded when received
 7. Bill marked as cleared after verification
 8. Complete audit trail maintained
