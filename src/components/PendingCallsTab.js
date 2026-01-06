@@ -5,6 +5,7 @@ import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import { createStageValidationHandler, stageReverseMapping } from '../utils/stageValidation';
 import { getAllSchedules } from '../services/scheduleService';
+import { getDisplayStatus as getDisplayStatusFromMapper, getAvailableActions, shouldShowScheduleDate, API_STATUS } from '../utils/statusMapper';
 
 // Responsive styles for mobile
 const responsiveStyles = `
@@ -153,6 +154,9 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
   // Use all calls directly - filtering by assignedToUser is done in workflowService
   const pendingCalls = calls;
 
+  // Calls for which vendor name should be hidden in the table (UI-only masking)
+  const HIDE_VENDOR_FOR_CALLS = new Set(['IC1201', 'IC1202']);
+
   // Extract unique values for filter dropdowns
   const uniqueProductTypes = [...new Set(pendingCalls.map(c => c.product_type))];
   const uniqueVendors = [...new Set(pendingCalls.map(c => c.vendor_name))].sort();
@@ -237,12 +241,64 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
   const columns = [
     { key: 'call_no', label: 'Call No.' },
     { key: 'po_no', label: 'PO No.' },
-    { key: 'vendor_name', label: 'Vendor Name' },
+    {
+      key: 'vendor_name',
+      label: 'Vendor Name',
+      render: (val, row) => {
+        const callNo = (row?.call_no || '').toString().toUpperCase();
+        return HIDE_VENDOR_FOR_CALLS.has(callNo) ? '-' : (val || '-');
+      }
+    },
     { key: 'product_type', label: 'Product Type', render: (val) => getProductTypeDisplayName(val) },
     { key: 'call_date', label: 'Call Date', render: (val) => formatDate(val) },
     { key: 'desired_inspection_date', label: 'Desired Inspection Date', render: (val) => formatDate(val) },
-    { key: 'scheduled_date', label: 'Scheduled Date', render: (val, row) => getScheduledDate(row.call_no) },
-    { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
+    {
+      key: 'scheduled_date',
+      label: 'Scheduled Date',
+      render: (_val, row) => {
+        // Check if this is a Raw Material call from API
+        const isRawMaterialFromAPI = row.product_type === 'Raw Material' &&
+                                      (row.status === 'CALL_REGISTERED' ||
+                                       row.status === 'SCHEDULED' ||
+                                       row.status === 'VERIFY_PO_DETAILS');
+
+        if (isRawMaterialFromAPI) {
+          // For API calls, show schedule date based on status
+          const apiStatus = row.status || API_STATUS.CALL_REGISTERED;
+          if (shouldShowScheduleDate(apiStatus)) {
+            return getScheduledDate(row.call_no);
+          }
+          return '-';
+        } else {
+          // For mock Process/Final calls, show schedule date if scheduled
+          return getScheduledDate(row.call_no);
+        }
+      }
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (_val, row) => {
+        // Only apply status mapping to Raw Material calls from API
+        // Mock Process/Final calls keep their original status
+        const isRawMaterialFromAPI = row.product_type === 'Raw Material' &&
+                                      (row.status === 'CALL_REGISTERED' ||
+                                       row.status === 'SCHEDULED' ||
+                                       row.status === 'VERIFY_PO_DETAILS');
+
+        let displayStatus;
+        if (isRawMaterialFromAPI) {
+          // Apply status mapper for API calls
+          const apiStatus = row.status || API_STATUS.CALL_REGISTERED;
+          displayStatus = getDisplayStatusFromMapper(apiStatus);
+        } else {
+          // Keep original status for mock data
+          displayStatus = row.status || 'Pending';
+        }
+
+        return <StatusBadge status={displayStatus} />;
+      }
+    },
   ];
 
   const selectedCallsData = filteredCalls.filter(call => selectedRows.includes(call.id));
@@ -273,22 +329,60 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
   };
 
   // Show individual actions only when exactly one row is selected
-  // If not scheduled: show SCHEDULE only
-  // If scheduled: show RESCHEDULE and START
-  const actions = selectedRows.length === 1 ? (row) => (
-    selectedRows.includes(row.id) ? (
+  // Actions are determined by API status for Raw Material, or by schedule status for mock data
+  const actions = selectedRows.length === 1 ? (row) => {
+    // Check if this is a Raw Material call from API
+    const isRawMaterialFromAPI = row.product_type === 'Raw Material' &&
+                                  (row.status === 'CALL_REGISTERED' ||
+                                   row.status === 'SCHEDULED' ||
+                                   row.status === 'VERIFY_PO_DETAILS');
+
+    let availableActions = [];
+
+    if (isRawMaterialFromAPI) {
+      // Use new workflow for API calls
+      const apiStatus = row.status || API_STATUS.CALL_REGISTERED;
+      availableActions = getAvailableActions(apiStatus);
+    } else {
+      // Use old logic for mock Process/Final calls
+      const scheduled = isScheduled(row.call_no);
+      if (!scheduled) {
+        availableActions = ['schedule'];
+      } else {
+        availableActions = ['reschedule', 'start'];
+      }
+    }
+
+    // No actions if none are available
+    if (availableActions.length === 0) {
+      return null;
+    }
+
+    return selectedRows.includes(row.id) ? (
       <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
-        {!isScheduled(row.call_no) ? (
-          <button className="btn btn-sm btn-secondary" onClick={() => onSchedule(row, refreshSchedules)}>SCHEDULE</button>
-        ) : (
-          <>
-            <button className="btn btn-sm btn-secondary" onClick={() => onReschedule(row, refreshSchedules)}>RESCHEDULE</button>
-            <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>START</button>
-          </>
+        {availableActions.includes('schedule') && (
+          <button className="btn btn-sm btn-secondary" onClick={() => onSchedule(row, refreshSchedules)}>
+            SCHEDULE
+          </button>
+        )}
+        {availableActions.includes('reschedule') && (
+          <button className="btn btn-sm btn-secondary" onClick={() => onReschedule(row, refreshSchedules)}>
+            RESCHEDULE
+          </button>
+        )}
+        {availableActions.includes('start') && (
+          <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>
+            START
+          </button>
+        )}
+        {availableActions.includes('resume') && (
+          <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>
+            RESUME
+          </button>
         )}
       </div>
-    ) : null
-  ) : null;
+    ) : null;
+  } : null;
 
   // Separate selected calls into scheduled and unscheduled
   const scheduledCallsData = selectedCallsData.filter(call => isScheduled(call.call_no));

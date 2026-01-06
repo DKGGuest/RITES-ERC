@@ -4,7 +4,18 @@ import HeatNumberDetails from '../components/HeatNumberDetails';
 import { fetchPoDataForSections, updateColorCode } from '../services/poDataService';
 import { finishInspection } from '../services/rmInspectionService';
 import { useInspection } from '../context/InspectionContext';
+import { markAsWithheld } from '../services/callStatusService';
+import { saveInspectionInitiation } from '../services/vendorInspectionService';
 import './RawMaterialDashboard.css';
+
+// Reason options for withheld inspection
+const WITHHELD_REASONS = [
+  { value: '', label: 'Select Reason *' },
+  { value: 'MATERIAL_NOT_AVAILABLE', label: 'Full quantity of material not available with firm at the time of inspection' },
+  { value: 'PLACE_NOT_AS_PER_PO', label: 'Place of inspection is not as per the PO' },
+  { value: 'VENDOR_WITHDRAWN', label: 'Vendor has withdrawn the inspection call' },
+  { value: 'ANY_OTHER', label: 'Any other' },
+];
 
 // LocalStorage keys for submodule data
 const STORAGE_KEYS = {
@@ -15,6 +26,9 @@ const STORAGE_KEYS = {
   CALIBRATION: 'calibration_draft_data',
   MAIN_INSPECTION: 'rm_main_inspection_data'
 };
+
+// localStorage key for dashboard draft data
+const DASHBOARD_DRAFT_KEY = 'rm_dashboard_draft_';
 
 const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChange, onProductModelChange, onLadleValuesChange }) => {
   // Import cache functions from context
@@ -41,6 +55,15 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   // Finish Inspection state
   const [isSaving, setIsSaving] = useState(false);
 
+  // Save Draft state
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  // Withheld modal state
+  const [showWithheldModal, setShowWithheldModal] = useState(false);
+  const [withheldReason, setWithheldReason] = useState('');
+  const [withheldRemarks, setWithheldRemarks] = useState('');
+  const [withheldError, setWithheldError] = useState('');
+
   // Submodule status tracking per heat (auto-populated from localStorage)
   // Structure: { heatNo: { calibration: 'OK', visual: 'Pending', ... }, ... }
   const [heatSubmoduleStatuses, setHeatSubmoduleStatuses] = useState({});
@@ -48,6 +71,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   // Ref to prevent duplicate API calls in React StrictMode
   const hasFetchedRef = useRef(false);
   const currentCallRef = useRef(null);
+  const hasLoadedDraftRef = useRef(false);
 
   // Fetch data from new unified PO data API with caching
   useEffect(() => {
@@ -65,6 +89,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       // Reset fetch flag if call changes
       if (currentCallRef.current !== callNo) {
         hasFetchedRef.current = false;
+        hasLoadedDraftRef.current = false;
         currentCallRef.current = callNo;
       }
 
@@ -84,10 +109,31 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         console.log('✅ Using cached data for call:', callNo);
         setIsLoadingFromCache(true);
 
+        // Load saved color codes from localStorage
+        const mainKey = `${STORAGE_KEYS.MAIN_INSPECTION}_${callNo}`;
+        const savedData = localStorage.getItem(mainKey);
+        let savedColorCodes = {};
+        if (savedData) {
+          try {
+            const parsed = JSON.parse(savedData);
+            savedColorCodes = parsed.heatColorCodes || {};
+            console.log('📦 Loaded saved color codes from localStorage:', savedColorCodes);
+          } catch (e) {
+            console.error('Error parsing saved color codes:', e);
+          }
+        }
+
         // Immediately set cached data (instant load!)
         if (cachedData.poData) setFetchedPoData(cachedData.poData);
         if (cachedData.callData) setFetchedCallData(cachedData.callData);
-        if (cachedData.heatData) setFetchedHeatData(cachedData.heatData);
+        if (cachedData.heatData) {
+          // Merge color codes into cached heat data
+          const heatsWithColorCodes = cachedData.heatData.map(heat => ({
+            ...heat,
+            colorCode: savedColorCodes[heat.heatNo] || heat.colorCode || ''
+          }));
+          setFetchedHeatData(heatsWithColorCodes);
+        }
 
         setIsLoading(false);
         setIsLoadingFromCache(false);
@@ -184,8 +230,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                 subPoNumber: heat.subPoNumber || '',
                 subPoDate: heat.subPoDate || '',
                 subPoQty: heat.subPoQty || '',
-                totalValueOfPo: '',
-                tcQuantity: heat.tcQty || '',
+                totalValueOfPo: heat.totalValueOfPo || '', // From inventory_entries.total_po
+                tcQuantity: heat.tcQuantity || '', // From inventory_entries.tc_quantity
                 offeredQty: heat.offeredQty || '',
                 // Restore color code from localStorage if available
                 colorCode: savedColorCodes[heatNo] || ''
@@ -844,6 +890,160 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     }
   }, [call?.call_no, activeHeats, onBack, numberOfBundles, numberOfERC, sourceOfRawMaterial, poData, productModel, heatSubmoduleStatuses, heatRemarks]);
 
+  // Withheld modal handlers
+  const handleOpenWithheldModal = () => {
+    setWithheldReason('');
+    setWithheldRemarks('');
+    setWithheldError('');
+    setShowWithheldModal(true);
+  };
+
+  const handleCloseWithheldModal = () => {
+    setShowWithheldModal(false);
+    setWithheldReason('');
+    setWithheldRemarks('');
+    setWithheldError('');
+  };
+
+  const handleSubmitWithheld = async () => {
+    if (!withheldReason) {
+      setWithheldError('Please select a reason');
+      return;
+    }
+    if (withheldReason === 'ANY_OTHER' && !withheldRemarks.trim()) {
+      setWithheldError('Please provide remarks for "Any other" reason');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const actionData = {
+        inspectionRequestId: call?.api_id || null,
+        callNo: call?.call_no,
+        poNo: call?.po_no,
+        actionType: 'WITHHELD',
+        reason: withheldReason,
+        remarks: withheldRemarks.trim(),
+        status: 'WITHHELD',
+        actionDate: new Date().toISOString()
+      };
+
+      // Raw Material: Call real API
+      await saveInspectionInitiation(actionData);
+
+      // Mark call as withheld in local storage
+      markAsWithheld(call?.call_no, withheldRemarks.trim());
+
+      // Clear all inspection data from localStorage
+      const inspectionCallNo = call?.call_no;
+      if (inspectionCallNo) {
+        const visKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${inspectionCallNo}`;
+        const dimKey = `${STORAGE_KEYS.DIMENSIONAL_CHECK}_${inspectionCallNo}`;
+        const matKey = `${STORAGE_KEYS.MATERIAL_TESTING}_${inspectionCallNo}`;
+        const packKey = `${STORAGE_KEYS.PACKING_STORAGE}_${inspectionCallNo}`;
+        const calKey = `${STORAGE_KEYS.CALIBRATION}_${inspectionCallNo}`;
+        const mainKey = `${STORAGE_KEYS.MAIN_INSPECTION}_${inspectionCallNo}`;
+
+        localStorage.removeItem(visKey);
+        localStorage.removeItem(dimKey);
+        localStorage.removeItem(matKey);
+        localStorage.removeItem(packKey);
+        localStorage.removeItem(calKey);
+        localStorage.removeItem(mainKey);
+      }
+
+      alert('✅ Inspection has been withheld successfully');
+      handleCloseWithheldModal();
+      onBack();
+    } catch (error) {
+      console.error('Error withholding inspection:', error);
+      setWithheldError('Failed to save. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Save Draft handler
+  const handleSaveDraft = useCallback(() => {
+    const inspectionCallNo = call?.call_no;
+    if (!inspectionCallNo) {
+      alert('Cannot save draft: No inspection call number found');
+      return;
+    }
+
+    setIsSavingDraft(true);
+
+    try {
+      // Collect all dashboard form data
+      const draftData = {
+        savedAt: new Date().toISOString(),
+        numberOfBundles: numberOfBundles,
+        sourceOfRawMaterial: sourceOfRawMaterial,
+        heatRemarks: heatRemarks,
+        // Save heat color codes
+        heatColorCodes: fetchedHeatData.reduce((acc, heat) => {
+          if (heat.heatNo && heat.colorCode) {
+            acc[heat.heatNo] = heat.colorCode;
+          }
+          return acc;
+        }, {})
+      };
+
+      // Save to localStorage with inspection call number as key
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo}`;
+      localStorage.setItem(storageKey, JSON.stringify(draftData));
+
+      // Also save to main inspection data key (for color codes)
+      const mainKey = `${STORAGE_KEYS.MAIN_INSPECTION}_${inspectionCallNo}`;
+      localStorage.setItem(mainKey, JSON.stringify(draftData));
+
+      alert(`✅ Draft saved successfully at ${new Date().toLocaleTimeString()}`);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert(`Failed to save draft: ${error.message}`);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  }, [call?.call_no, numberOfBundles, sourceOfRawMaterial, heatRemarks, fetchedHeatData]);
+
+  // Load draft data from localStorage on mount (after heat data is loaded)
+  useEffect(() => {
+    const inspectionCallNo = call?.call_no;
+    if (!inspectionCallNo || fetchedHeatData.length === 0 || hasLoadedDraftRef.current) return;
+
+    // Mark as loaded to prevent re-running
+    hasLoadedDraftRef.current = true;
+
+    try {
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo}`;
+      const savedDraft = localStorage.getItem(storageKey);
+
+      if (savedDraft) {
+        const draftData = JSON.parse(savedDraft);
+        console.log('📦 Loading draft data from localStorage:', draftData);
+
+        // Restore form data
+        if (draftData.numberOfBundles) setNumberOfBundles(draftData.numberOfBundles);
+        if (draftData.sourceOfRawMaterial) setSourceOfRawMaterial(draftData.sourceOfRawMaterial);
+        if (draftData.heatRemarks) setHeatRemarks(draftData.heatRemarks);
+
+        // Restore color codes to heat data
+        if (draftData.heatColorCodes && Object.keys(draftData.heatColorCodes).length > 0) {
+          const heatsWithColorCodes = fetchedHeatData.map(heat => ({
+            ...heat,
+            colorCode: draftData.heatColorCodes[heat.heatNo] || heat.colorCode || ''
+          }));
+          setFetchedHeatData(heatsWithColorCodes);
+          console.log('✅ Restored color codes to heat data');
+        }
+
+        console.log('✅ Draft data loaded successfully');
+      }
+    } catch (error) {
+      console.error('Error loading draft data:', error);
+    }
+  }, [call?.call_no, fetchedHeatData]);
+
   // Show loading indicator while fetching data
   if (isLoading) {
     return (
@@ -871,12 +1071,12 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         <div className="breadcrumb-item breadcrumb-active">ERC Raw Material</div>
       </div>
 
-      <div className="rm-page-header">
+      {/* <div className="rm-page-header">
         <h1>ERC Raw Material Inspection - {callNo}</h1>
         <button className="rm-back-button" onClick={onBack}>
           ← Back to Landing Page
         </button>
-      </div>
+      </div> */}
 
       {/* Inspection Call Info Banner */}
       <div className="card" style={{ background: 'var(--color-primary-light)', marginBottom: 'var(--space-16)', padding: 'var(--space-16)' }}>
@@ -1194,9 +1394,21 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
         {/* Action Buttons */}
         <div className="rm-action-buttons" style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '24px' }}>
-          <button className="btn btn-outline" style={{ minHeight: '44px', padding: '10px 20px' }}>Save Draft</button>
+          <button
+            className="btn btn-outline"
+            style={{
+              minHeight: '44px',
+              padding: '10px 20px',
+              backgroundColor: isSavingDraft ? '#f3f4f6' : '#fff',
+              cursor: isSavingDraft ? 'not-allowed' : 'pointer'
+            }}
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft}
+          >
+            {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
+          </button>
           <button className="btn btn-outline">Pause Inspection</button>
-          <button className="btn btn-outline">Withheld Inspection</button>
+          <button className="btn btn-outline" onClick={handleOpenWithheldModal}>Withheld Inspection</button>
           <button
             className="btn btn-primary"
             onClick={handleFinishInspection}
@@ -1212,6 +1424,56 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           ← Return to Landing Page
         </button>
       </div>
+
+      {/* Withheld Modal */}
+      {showWithheldModal && (
+        <div className="modal-overlay" onClick={handleCloseWithheldModal}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Withheld Inspection</h3>
+              <button className="modal-close" onClick={handleCloseWithheldModal}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-field">
+                <label className="modal-label">Reason <span className="required">*</span></label>
+                <select
+                  className="modal-select"
+                  value={withheldReason}
+                  onChange={(e) => { setWithheldReason(e.target.value); setWithheldError(''); }}
+                >
+                  {WITHHELD_REASONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {withheldReason === 'ANY_OTHER' && (
+                <div className="modal-field">
+                  <label className="modal-label">Remarks <span className="required">*</span></label>
+                  <textarea
+                    className="modal-textarea"
+                    placeholder="Please provide details..."
+                    value={withheldRemarks}
+                    onChange={(e) => { setWithheldRemarks(e.target.value); setWithheldError(''); }}
+                  />
+                </div>
+              )}
+
+              {withheldError && <div className="modal-error">{withheldError}</div>}
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary modal-actions__btn" onClick={handleCloseWithheldModal} disabled={isSaving}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-warning modal-actions__btn" onClick={handleSubmitWithheld} disabled={isSaving}>
+                {isSaving ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

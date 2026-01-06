@@ -1380,6 +1380,32 @@ select.form-control {
   border: 1px solid rgba(var(--color-warning-rgb), 0.25);
 }
 
+/* Pending Calls: additional statuses */
+.status-badge.scheduled {
+  background: rgba(var(--color-info-rgb), 0.15);
+  color: var(--color-info);
+  border: 1px solid rgba(var(--color-info-rgb), 0.25);
+}
+
+.status-badge.under-inspection {
+  background: rgba(var(--color-warning-rgb), 0.15);
+  color: var(--color-warning);
+  border: 1px solid rgba(var(--color-warning-rgb), 0.25);
+}
+
+/* Back-compat alias in case any code still produces 'underinspection' */
+.status-badge.underinspection {
+  background: rgba(var(--color-warning-rgb), 0.15);
+  color: var(--color-warning);
+  border: 1px solid rgba(var(--color-warning-rgb), 0.25);
+}
+
+.status-badge.withheld {
+  background: rgba(var(--color-error-rgb), 0.15);
+  color: var(--color-error);
+  border: 1px solid rgba(var(--color-error-rgb), 0.25);
+}
+
 /* Billing Status Badges */
 .status-badge.billing-pending {
   background: rgba(255, 193, 7, 0.15);
