@@ -12,6 +12,9 @@ import useCallDeskData from '../hooks/useCallDeskData';
 import useCallActions from '../hooks/useCallActions';
 import '../styles/CallDeskDashboard.css';
 
+const RIO_OPTIONS = ['NRIO', 'CRIO', 'WRIO', 'SRIO'];
+
+
 const CallDeskDashboard = () => {
   const [activeTab, setActiveTab] = useState('pending');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -23,6 +26,10 @@ const CallDeskDashboard = () => {
   const [actionRemarks, setActionRemarks] = useState('');
   const [selectedRIO, setSelectedRIO] = useState('');
   const [flaggedFields, setFlaggedFields] = useState([]);
+
+  const [historyData, setHistoryData] = useState([]);
+const [historyLoading, setHistoryLoading] = useState(false);
+
 
   // Hooks
   const {
@@ -38,11 +45,16 @@ const CallDeskDashboard = () => {
   } = useCallDeskData();
 
   const {
-    verifyAndAccept,
-    returnForRectification,
-    rerouteToRIO,
-    loading: actionLoading
-  } = useCallActions();
+  verifyAndAccept,
+  returnForRectification,
+  rerouteToRIO,
+  viewCallHistory,          
+  loading: actionLoading
+} = useCallActions();
+
+
+
+
 
   // Tab configuration
   const tabs = [
@@ -64,10 +76,22 @@ const CallDeskDashboard = () => {
   ];
 
   // Action handlers
-  const handleViewHistory = (call) => {
-    setSelectedCall(call);
-    setShowHistoryModal(true);
-  };
+const handleViewHistory = async (call) => {
+  setSelectedCall(call);
+  setShowHistoryModal(true);
+  setHistoryLoading(true);
+
+  try {
+    const data = await viewCallHistory(call.callNumber); //  API CALL
+    setHistoryData(data);
+    console.log("history data", data);
+  } catch (err) {
+    alert(err.message || 'Failed to load history');
+  } finally {
+    setHistoryLoading(false);
+  }
+};
+
 
   const handleViewDetails = (call) => {
     setSelectedCall(call);
@@ -98,7 +122,7 @@ const CallDeskDashboard = () => {
   const submitVerify = async () => {
     if (!selectedCall) return;
     
-    const result = await verifyAndAccept(selectedCall.id, actionRemarks);
+    const result = await verifyAndAccept(selectedCall.id, selectedCall, actionRemarks);
     if (result.success) {
       alert('Call verified and registered successfully!');
       setShowVerifyModal(false);
@@ -109,45 +133,42 @@ const CallDeskDashboard = () => {
   };
 
   const submitReturn = async () => {
-    // Validation: Check if remarks are provided
     if (!selectedCall || !actionRemarks.trim()) {
       alert('Remarks are mandatory for returning a call');
       return;
     }
-
-    // Validation: Check if at least one field is flagged
-    if (flaggedFields.length === 0) {
-      alert('Please select at least one field that requires correction');
-      return;
-    }
-
-    const result = await returnForRectification(selectedCall.id, actionRemarks, flaggedFields);
+    
+    const result = await returnForRectification(selectedCall.id,selectedCall, actionRemarks, flaggedFields);
     if (result.success) {
       alert('Call returned for rectification successfully!');
       setShowReturnModal(false);
-      setActionRemarks('');
-      setFlaggedFields([]);
       refreshData();
     } else {
       alert(result.message);
     }
   };
+const submitReroute = async () => {
+  if (!selectedCall || !selectedRIO || !actionRemarks.trim()) {
+    alert('Target RIO and remarks are mandatory for re-routing');
+    return;
+  }
 
-  const submitReroute = async () => {
-    if (!selectedCall || !selectedRIO || !actionRemarks.trim()) {
-      alert('Target RIO and remarks are mandatory for re-routing');
-      return;
-    }
-    
-    const result = await rerouteToRIO(selectedCall.id, selectedRIO, actionRemarks);
-    if (result.success) {
-      alert(`Call re-routed to ${selectedRIO} successfully!`);
-      setShowRerouteModal(false);
-      refreshData();
-    } else {
-      alert(result.message);
-    }
-  };
+  const result = await rerouteToRIO(
+    selectedCall.id,
+    selectedCall,
+    selectedRIO,
+    actionRemarks
+  );
+
+  if (result.success) {
+    alert(`Call re-routed to ${selectedRIO} successfully!`);
+    setShowRerouteModal(false);
+    refreshData();
+  } else {
+    alert(result.message);
+  }
+};
+
 
   // Toggle flagged field
   const toggleFlaggedField = (field) => {
@@ -214,7 +235,6 @@ const CallDeskDashboard = () => {
         <VerifiedOpenCallsTab
           calls={verifiedCalls}
           kpis={dashboardKPIs?.verifiedOpen || {}}
-          onViewHistory={handleViewHistory}
         />
       )}
 
@@ -222,7 +242,6 @@ const CallDeskDashboard = () => {
         <DisposedCallsTab
           calls={disposedCalls}
           kpis={dashboardKPIs?.disposed || {}}
-          onViewHistory={handleViewHistory}
         />
       )}
 
@@ -234,21 +253,62 @@ const CallDeskDashboard = () => {
               <h2>Call History - {selectedCall.callNumber}</h2>
               <button className="modal-close" onClick={() => setShowHistoryModal(false)}>×</button>
             </div>
-            <div className="modal-body">
-              <div className="call-history-timeline">
-                {getCallHistory(selectedCall.callNumber).map((entry, index) => (
-                  <div key={index} className="timeline-entry">
-                    <div className="timeline-marker"></div>
-                    <div className="timeline-content">
-                      <div className="timeline-time">{new Date(entry.timestamp).toLocaleString()}</div>
-                      <div className="timeline-action">{entry.action}</div>
-                      <div className="timeline-user">By: {entry.user}</div>
-                      {entry.remarks && <div className="timeline-remarks">{entry.remarks}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+           <div className="modal-body">
+  {historyLoading ? (
+    <div className="history-empty">Loading history...</div>
+  ) : historyData.length === 0 ? (
+    <div className="history-empty">No history found</div>
+  ) : (
+    <table className="history-table">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Status</th>
+          <th>Created By</th>
+          <th>Modified By</th>
+          <th>Date & Time</th>
+        </tr>
+      </thead>
+
+      <tbody>
+  {historyData.map((row, index) => (
+    <tr key={index}>
+      {/* Action */}
+      <td className="action-cell">
+        {row.action || '-'}
+      </td>
+
+      {/* Status */}
+      <td>
+        {row.status || '-'}
+      </td>
+
+      {/* Created By */}
+      <td>
+        {row.createdBy ?? '-'}
+      </td>
+
+      {/* Modified By */}
+      <td>
+        {row.updatedBy ?? '-'}
+      </td>
+
+      {/* Date & Time */}
+      <td>
+        {row.createdDate
+          ? new Date(row.createdDate).toLocaleString()
+          : '-'}
+      </td>
+    </tr>
+  ))}
+</tbody>
+
+    </table>
+  )}
+</div>
+
+
+          
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowHistoryModal(false)}>
                 Close
@@ -380,49 +440,30 @@ const CallDeskDashboard = () => {
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Flagged Fields for Correction: <span className="text-danger">*</span></label>
-                <p className="field-description">Select the specific sections that require correction by the vendor</p>
+                <label>Remarks (Mandatory): <span className="text-danger">*</span></label>
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  value={actionRemarks}
+                  onChange={(e) => setActionRemarks(e.target.value)}
+                  placeholder="Enter reason for returning the call..."
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Flag Fields for Correction:</label>
                 <div className="checkbox-group">
-                  {[
-                    { value: 'poDetails', label: '📄 PO Details' },
-                    { value: 'deliveryPeriod', label: '📅 Delivery Period' },
-                    { value: 'maDetails', label: '📋 MA Details' },
-                    { value: 'quantity', label: '🔢 Quantity' },
-                    { value: 'placeOfInspection', label: '📍 Place of Inspection' },
-                    { value: 'subPoDetails', label: '📦 Sub PO Details' }
-                  ].map(field => (
-                    <label key={field.value} className="checkbox-label">
+                  {['poNumber', 'quantity', 'desiredInspectionDate', 'placeOfInspection', 'documents'].map(field => (
+                    <label key={field} className="checkbox-label">
                       <input
                         type="checkbox"
-                        checked={flaggedFields.includes(field.value)}
-                        onChange={() => toggleFlaggedField(field.value)}
+                        checked={flaggedFields.includes(field)}
+                        onChange={() => toggleFlaggedField(field)}
                       />
-                      <span>{field.label}</span>
+                      <span>{field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
                     </label>
                   ))}
                 </div>
-                {flaggedFields.length === 0 && (
-                  <p className="validation-hint text-danger" style={{ marginTop: '8px', fontSize: '13px' }}>
-                    ⚠️ Please select at least one field that requires correction
-                  </p>
-                )}
-              </div>
-              <div className="form-group">
-                <label>Remarks (Mandatory): <span className="text-danger">*</span></label>
-                <p className="field-description">Provide exact details about the issues identified in the selected fields above</p>
-                <textarea
-                  className="form-control"
-                  rows="5"
-                  value={actionRemarks}
-                  onChange={(e) => setActionRemarks(e.target.value)}
-                  placeholder="Enter detailed explanation of the issues found in the flagged fields. Be specific about what needs to be corrected..."
-                  required
-                />
-                {actionRemarks.trim().length === 0 && (
-                  <p className="validation-hint text-danger" style={{ marginTop: '8px', fontSize: '13px' }}>
-                    ⚠️ Remarks are mandatory for returning a call
-                  </p>
-                )}
               </div>
             </div>
             <div className="modal-footer">
@@ -432,7 +473,7 @@ const CallDeskDashboard = () => {
               <button
                 className="btn btn-warning"
                 onClick={submitReturn}
-                disabled={actionLoading || !actionRemarks.trim() || flaggedFields.length === 0}
+                disabled={actionLoading || !actionRemarks.trim()}
               >
                 {actionLoading ? 'Processing...' : '↩️ Return for Rectification'}
               </button>
@@ -453,18 +494,21 @@ const CallDeskDashboard = () => {
               <div className="form-group">
                 <label>Target RIO: <span className="text-danger">*</span></label>
                 <select
-                  className="form-control"
-                  value={selectedRIO}
-                  onChange={(e) => setSelectedRIO(e.target.value)}
-                  required
-                >
-                  <option value="">Select RIO...</option>
-                  {rioOffices.filter(rio => rio.code !== selectedCall.rio).map(rio => (
-                    <option key={rio.id} value={rio.code}>
-                      {rio.name} ({rio.code})
-                    </option>
-                  ))}
-                </select>
+  className="form-control"
+  value={selectedRIO}
+  onChange={(e) => setSelectedRIO(e.target.value)}
+  required
+>
+  <option value="">Select RIO...</option>
+  {['NRIO', 'CRIO', 'WRIO', 'SRIO']
+    .filter(rio => rio !== selectedCall.rio)
+    .map(rio => (
+      <option key={rio} value={rio}>
+        {rio}
+      </option>
+    ))}
+</select>
+
               </div>
               <div className="form-group">
                 <label>Remarks (Mandatory): <span className="text-danger">*</span></label>

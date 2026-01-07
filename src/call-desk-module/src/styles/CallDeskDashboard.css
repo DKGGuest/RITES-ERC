@@ -811,3 +811,43 @@ select.form-control {
   }
 }
 
+
+
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.history-table th,
+.history-table td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.history-table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+}
+
+.history-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.history-table tr:hover {
+  background-color: #eef6ff;
+}
+
+.action-cell {
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+}

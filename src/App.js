@@ -9,6 +9,8 @@ import { getStoredUser } from './services/authService';
 // Page Wrappers
 import LandingPageWrapper from './pages/wrappers/LandingPageWrapper';
 import InitiationPageWrapper from './pages/wrappers/InitiationPageWrapper';
+
+import { ROLE_LANDING_ROUTE } from './routes';
 import {
   RawMaterialDashboardWrapper,
   CalibrationDocumentsWrapper,
@@ -50,37 +52,63 @@ import { FinanceDashboardWrapper } from './pages/wrappers/FinanceWrapper';
 /**
  * Role-based redirect component
  */
-const RoleBasedRedirect = () => {
-  const currentUser = getStoredUser();
+// const RoleBasedRedirect = () => {
+//   const currentUser = getStoredUser();
 
-  if (currentUser?.roleName === 'CM') {
-    return <Navigate to={ROUTES.CM_DASHBOARD} replace />;
-  } else if (currentUser?.roleName === 'CALL_DESK') {
-    return <Navigate to={ROUTES.CALL_DESK} replace />;
-  } else if (currentUser?.roleName === 'Finance') {
-    return <Navigate to={ROUTES.FINANCE} replace />;
-  } else {
-    return <Navigate to={ROUTES.LANDING} replace />;
-  }
+//   if (currentUser?.roleName === 'CM') {
+//     return <Navigate to={ROUTES.CM_DASHBOARD} replace />;
+//   } else if (currentUser?.roleName === 'CALL_DESK') {
+//     return <Navigate to={ROUTES.CALL_DESK} replace />;
+//   } else if (currentUser?.roleName === 'Finance') {
+//     return <Navigate to={ROUTES.FINANCE} replace />;
+//   } else {
+//     return <Navigate to={ROUTES.LANDING} replace />;
+//   }
+// };
+
+
+
+
+const RoleBasedRedirect = () => {
+  const user = getStoredUser();
+  const target =
+    ROLE_LANDING_ROUTE[user?.roleName] || ROUTES.LOGIN;
+
+  return <Navigate to={target} replace />;
 };
 
 /**
  * Role-based Landing Page Guard
  * Redirects non-IE users to their respective dashboards
  */
-const LandingPageGuard = () => {
-  const currentUser = getStoredUser();
+// const LandingPageGuard = () => {
+//   const currentUser = getStoredUser();
 
-  // Redirect Finance, CM, and Call Desk users to their dashboards
-  if (currentUser?.roleName === 'Finance') {
-    return <Navigate to={ROUTES.FINANCE} replace />;
-  } else if (currentUser?.roleName === 'CM') {
-    return <Navigate to={ROUTES.CM_DASHBOARD} replace />;
-  } else if (currentUser?.roleName === 'CALL_DESK') {
-    return <Navigate to={ROUTES.CALL_DESK} replace />;
+//   // Redirect Finance, CM, and Call Desk users to their dashboards
+//   if (currentUser?.roleName === 'Finance') {
+//     return <Navigate to={ROUTES.FINANCE} replace />;
+//   } else if (currentUser?.roleName === 'CM') {
+//     return <Navigate to={ROUTES.CM_DASHBOARD} replace />;
+//   } else if (currentUser?.roleName === 'CALL_DESK') {
+//     return <Navigate to={ROUTES.CALL_DESK} replace />;
+//   }
+
+//   // IE users can access Landing Page
+//   return <LandingPageWrapper />;
+// };
+
+const LandingPageGuard = () => {
+  const user = getStoredUser();
+
+  if (user?.roleName !== 'IE') {
+    return (
+      <Navigate
+        to={ROLE_LANDING_ROUTE[user?.roleName]}
+        replace
+      />
+    );
   }
 
-  // IE users can access Landing Page
   return <LandingPageWrapper />;
 };
 

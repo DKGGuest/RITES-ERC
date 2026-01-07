@@ -96,6 +96,7 @@ export const storeAuthData = (authData) => {
   localStorage.setItem('userId', authData.userId);
   localStorage.setItem('userName', authData.userName);
   localStorage.setItem('roleName', authData.roleName);
+   localStorage.setItem('rio', authData.rio);
 };
 
 /**
@@ -118,6 +119,7 @@ export const getStoredUser = () => {
     userId: localStorage.getItem('userId'),
     userName: localStorage.getItem('userName'),
     roleName: localStorage.getItem('roleName'),
+    rio: localStorage.getItem('rio'),
     token: token,
   };
 };
@@ -138,6 +140,7 @@ export const logoutUser = () => {
   localStorage.removeItem('userId');
   localStorage.removeItem('userName');
   localStorage.removeItem('roleName');
+  localStorage.removeItem('rio');
 };
 
 /**

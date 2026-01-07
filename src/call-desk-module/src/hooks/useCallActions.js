@@ -6,6 +6,12 @@
 import { useState } from 'react';
 import { CALL_STATUS } from '../utils/constants';
 
+import axios from 'axios';
+import { getStoredUser, getAuthHeaders } from '../../../services/authService';
+const BASE_URL =
+  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+
+
 /**
  * Custom hook for Call Desk actions
  */
@@ -13,136 +19,189 @@ export const useCallActions = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+
   /**
-   * Verify and accept a call
-   */
-  const verifyAndAccept = async (callId, remarks) => {
-    try {
-      setLoading(true);
-      setError(null);
+ * Verify and accept a call (REAL API)
+ */
+const verifyAndAccept = async (workflowTransitionId,selectedCall, remarks) => {
+  try {
+    setLoading(true);
+    setError(null);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+    const user = getStoredUser();
 
-      // In real implementation, this would call the API
-      console.log('Verifying call:', callId, remarks);
+    //  API payload
+    const payload = {
+      workflowTransitionId: workflowTransitionId,
+      requestId: selectedCall.callNumber,
+      action: 'VERIFY',
+      remarks: remarks || null,
+      actionBy: Number(user.userId),
+      pincode: null,
+    };
 
-      setLoading(false);
-      return {
-        success: true,
-        message: 'Call verified and registered successfully',
-        data: {
-          callId,
-          newStatus: CALL_STATUS.VERIFIED_REGISTERED,
-          verifiedAt: new Date().toISOString(),
-          remarks
-        }
-      };
-    } catch (err) {
-      setError(err.message || 'Failed to verify call');
-      setLoading(false);
-      return {
-        success: false,
-        message: err.message || 'Failed to verify call'
-      };
+  
+    const response = await axios.post(
+      'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend/performTransitionAction',
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+      }
+    );
+
+    
+    if (response.data?.responseStatus?.statusCode !== 0) {
+      throw new Error(
+        response.data?.responseStatus?.message || 'Verify failed'
+      );
     }
-  };
+
+    
+    return {
+      success: true,
+      message: 'Call verified successfully',
+    };
+
+  } catch (err) {
+    setError(err.message || 'Failed to verify call');
+    return {
+      success: false,
+      message: err.message || 'Failed to verify call',
+    };
+  } finally {
+    setLoading(false);
+  }
+};
 
   /**
    * Return call for rectification
-   */
-  const returnForRectification = async (callId, remarks, flaggedFields = []) => {
-    try {
-      setLoading(true);
-      setError(null);
+   *//**
+ * Return call to vendor (REAL API)
+ */
+const returnForRectification = async (
+  workflowTransitionId,
+  selectedCall,
+  remarks,
+  flaggedFields = []
+) => {
+  try {
+    setLoading(true);
+    setError(null);
 
-      // Validate remarks
-      if (!remarks || remarks.trim().length === 0) {
-        throw new Error('Remarks are mandatory for returning a call');
-      }
-
-      // Validate flagged fields
-      if (!flaggedFields || flaggedFields.length === 0) {
-        throw new Error('At least one field must be flagged for correction');
-      }
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // In real implementation, this would call the API
-      // Example: POST /api/call-desk/calls/{callId}/return
-      // Body: { remarks, flaggedFields }
-      console.log('Returning call for rectification:', {
-        callId,
-        remarks,
-        flaggedFields,
-        timestamp: new Date().toISOString()
-      });
-
-      setLoading(false);
-      return {
-        success: true,
-        message: 'Call returned for rectification successfully',
-        data: {
-          callId,
-          newStatus: CALL_STATUS.RETURNED,
-          returnedAt: new Date().toISOString(),
-          remarks,
-          flaggedFields
-        }
-      };
-    } catch (err) {
-      setError(err.message || 'Failed to return call');
-      setLoading(false);
-      return {
-        success: false,
-        message: err.message || 'Failed to return call'
-      };
+    if (!remarks || !remarks.trim()) {
+      throw new Error('Remarks are mandatory for returning a call');
     }
-  };
+
+    const user = getStoredUser();
+
+    //  API payload
+    const payload = {
+      workflowTransitionId: workflowTransitionId,
+      requestId: selectedCall.callNumber,
+      action: 'RETURN_TO_VENDOR', 
+      remarks: remarks,
+      actionBy: Number(user.userId),
+      pincode: null,
+    };
+
+    const response = await axios.post(
+      `${BASE_URL}/performTransitionAction`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+      }
+    );
+
+    if (response.data?.responseStatus?.statusCode !== 0) {
+      throw new Error(
+        response.data?.responseStatus?.message || 'Return failed'
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Call returned to vendor successfully',
+    };
+
+  } catch (err) {
+    setError(err.message || 'Failed to return call');
+    return {
+      success: false,
+      message: err.message || 'Failed to return call',
+    };
+  } finally {
+    setLoading(false);
+  }
+};
 
   /**
    * Re-route call to another RIO
-   */
-  const rerouteToRIO = async (callId, targetRIO, remarks) => {
-    try {
-      setLoading(true);
-      setError(null);
+   *//**
+ * Re-route call to another RIO (REAL API)
+ */
 
-      // Validate inputs
-      if (!targetRIO) {
-        throw new Error('Target RIO is required');
-      }
-      if (!remarks || remarks.trim().length === 0) {
-        throw new Error('Remarks are mandatory for re-routing a call');
-      }
+   const rerouteToRIO = async (
+  workflowTransitionId,
+  selectedCall,
+  targetRIO,
+  remarks
+) => {
+  try {
+    setLoading(true);
+    setError(null);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // In real implementation, this would call the API
-      console.log('Re-routing call:', callId, 'to', targetRIO, remarks);
-
-      setLoading(false);
-      return {
-        success: true,
-        message: `Call re-routed to ${targetRIO} successfully`,
-        data: {
-          callId,
-          targetRIO,
-          reroutedAt: new Date().toISOString(),
-          remarks
-        }
-      };
-    } catch (err) {
-      setError(err.message || 'Failed to re-route call');
-      setLoading(false);
-      return {
-        success: false,
-        message: err.message || 'Failed to re-route call'
-      };
+    if (!targetRIO) {
+      throw new Error('Target RIO is required');
     }
-  };
+    if (!remarks || !remarks.trim()) {
+      throw new Error('Remarks are mandatory for re-routing');
+    }
+
+    const user = getStoredUser();
+
+    const payload = {
+      workflowTransitionId,
+      requestId: selectedCall.callNumber,
+      action: 'FIX_ROUTING',
+      remarks,
+      actionBy: Number(user.userId),
+      pincode: null,
+      rioRouteChange: targetRIO,
+    };
+
+    const response = await axios.post(
+      `${BASE_URL}/performTransitionAction`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+      }
+    );
+
+    if (response.data?.responseStatus?.statusCode !== 0) {
+      throw new Error(response.data?.responseStatus?.message);
+    }
+
+    return { success: true };
+
+  } catch (err) {
+    setError(err.message);
+    return { success: false, message: err.message };
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
 
   /**
    * View call details
@@ -159,14 +218,34 @@ export const useCallActions = () => {
   /**
    * View call history
    */
-  const viewCallHistory = (callId) => {
-    // This would typically fetch call history
-    console.log('Viewing call history:', callId);
-    return {
-      success: true,
-      callId
-    };
-  };
+ /**
+ * Fetch workflow transition history (REAL API)
+ */
+const viewCallHistory = async (requestId) => {
+  const response = await axios.get(
+    `${BASE_URL}/workflowTransitionHistory`,
+    {
+      params: { requestId },
+      headers: {
+        ...getAuthHeaders(),
+      },
+    }
+  );
+
+  if (response.data?.responseStatus?.statusCode !== 0) {
+    throw new Error('Failed to fetch call history');
+  }
+
+  // Map backend response to UI table format
+  return response.data.responseData.map(item => ({
+    action: item.action || '-',
+    status: item.status || '-',
+    createdBy: item.createdBy || '-',
+    updatedBy: item.modifiedBy || '-',
+    createdDate: item.createdDate,
+  }));
+};
+
 
   return {
     // State

@@ -1,22 +1,12 @@
-/**
- * useCallDeskData Hook
- * Main data hook for Call Desk Module
- */
+
 
 import { useState, useEffect } from 'react';
-import {
-  MOCK_PENDING_VERIFICATION_CALLS,
-  MOCK_VERIFIED_OPEN_CALLS,
-  MOCK_DISPOSED_CALLS,
-  MOCK_DASHBOARD_KPIS,
-  MOCK_VENDORS,
-  MOCK_RIO_OFFICES,
-  MOCK_CALL_HISTORY
-} from '../utils/mockData';
+import axios from 'axios';
+import { getStoredUser, getAuthHeaders } from '../../../services/authService';
+const BASE_URL =
+  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 
-/**
- * Custom hook for Call Desk data management
- */
+
 export const useCallDeskData = () => {
   const [pendingCalls, setPendingCalls] = useState([]);
   const [verifiedCalls, setVerifiedCalls] = useState([]);
@@ -28,28 +18,84 @@ export const useCallDeskData = () => {
   const [error, setError] = useState(null);
 
   // Simulate API call to fetch data
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+ // Fetch data from backend API
+const fetchData = async () => {
+  try {
+    setLoading(true);
+    setError(null);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+    // Pending Verification Calls
+    const pending = await fetchPendingVerificationCalls();
 
-      // Set mock data
-      setPendingCalls(MOCK_PENDING_VERIFICATION_CALLS);
-      setVerifiedCalls(MOCK_VERIFIED_OPEN_CALLS);
-      setDisposedCalls(MOCK_DISPOSED_CALLS);
-      setDashboardKPIs(MOCK_DASHBOARD_KPIS);
-      setVendors(MOCK_VENDORS);
-      setRioOffices(MOCK_RIO_OFFICES);
+    setPendingCalls(pending);
 
-      setLoading(false);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch data');
-      setLoading(false);
+    // KPIs (derived from API data)
+    setDashboardKPIs({
+      pendingVerification: {
+        total: pending.length,
+        fresh: pending.length,
+        resubmissions: 0,
+        returned: 0,
+      },
+      verifiedOpen: {
+        total: 0,
+      },
+      disposed: {
+        total: 0,
+      },
+    });
+
+    setVerifiedCalls([]);   // later via API
+    setDisposedCalls([]);   // later via API
+    setVendors([]);         // later via API
+    setRioOffices([]);      // later via API
+
+  } catch (err) {
+    setError(err.message || 'Failed to fetch Call Desk data');
+  } finally {
+    setLoading(false);
+  }
+};
+
+  //  API: Fetch Pending Verification Calls
+const fetchPendingVerificationCalls = async () => {
+  const user = getStoredUser();
+
+  const response = await axios.get(
+    `${BASE_URL}/allPendingWorkflowTransition`,
+    {
+      params: {
+        roleName: 'RIO Help Desk',
+      },
+      headers: {
+        ...getAuthHeaders(),
+      },
     }
-  };
+  );
+
+  if (response.data?.responseStatus?.statusCode !== 0) {
+    throw new Error('Failed to fetch pending verification calls');
+  }
+
+  //  Filter by assignedToUser == logged-in user
+  return response.data.responseData
+    .filter(
+      item => String(item.rio) === String(user.rio)
+    )
+    .map(item => ({
+      id: item.workflowTransitionId,
+      callNumber: item.requestId,
+      vendor: { name: item.vendorName || '-' },
+      submissionDateTime: item.createdDate,
+      poNumber: item.poNo,
+      productStage: item.productType,
+      desiredInspectionDate: item.desiredInspectionDate,
+      placeOfInspection: '-',
+      status: item.status,
+      rio: item.rio,
+    }));
+};
+
 
   // Fetch data on mount
   useEffect(() => {
@@ -63,9 +109,9 @@ export const useCallDeskData = () => {
   };
 
   // Get call history
-  const getCallHistory = (callNumber) => {
-    return MOCK_CALL_HISTORY[callNumber] || [];
-  };
+ const getCallHistory = () => {
+  return [];
+};
 
   // Get calls by status
   const getCallsByStatus = (status) => {
