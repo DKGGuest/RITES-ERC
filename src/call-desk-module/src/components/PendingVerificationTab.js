@@ -1,12 +1,15 @@
 /**
  * Pending Verification Tab Component
  * Displays pending verification calls with action buttons
+ * Updated: Filter data mapping fixed to prevent duplicates
+ * Updated: Added CallDetailsModal for comprehensive call details view
  */
 
 import React, { useState, useMemo } from 'react';
 import DataTable from '../../../components/DataTable';
 import StatusBadge from '../../../components/StatusBadge';
 import CallsFilterSection from '../../../components/common/CallsFilterSection';
+import CallDetailsModal from './CallDetailsModal';
 import { CALL_STATUS_CONFIG } from '../utils/constants';
 import { formatDateTime } from '../utils/helpers';
 
@@ -20,6 +23,8 @@ const PendingVerificationTab = ({
   onViewDetails
 }) => {
   const [searchTerm] = useState('');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedCall, setSelectedCall] = useState(null);
 
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
@@ -133,17 +138,13 @@ const PendingVerificationTab = ({
           </button>
           <button
             className="btn btn-sm btn-secondary"
-            onClick={() => onViewDetails(row)}
+            onClick={() => {
+              setSelectedCall(row);
+              setShowDetailsModal(true);
+            }}
             title="View Full Details"
           >
             👁️ Details
-          </button>
-          <button
-            className="btn btn-sm btn-success"
-            onClick={() => onVerifyAccept(row)}
-            title="Verify & Accept"
-          >
-            ✅ Verify
           </button>
           <button
             className="btn btn-sm btn-warning"
@@ -242,14 +243,28 @@ const PendingVerificationTab = ({
   };
 
   // Prepare data for CallsFilterSection - map Call Desk data structure to expected format
-  const callsForFilter = calls.map(call => ({
-    ...call,
+  const callsForFilter = useMemo(() => {
+    const mapped = calls.map(call => ({
+      product_type: call.product,
+      vendor_name: call.vendor?.name,
+      po_no: call.poNumber,
+      call_no: call.callNumber,
+      requested_date: call.submissionDateTime,
+      stage: call.stage
+    }));
+    console.log('🔧 FILTER FIX ACTIVE - callsForFilter mapped:', mapped.length, 'calls');
+    return mapped;
+  }, [calls]);
+
+  // Map filtered calls for CallsFilterSection
+  const filteredCallsForFilter = useMemo(() => filteredCalls.map(call => ({
     product_type: call.product,
     vendor_name: call.vendor?.name,
     po_no: call.poNumber,
     call_no: call.callNumber,
-    requested_date: call.submissionDateTime
-  }));
+    requested_date: call.submissionDateTime,
+    stage: call.stage
+  })), [filteredCalls]);
 
   return (
 
@@ -274,14 +289,7 @@ const PendingVerificationTab = ({
       {/* Filter Section */}
       <CallsFilterSection
         allCalls={callsForFilter}
-        filteredCalls={filteredCalls.map(call => ({
-          ...call,
-          product_type: call.product,
-          vendor_name: call.vendor?.name,
-          po_no: call.poNumber,
-          call_no: call.callNumber,
-          requested_date: call.submissionDateTime
-        }))}
+        filteredCalls={filteredCallsForFilter}
         filters={filters}
         setFilters={setFilters}
         showFilters={showFilters}
@@ -301,6 +309,17 @@ const PendingVerificationTab = ({
         columns={columns}
         data={filteredCalls}
         emptyMessage="No pending verification calls found"
+      />
+
+      {/* Call Details Modal */}
+      <CallDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedCall(null);
+        }}
+        call={selectedCall}
+        onVerifyAccept={onVerifyAccept}
       />
     </div>
   );

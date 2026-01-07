@@ -17,9 +17,9 @@ export const MOCK_VENDORS = [
 // Mock Dashboard KPIs
 export const MOCK_DASHBOARD_KPIS = {
   pendingFinanceApproval: {
-    count: 12,
-    amount: 2450000,
-    slaBreached: 3
+    count: 9,
+    amount: 1025000, // 3 Advance (580k) + 3 Cancellation (75k) + 3 Rejection (115k) = 770k + returned/resubmitted (255k)
+    slaBreached: 1
   },
   pendingBilling: {
     count: 8,
@@ -45,6 +45,7 @@ export const MOCK_DASHBOARD_KPIS = {
 
 // Section 1: Vendor Payments - Pending Finance Approval
 export const MOCK_PENDING_PAYMENTS = [
+  // ADVANCE_PAYMENT samples (3 payments)
   {
     id: 'PAY-001',
     callNumber: 'CALL-2025-001',
@@ -52,30 +53,30 @@ export const MOCK_PENDING_PAYMENTS = [
     poNumber: 'PO-2024-1001',
     productType: PRODUCT_TYPES.ERC,
     stage: INSPECTION_STAGES.FINAL,
-    paymentType: PAYMENT_TYPES.INSPECTION_FEE,
-    amount: 125000,
+    paymentType: PAYMENT_TYPES.ADVANCE_PAYMENT,
+    amount: 250000,
     submissionDate: '2025-01-20T10:30:00',
     submittedBy: 'IE - Rajesh Kumar',
-    paymentStatus: PAYMENT_STATUS.PENDING_FINANCE_APPROVAL,
-    remarks: 'Final inspection completed, IC issued',
-    documents: ['invoice.pdf', 'ic_certificate.pdf'],
+    paymentStatus: PAYMENT_STATUS.PAYMENT_SUBMITTED,
+    remarks: 'Advance payment request - 40% of total contract value for upcoming final inspection',
+    documents: ['advance_request.pdf', 'contract_copy.pdf', 'po_copy.pdf'],
     slaBreached: false
   },
   {
     id: 'PAY-002',
     callNumber: 'CALL-2025-002',
-    vendor: { id: 'V002', name: 'XYZ Manufacturing Ltd' },
+    vendor: { id: 'V005', name: 'RST Industries' },
     poNumber: 'PO-2024-1002',
     productType: PRODUCT_TYPES.SLEEPER,
     stage: INSPECTION_STAGES.RAW_MATERIAL,
-    paymentType: PAYMENT_TYPES.TESTING_FEE,
-    amount: 85000,
-    submissionDate: '2025-01-18T14:15:00',
-    submittedBy: 'IE - Priya Sharma',
-    paymentStatus: PAYMENT_STATUS.PENDING_FINANCE_APPROVAL,
-    remarks: 'Lab testing completed',
-    documents: ['test_report.pdf', 'invoice.pdf'],
-    slaBreached: true
+    paymentType: PAYMENT_TYPES.ADVANCE_PAYMENT,
+    amount: 180000,
+    submissionDate: '2025-01-21T14:15:00',
+    submittedBy: 'IE - Vikram Singh',
+    paymentStatus: PAYMENT_STATUS.PAYMENT_SUBMITTED,
+    remarks: 'Advance payment for raw material inspection - 35% of estimated charges',
+    documents: ['advance_request.pdf', 'contract_agreement.pdf'],
+    slaBreached: false
   },
   {
     id: 'PAY-003',
@@ -84,32 +85,37 @@ export const MOCK_PENDING_PAYMENTS = [
     poNumber: 'PO-2024-1003',
     productType: PRODUCT_TYPES.GRSP,
     stage: INSPECTION_STAGES.PROCESS,
-    paymentType: PAYMENT_TYPES.INSPECTION_FEE,
-    amount: 95000,
-    submissionDate: '2025-01-22T09:00:00',
+    paymentType: PAYMENT_TYPES.ADVANCE_PAYMENT,
+    amount: 150000,
+    submissionDate: '2025-01-15T09:00:00',
     submittedBy: 'IE - Amit Patel',
-    paymentStatus: PAYMENT_STATUS.PENDING_FINANCE_APPROVAL,
-    remarks: 'Process inspection completed',
-    documents: ['invoice.pdf'],
+    paymentStatus: PAYMENT_STATUS.RETURNED,
+    remarks: 'Advance payment request - documentation incomplete',
+    returnReason: 'Contract copy missing. Please attach signed contract agreement and resubmit.',
+    returnedBy: 'Finance - Suresh Menon',
+    returnedDate: '2025-01-17T11:30:00',
+    documents: ['advance_request.pdf'],
     slaBreached: false
   },
+
+  // CALL_CANCELLATION_CHARGES samples (3 payments)
   {
     id: 'PAY-004',
     callNumber: 'CALL-2025-004',
-    vendor: { id: 'V001', name: 'ABC Steel Industries' },
+    vendor: { id: 'V002', name: 'XYZ Manufacturing Ltd' },
     poNumber: 'PO-2024-1004',
     productType: PRODUCT_TYPES.ERC,
     stage: INSPECTION_STAGES.FINAL,
-    paymentType: PAYMENT_TYPES.TRAVEL_CHARGES,
-    amount: 15000,
-    submissionDate: '2025-01-17T11:30:00',
-    submittedBy: 'IE - Rajesh Kumar',
+    paymentType: PAYMENT_TYPES.CALL_CANCELLATION_CHARGES,
+    amount: 28000,
+    submissionDate: '2025-01-19T11:30:00',
+    submittedBy: 'IE - Priya Sharma',
     paymentStatus: PAYMENT_STATUS.RETURNED,
-    remarks: 'Incorrect travel claim amount',
-    returnReason: 'Travel claim exceeds approved limit. Please revise.',
+    remarks: 'Call cancellation charges - vendor cancelled after IE assignment',
+    returnReason: 'Charge calculation incorrect. Please revise as per contract clause 5.2 and resubmit.',
     returnedBy: 'Finance - Suresh Menon',
-    returnedDate: '2025-01-19T16:00:00',
-    documents: ['travel_claim.pdf'],
+    returnedDate: '2025-01-21T10:00:00',
+    documents: ['cancellation_notice.pdf', 'charge_calculation.pdf'],
     slaBreached: true
   },
   {
@@ -119,14 +125,81 @@ export const MOCK_PENDING_PAYMENTS = [
     poNumber: 'PO-2024-1005',
     productType: PRODUCT_TYPES.SLEEPER,
     stage: INSPECTION_STAGES.RAW_MATERIAL,
-    paymentType: PAYMENT_TYPES.INSPECTION_FEE,
-    amount: 110000,
+    paymentType: PAYMENT_TYPES.CALL_CANCELLATION_CHARGES,
+    amount: 22000,
     submissionDate: '2025-01-23T13:45:00',
     submittedBy: 'IE - Neha Gupta',
     paymentStatus: PAYMENT_STATUS.RESUBMITTED,
-    remarks: 'Resubmitted with corrected invoice',
-    originalSubmissionDate: '2025-01-15T10:00:00',
-    documents: ['invoice_revised.pdf', 'ic_certificate.pdf'],
+    remarks: 'Resubmitted with corrected charge calculation - late cancellation by vendor',
+    originalSubmissionDate: '2025-01-18T10:00:00',
+    documents: ['cancellation_notice.pdf', 'charge_calculation_revised.pdf', 'expense_breakdown.pdf'],
+    slaBreached: false
+  },
+  {
+    id: 'PAY-006',
+    callNumber: 'CALL-2025-006',
+    vendor: { id: 'V001', name: 'ABC Steel Industries' },
+    poNumber: 'PO-2024-1006',
+    productType: PRODUCT_TYPES.GRSP,
+    stage: INSPECTION_STAGES.PROCESS,
+    paymentType: PAYMENT_TYPES.CALL_CANCELLATION_CHARGES,
+    amount: 25000,
+    submissionDate: '2025-01-22T15:30:00',
+    submittedBy: 'IE - Rajesh Kumar',
+    paymentStatus: PAYMENT_STATUS.RESUBMITTED,
+    remarks: 'Resubmitted - call cancelled less than 24 hours before scheduled inspection',
+    originalSubmissionDate: '2025-01-16T14:00:00',
+    documents: ['cancellation_notice.pdf', 'charge_invoice_revised.pdf', 'travel_expenses.pdf'],
+    slaBreached: false
+  },
+
+  // CALL_REJECTION_CHARGES samples (3 payments)
+  {
+    id: 'PAY-007',
+    callNumber: 'CALL-2025-007',
+    vendor: { id: 'V003', name: 'PQR Engineering Works' },
+    poNumber: 'PO-2024-1007',
+    productType: PRODUCT_TYPES.ERC,
+    stage: INSPECTION_STAGES.FINAL,
+    paymentType: PAYMENT_TYPES.CALL_REJECTION_CHARGES,
+    amount: 45000,
+    submissionDate: '2025-01-20T11:15:00',
+    submittedBy: 'IE - Amit Patel',
+    paymentStatus: PAYMENT_STATUS.PENDING_FINANCE_APPROVAL,
+    remarks: 'Material rejected during final inspection - charges for additional visits and re-inspection',
+    documents: ['rejection_report.pdf', 'charge_invoice.pdf', 'visit_log.pdf'],
+    slaBreached: false
+  },
+  {
+    id: 'PAY-008',
+    callNumber: 'CALL-2025-008',
+    vendor: { id: 'V005', name: 'RST Industries' },
+    poNumber: 'PO-2024-1008',
+    productType: PRODUCT_TYPES.SLEEPER,
+    stage: INSPECTION_STAGES.PROCESS,
+    paymentType: PAYMENT_TYPES.CALL_REJECTION_CHARGES,
+    amount: 38000,
+    submissionDate: '2025-01-24T09:30:00',
+    submittedBy: 'IE - Vikram Singh',
+    paymentStatus: PAYMENT_STATUS.PENDING_FINANCE_APPROVAL,
+    remarks: 'Multiple rejections during process inspection - charges for three additional visits',
+    documents: ['rejection_report.pdf', 'visit_log.pdf', 'charge_breakdown.pdf'],
+    slaBreached: false
+  },
+  {
+    id: 'PAY-009',
+    callNumber: 'CALL-2025-009',
+    vendor: { id: 'V002', name: 'XYZ Manufacturing Ltd' },
+    poNumber: 'PO-2024-1009',
+    productType: PRODUCT_TYPES.GRSP,
+    stage: INSPECTION_STAGES.RAW_MATERIAL,
+    paymentType: PAYMENT_TYPES.CALL_REJECTION_CHARGES,
+    amount: 32000,
+    submissionDate: '2025-01-22T14:00:00',
+    submittedBy: 'IE - Priya Sharma',
+    paymentStatus: PAYMENT_STATUS.PENDING_FINANCE_APPROVAL,
+    remarks: 'Raw material rejected - charges for re-inspection and additional testing',
+    documents: ['rejection_report.pdf', 'charge_invoice.pdf'],
     slaBreached: false
   }
 ];
@@ -145,10 +218,19 @@ export const MOCK_PENDING_BILLING = [
     inspectionAmount: 125000,
     testingAmount: 35000,
     totalAmount: 160000,
-    billStatus: BILL_STATUS.BILLING_PENDING,
+    billStatus: BILL_STATUS.IC_ISSUED_BILLING_PENDING,
     assignedTo: 'Finance - Suresh Menon',
     remarks: 'IC issued, ready for billing',
-    slaBreached: true
+    slaBreached: true,
+    paymentHistory: [
+      {
+        timestamp: '2025-01-15T10:00:00.000Z',
+        action: 'IC_ISSUED',
+        description: 'Inspection Certificate issued after successful final inspection',
+        performedBy: 'IE - Rajesh Kumar',
+        status: 'ic_issued_billing_pending'
+      }
+    ]
   },
   {
     id: 'IC-002',
@@ -162,12 +244,19 @@ export const MOCK_PENDING_BILLING = [
     inspectionAmount: 95000,
     testingAmount: 0,
     totalAmount: 95000,
-    billStatus: BILL_STATUS.UNDER_SUSPENSE,
+    billStatus: BILL_STATUS.REJECTED_BILLING_PENDING,
     assignedTo: 'Finance - Suresh Menon',
-    remarks: 'Payment not received for previous bill',
-    suspenseReason: 'Vendor has outstanding payment of ₹2,50,000 from previous billing cycle',
-    suspenseDate: '2025-01-21T09:00:00',
-    slaBreached: false
+    remarks: 'Rejected call, billing for rejection charges',
+    slaBreached: false,
+    paymentHistory: [
+      {
+        timestamp: '2025-01-20T14:30:00.000Z',
+        action: 'CALL_REJECTED',
+        description: 'Call rejected due to quality issues - rejection charges applicable',
+        performedBy: 'IE - Vikram Singh',
+        status: 'rejected_billing_pending'
+      }
+    ]
   },
   {
     id: 'IC-003',
@@ -181,14 +270,33 @@ export const MOCK_PENDING_BILLING = [
     inspectionAmount: 75000,
     testingAmount: 25000,
     totalAmount: 100000,
-    billStatus: BILL_STATUS.BILLING_PENDING,
+    billStatus: BILL_STATUS.ADVANCE_SUSPENSE,
     assignedTo: 'Finance - Suresh Menon',
-    remarks: 'Ready for billing',
-    slaBreached: false
+    remarks: 'Advance payment on hold',
+    suspenseReason: 'Vendor has outstanding payment of ₹2,50,000 from previous billing cycle',
+    suspenseDate: '2025-01-21T09:00:00',
+    slaBreached: false,
+    paymentHistory: [
+      {
+        timestamp: '2025-01-18T09:30:00.000Z',
+        action: 'ADVANCE_PAYMENT_RECEIVED',
+        description: 'Advance payment received from vendor',
+        amount: 100000,
+        performedBy: 'Vendor - PQR Engineering Works',
+        status: 'advance_payment_received'
+      },
+      {
+        timestamp: '2025-01-21T09:00:00.000Z',
+        action: 'STATUS_CHANGED',
+        description: 'Payment placed under suspense - Vendor has outstanding payment of ₹2,50,000 from previous billing cycle',
+        performedBy: 'Finance - Suresh Menon',
+        status: 'advance_suspense'
+      }
+    ]
   }
 ];
 
-// Section 3: Bills Generated - Payment Pending
+// Section 3: Pending Payment - Bills Generated Awaiting Payment
 export const MOCK_BILLS_GENERATED = [
   {
     id: 'BILL-001',
@@ -207,7 +315,25 @@ export const MOCK_BILLS_GENERATED = [
     dueDate: '2025-01-24T23:59:59',
     remarks: 'Bill sent to vendor',
     documents: ['bill_202501_0001.pdf'],
-    slaBreached: false
+    slaBreached: false,
+    paymentHistory: [
+      {
+        timestamp: '2025-01-08T10:00:00.000Z',
+        action: 'IC_ISSUED',
+        description: 'Inspection Certificate issued after successful final inspection',
+        performedBy: 'IE - Rajesh Kumar',
+        status: 'ic_issued_billing_pending'
+      },
+      {
+        timestamp: '2025-01-10T10:00:00.000Z',
+        action: 'BILL_GENERATED',
+        description: 'Bill generated and sent to vendor',
+        amount: 218300,
+        billNumber: 'BILL-202501-0001',
+        performedBy: 'Finance - Suresh Menon',
+        status: 'bill_generated'
+      }
+    ]
   },
   {
     id: 'BILL-002',
@@ -274,7 +400,41 @@ export const MOCK_BILLS_CLEARED = [
     clearedDate: '2024-12-29T10:00:00',
     clearedBy: 'Finance - Suresh Menon',
     remarks: 'Payment cleared successfully',
-    documents: ['bill_202412_0045.pdf', 'payment_proof.pdf']
+    documents: ['bill_202412_0045.pdf', 'payment_proof.pdf'],
+    paymentHistory: [
+      {
+        timestamp: '2024-12-12T10:00:00.000Z',
+        action: 'IC_ISSUED',
+        description: 'Inspection Certificate issued after successful final inspection',
+        performedBy: 'IE - Rajesh Kumar',
+        status: 'ic_issued_billing_pending'
+      },
+      {
+        timestamp: '2024-12-15T10:00:00.000Z',
+        action: 'BILL_GENERATED',
+        description: 'Bill generated and sent to vendor',
+        amount: 177000,
+        billNumber: 'BILL-202412-0045',
+        performedBy: 'Finance - Suresh Menon',
+        status: 'bill_generated'
+      },
+      {
+        timestamp: '2024-12-28T14:30:00.000Z',
+        action: 'PAYMENT_RECORDED',
+        description: 'Payment received from vendor via RTGS',
+        amount: 177000,
+        paymentReference: 'UTR-2024122800456',
+        performedBy: 'Finance - Suresh Menon',
+        status: 'payment_recorded'
+      },
+      {
+        timestamp: '2024-12-29T10:00:00.000Z',
+        action: 'BILL_CLEARED',
+        description: 'Bill cleared and transaction completed',
+        performedBy: 'Finance - Suresh Menon',
+        status: 'bill_cleared'
+      }
+    ]
   },
   {
     id: 'BILL-CLR-002',

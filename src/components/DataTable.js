@@ -1,6 +1,26 @@
 import React, { useState, useMemo } from 'react';
 
-const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRows, onSelectionChange }) => {
+// Helper function to recursively search through nested objects and arrays
+const deepSearch = (obj, searchText) => {
+  if (obj === null || obj === undefined) {
+    return false;
+  }
+
+  // If it's a primitive value, convert to string and search
+  if (typeof obj !== 'object') {
+    return String(obj).toLowerCase().includes(searchText);
+  }
+
+  // If it's an array, search each element
+  if (Array.isArray(obj)) {
+    return obj.some(item => deepSearch(item, searchText));
+  }
+
+  // If it's an object, search all values recursively
+  return Object.values(obj).some(val => deepSearch(val, searchText));
+};
+
+const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRows, onSelectionChange, hideSearch = false, emptyMessage = 'No data available' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
@@ -11,11 +31,8 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
     let result = [...data];
 
     if (searchTerm) {
-      result = result.filter(row =>
-        Object.values(row).some(val =>
-          String(val).toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
+      const searchText = searchTerm.toLowerCase();
+      result = result.filter(row => deepSearch(row, searchText));
     }
 
     if (sortColumn) {
@@ -69,13 +86,15 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
   return (
     <div className="data-table-wrapper">
       <div className="table-controls">
-        <input
-          type="text"
-          className="form-control search-box"
-          placeholder="Search..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        {!hideSearch && (
+          <input
+            type="text"
+            className="form-control search-box"
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        )}
         <select
           className="form-control"
           style={{ width: '120px' }}
@@ -130,6 +149,13 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
               {actions && <td data-label="Actions">{actions(row)}</td>}
             </tr>
           ))}
+          {paginatedData.length === 0 && (
+            <tr>
+              <td colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                {emptyMessage}
+              </td>
+            </tr>
+          )}
         </tbody>
         </table>
       </div>

@@ -109,15 +109,24 @@ const CallDeskDashboard = () => {
   };
 
   const submitReturn = async () => {
+    // Validation: Check if remarks are provided
     if (!selectedCall || !actionRemarks.trim()) {
       alert('Remarks are mandatory for returning a call');
       return;
     }
-    
+
+    // Validation: Check if at least one field is flagged
+    if (flaggedFields.length === 0) {
+      alert('Please select at least one field that requires correction');
+      return;
+    }
+
     const result = await returnForRectification(selectedCall.id, actionRemarks, flaggedFields);
     if (result.success) {
       alert('Call returned for rectification successfully!');
       setShowReturnModal(false);
+      setActionRemarks('');
+      setFlaggedFields([]);
       refreshData();
     } else {
       alert(result.message);
@@ -205,6 +214,7 @@ const CallDeskDashboard = () => {
         <VerifiedOpenCallsTab
           calls={verifiedCalls}
           kpis={dashboardKPIs?.verifiedOpen || {}}
+          onViewHistory={handleViewHistory}
         />
       )}
 
@@ -212,6 +222,7 @@ const CallDeskDashboard = () => {
         <DisposedCallsTab
           calls={disposedCalls}
           kpis={dashboardKPIs?.disposed || {}}
+          onViewHistory={handleViewHistory}
         />
       )}
 
@@ -369,30 +380,49 @@ const CallDeskDashboard = () => {
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Remarks (Mandatory): <span className="text-danger">*</span></label>
-                <textarea
-                  className="form-control"
-                  rows="4"
-                  value={actionRemarks}
-                  onChange={(e) => setActionRemarks(e.target.value)}
-                  placeholder="Enter reason for returning the call..."
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Flag Fields for Correction:</label>
+                <label>Flagged Fields for Correction: <span className="text-danger">*</span></label>
+                <p className="field-description">Select the specific sections that require correction by the vendor</p>
                 <div className="checkbox-group">
-                  {['poNumber', 'quantity', 'desiredInspectionDate', 'placeOfInspection', 'documents'].map(field => (
-                    <label key={field} className="checkbox-label">
+                  {[
+                    { value: 'poDetails', label: '📄 PO Details' },
+                    { value: 'deliveryPeriod', label: '📅 Delivery Period' },
+                    { value: 'maDetails', label: '📋 MA Details' },
+                    { value: 'quantity', label: '🔢 Quantity' },
+                    { value: 'placeOfInspection', label: '📍 Place of Inspection' },
+                    { value: 'subPoDetails', label: '📦 Sub PO Details' }
+                  ].map(field => (
+                    <label key={field.value} className="checkbox-label">
                       <input
                         type="checkbox"
-                        checked={flaggedFields.includes(field)}
-                        onChange={() => toggleFlaggedField(field)}
+                        checked={flaggedFields.includes(field.value)}
+                        onChange={() => toggleFlaggedField(field.value)}
                       />
-                      <span>{field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
+                      <span>{field.label}</span>
                     </label>
                   ))}
                 </div>
+                {flaggedFields.length === 0 && (
+                  <p className="validation-hint text-danger" style={{ marginTop: '8px', fontSize: '13px' }}>
+                    ⚠️ Please select at least one field that requires correction
+                  </p>
+                )}
+              </div>
+              <div className="form-group">
+                <label>Remarks (Mandatory): <span className="text-danger">*</span></label>
+                <p className="field-description">Provide exact details about the issues identified in the selected fields above</p>
+                <textarea
+                  className="form-control"
+                  rows="5"
+                  value={actionRemarks}
+                  onChange={(e) => setActionRemarks(e.target.value)}
+                  placeholder="Enter detailed explanation of the issues found in the flagged fields. Be specific about what needs to be corrected..."
+                  required
+                />
+                {actionRemarks.trim().length === 0 && (
+                  <p className="validation-hint text-danger" style={{ marginTop: '8px', fontSize: '13px' }}>
+                    ⚠️ Remarks are mandatory for returning a call
+                  </p>
+                )}
               </div>
             </div>
             <div className="modal-footer">
@@ -402,7 +432,7 @@ const CallDeskDashboard = () => {
               <button
                 className="btn btn-warning"
                 onClick={submitReturn}
-                disabled={actionLoading || !actionRemarks.trim()}
+                disabled={actionLoading || !actionRemarks.trim() || flaggedFields.length === 0}
               >
                 {actionLoading ? 'Processing...' : '↩️ Return for Rectification'}
               </button>

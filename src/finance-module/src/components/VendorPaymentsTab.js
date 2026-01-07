@@ -1,10 +1,13 @@
 /**
  * Vendor Payments Tab Component
  * Section 1: Vendor Payments - Pending Finance Approval
+ * Updated: Uses PaymentsFilterSection following Call Desk Module pattern
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import DataTable from '../../../components/DataTable';
+import PaymentsFilterSection from './PaymentsFilterSection';
+import ApprovePaymentModal from './ApprovePaymentModal';
 import { formatDateTime, formatCurrency, getPaymentStatusBadge, getSLAStatus } from '../utils/helpers';
 import { PAYMENT_STATUS } from '../utils/constants';
 
@@ -14,6 +17,18 @@ const VendorPaymentsTab = ({ payments = [], kpis = {}, onApprove, onReturn }) =>
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [remarks, setRemarks] = useState('');
   const [returnReason, setReturnReason] = useState('');
+
+  // Filter state - following Call Desk Module pattern
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterSearch, setFilterSearch] = useState(''); // Search within filter modal options
+  const [selectedCategory, setSelectedCategory] = useState('Payment Type');
+  const [filters, setFilters] = useState({
+    paymentTypes: [],
+    vendors: [],
+    statuses: [],
+    dateFrom: '',
+    dateTo: ''
+  });
 
   // KPI Tiles
   const kpiTiles = [
@@ -50,16 +65,6 @@ const VendorPaymentsTab = ({ payments = [], kpis = {}, onApprove, onReturn }) =>
       label: 'Vendor Name',
       sortable: true,
       render: (value) => value?.name || '-'
-    },
-    {
-      key: 'poNumber',
-      label: 'PO Number',
-      sortable: true
-    },
-    {
-      key: 'productType',
-      label: 'Product Type',
-      sortable: true
     },
     {
       key: 'paymentType',
@@ -180,6 +185,9 @@ const VendorPaymentsTab = ({ payments = [], kpis = {}, onApprove, onReturn }) =>
       setShowApproveModal(false);
       setSelectedPayment(null);
       setRemarks('');
+
+      // Show success notification
+      alert(`✅ Payment approved successfully!\n\nCall Number: ${selectedPayment.callNumber}\nVendor: ${selectedPayment.vendor?.name}\nAmount: ${formatCurrency(selectedPayment.amount)}`);
     }
   };
 
@@ -192,6 +200,63 @@ const VendorPaymentsTab = ({ payments = [], kpis = {}, onApprove, onReturn }) =>
     } else {
       alert('Return reason is mandatory');
     }
+  };
+
+  // Apply filters - following Call Desk Module pattern
+  const filteredPayments = useMemo(() => {
+    let result = [...payments];
+
+    // Payment Type filter
+    if (filters.paymentTypes.length > 0) {
+      result = result.filter(payment => filters.paymentTypes.includes(payment.paymentType));
+    }
+
+    // Vendor filter
+    if (filters.vendors.length > 0) {
+      result = result.filter(payment => filters.vendors.includes(payment.vendor?.name));
+    }
+
+    // Status filter
+    if (filters.statuses.length > 0) {
+      result = result.filter(payment => filters.statuses.includes(payment.paymentStatus));
+    }
+
+    // Date range filter
+    if (filters.dateFrom) {
+      result = result.filter(payment => new Date(payment.submissionDate) >= new Date(filters.dateFrom));
+    }
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo);
+      toDate.setHours(23, 59, 59, 999); // Include the entire day
+      result = result.filter(payment => new Date(payment.submissionDate) <= toDate);
+    }
+
+    return result;
+  }, [payments, filters]);
+
+  // Filter handlers - following Call Desk Module pattern
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleMultiSelectToggle = (key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: prev[key].includes(value)
+        ? prev[key].filter(v => v !== value)
+        : [...prev[key], value]
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      paymentTypes: [],
+      vendors: [],
+      statuses: [],
+      dateFrom: '',
+      dateTo: ''
+    });
+    setFilterSearch(''); // Clear filter modal search
   };
 
   return (
@@ -213,42 +278,45 @@ const VendorPaymentsTab = ({ payments = [], kpis = {}, onApprove, onReturn }) =>
         ))}
       </div>
 
+      {/* Filter Section - Following Call Desk Module Pattern */}
+      <PaymentsFilterSection
+        allPayments={payments}
+        filteredPayments={filteredPayments}
+        filters={filters}
+        setFilters={setFilters}
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        filterSearch={filterSearch}
+        setFilterSearch={setFilterSearch}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        clearAllFilters={clearAllFilters}
+        handleFilterChange={handleFilterChange}
+        handleMultiSelectToggle={handleMultiSelectToggle}
+        summaryLabel="payments"
+      />
+
       {/* Data Table */}
       <DataTable
         columns={columns}
-        data={payments}
+        data={filteredPayments}
+        hideSearch={false}
         emptyMessage="No pending payments found"
       />
 
       {/* Approve Modal */}
       {showApproveModal && (
-        <div className="modal-overlay" onClick={() => setShowApproveModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Approve Payment</h3>
-              <button className="modal-close" onClick={() => setShowApproveModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p><strong>Call Number:</strong> {selectedPayment?.callNumber}</p>
-              <p><strong>Vendor:</strong> {selectedPayment?.vendor?.name}</p>
-              <p><strong>Amount:</strong> {formatCurrency(selectedPayment?.amount)}</p>
-              <div className="form-group">
-                <label className="form-label">Remarks (Optional)</label>
-                <textarea
-                  className="form-control"
-                  rows="3"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Enter any remarks..."
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowApproveModal(false)}>Cancel</button>
-              <button className="btn btn-success" onClick={handleApproveSubmit}>Approve Payment</button>
-            </div>
-          </div>
-        </div>
+        <ApprovePaymentModal
+          payment={selectedPayment}
+          remarks={remarks}
+          setRemarks={setRemarks}
+          onApprove={handleApproveSubmit}
+          onClose={() => {
+            setShowApproveModal(false);
+            setSelectedPayment(null);
+            setRemarks('');
+          }}
+        />
       )}
 
       {/* Return Modal */}

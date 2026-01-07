@@ -16,6 +16,11 @@ export const useBillingActions = () => {
 
   /**
    * Generate bill for inspection call
+   *
+   * Billing Flow Logic:
+   * - ADVANCE_SUSPENSE: Bill generated → BILL_CLEARED (advance payment already received)
+   * - IC_ISSUED_BILLING_PENDING: Bill generated → BILL_GENERATED (standard flow)
+   * - REJECTED_BILLING_PENDING: Bill generated → BILL_GENERATED (standard flow)
    */
   const generateBill = async (inspectionCall, billData) => {
     try {
@@ -29,11 +34,27 @@ export const useBillingActions = () => {
       const gstAmount = billData.billAmount * 0.18; // 18% GST
       const totalAmount = billData.billAmount + gstAmount;
 
+      // Determine target status based on current billing status
+      // ADVANCE_SUSPENSE calls go directly to BILL_CLEARED (advance payment already received)
+      // Other statuses go to BILL_GENERATED (standard billing flow)
+      const targetStatus = inspectionCall.billStatus === BILL_STATUS.ADVANCE_SUSPENSE
+        ? BILL_STATUS.BILL_CLEARED
+        : BILL_STATUS.BILL_GENERATED;
+
+      const statusMessage = targetStatus === BILL_STATUS.BILL_CLEARED
+        ? 'Bill generated and cleared (advance payment already received)'
+        : 'Bill generated successfully';
+
       // In production, this would call the backend API
       // const response = await fetch('/api/finance/generate-bill', {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ ...billData, billNumber })
+      //   body: JSON.stringify({
+      //     ...billData,
+      //     billNumber,
+      //     currentStatus: inspectionCall.billStatus,
+      //     targetStatus
+      //   })
       // });
 
       console.log('Bill generated:', {
@@ -42,14 +63,30 @@ export const useBillingActions = () => {
         billAmount: billData.billAmount,
         gstAmount,
         totalAmount,
+        currentStatus: inspectionCall.billStatus,
+        targetStatus,
+        statusMessage,
         generatedBy: 'Finance - Suresh Menon',
         generatedAt: new Date().toISOString()
       });
 
+      // Create history entry for bill generation
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        action: 'BILL_GENERATED',
+        description: targetStatus === BILL_STATUS.BILL_CLEARED
+          ? 'Bill generated and automatically cleared (advance payment already received)'
+          : 'Bill generated and sent to vendor',
+        amount: totalAmount,
+        billNumber,
+        performedBy: 'Finance - Suresh Menon',
+        status: targetStatus
+      };
+
       setLoading(false);
       return {
         success: true,
-        message: `Bill ${billNumber} generated successfully`,
+        message: statusMessage,
         data: {
           billNumber,
           callNumber: inspectionCall.callNumber,
@@ -59,9 +96,11 @@ export const useBillingActions = () => {
           billAmount: billData.billAmount,
           gstAmount,
           totalAmount,
-          billStatus: BILL_STATUS.BILL_GENERATED,
+          billStatus: targetStatus,
+          previousStatus: inspectionCall.billStatus,
           generatedBy: 'Finance - Suresh Menon',
-          generatedAt: new Date().toISOString()
+          generatedAt: new Date().toISOString(),
+          paymentHistory: [...(inspectionCall.paymentHistory || []), historyEntry]
         }
       };
     } catch (err) {
@@ -105,6 +144,17 @@ export const useBillingActions = () => {
         recordedAt: new Date().toISOString()
       });
 
+      // Create history entry for payment recording
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        action: 'PAYMENT_RECORDED',
+        description: `Payment received from vendor via ${paymentData.paymentMode}`,
+        amount: bill.totalAmount,
+        paymentReference: paymentData.paymentReference,
+        performedBy: 'Finance - Suresh Menon',
+        status: BILL_STATUS.PAYMENT_RECORDED
+      };
+
       setLoading(false);
       return {
         success: true,
@@ -116,7 +166,8 @@ export const useBillingActions = () => {
           paymentReference: paymentData.paymentReference,
           paymentMode: paymentData.paymentMode,
           recordedBy: 'Finance - Suresh Menon',
-          recordedAt: new Date().toISOString()
+          recordedAt: new Date().toISOString(),
+          paymentHistory: [...(bill.paymentHistory || []), historyEntry]
         }
       };
     } catch (err) {
@@ -153,6 +204,15 @@ export const useBillingActions = () => {
         clearedAt: new Date().toISOString()
       });
 
+      // Create history entry for bill clearing
+      const historyEntry = {
+        timestamp: new Date().toISOString(),
+        action: 'BILL_CLEARED',
+        description: 'Bill cleared and transaction completed',
+        performedBy: 'Finance - Suresh Menon',
+        status: BILL_STATUS.BILL_CLEARED
+      };
+
       setLoading(false);
       return {
         success: true,
@@ -161,7 +221,8 @@ export const useBillingActions = () => {
           ...bill,
           billStatus: BILL_STATUS.BILL_CLEARED,
           clearedBy: 'Finance - Suresh Menon',
-          clearedAt: new Date().toISOString()
+          clearedAt: new Date().toISOString(),
+          paymentHistory: [...(bill.paymentHistory || []), historyEntry]
         }
       };
     } catch (err) {

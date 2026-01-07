@@ -9,7 +9,7 @@ export { default as FinanceDashboard } from './components/FinanceDashboard';
 // Tab Components
 export { default as VendorPaymentsTab } from './components/VendorPaymentsTab';
 export { default as PendingBillingTab } from './components/PendingBillingTab';
-export { default as BillsGeneratedTab } from './components/BillsGeneratedTab';
+export { default as PendingPaymentTab } from './components/PendingPaymentTab';
 export { default as BillsClearedTab } from './components/BillsClearedTab';
 export { default as HistoricalRecordsTab } from './components/HistoricalRecordsTab';
 

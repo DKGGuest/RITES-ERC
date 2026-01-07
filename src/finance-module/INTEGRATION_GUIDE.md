@@ -37,7 +37,7 @@ Navigate to any of these URLs:
 - `/finance` - Main Finance Dashboard
 - `/finance/vendor-payments` - Vendor Payments tab
 - `/finance/pending-billing` - Pending Billing tab
-- `/finance/bills-generated` - Bills Generated tab
+- `/finance/bills-generated` - Pending Payment tab
 - `/finance/bills-cleared` - Bills Cleared tab
 - `/finance/historical-records` - Historical Records tab
 
@@ -68,15 +68,15 @@ Navigate to any of these URLs:
 - Total Amount
 - Under Suspense count
 
-### Section 3: Bills Generated - Payment Pending
+### Section 3: Pending Payment - Bills Generated Awaiting Payment
 **Actions:**
-- ✅ View generated bills
+- ✅ View generated bills awaiting payment
 - ✅ Record payment details (UTR, date, mode)
 - ✅ Mark bills as cleared
 - ✅ Track payment status
 
 **KPIs:**
-- Total Bills Generated
+- Total Pending Payment
 - Total Amount
 - Payment Pending count
 
@@ -135,17 +135,17 @@ The module includes comprehensive mock data for testing:
 4. Enter bill amount
 5. Review auto-calculated GST (18%)
 6. Click "Generate Bill"
-7. Bill moves to "Bills Generated" tab
+7. Bill moves to "Pending Payment" tab
 
 ### Workflow 4: Record Payment
-1. Navigate to "Bills Generated" tab
+1. Navigate to "Pending Payment" tab
 2. Click "💳 Record Payment"
 3. Enter payment date, UTR, and mode
 4. Click "Record Payment"
 5. Bill status updates to "Payment Recorded"
 
 ### Workflow 5: Clear Bill
-1. Navigate to "Bills Generated" tab
+1. Navigate to "Pending Payment" tab
 2. Find bill with "Payment Recorded" status
 3. Click "✅ Mark Cleared"
 4. Bill moves to "Bills Cleared" tab

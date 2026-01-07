@@ -230,8 +230,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                 subPoNumber: heat.subPoNumber || '',
                 subPoDate: heat.subPoDate || '',
                 subPoQty: heat.subPoQty || '',
-                totalValueOfPo: '',
-                tcQuantity: heat.tcQty || '',
+                totalValueOfPo: heat.totalValueOfPo || '', // From inventory_entries.total_po
+                tcQuantity: heat.tcQuantity || '', // From inventory_entries.tc_quantity
                 offeredQty: heat.offeredQty || '',
                 // Restore color code from localStorage if available
                 colorCode: savedColorCodes[heatNo] || ''

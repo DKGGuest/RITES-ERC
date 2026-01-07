@@ -10,7 +10,7 @@ The Finance Module has been **fully implemented and integrated** into the RITES 
 1. ✅ **FinanceDashboard.js** - Main dashboard with tab navigation
 2. ✅ **VendorPaymentsTab.js** - Section 1: Vendor Payments approval/return
 3. ✅ **PendingBillingTab.js** - Section 2: IC pending billing with suspense handling
-4. ✅ **BillsGeneratedTab.js** - Section 3: Bills generated with payment recording
+4. ✅ **PendingPaymentTab.js** - Section 3: Pending payment with payment recording
 5. ✅ **BillsClearedTab.js** - Section 4: Cleared bills (read-only)
 6. ✅ **HistoricalRecordsTab.js** - Section 5: Audit trail with export
 
@@ -48,7 +48,7 @@ src/finance-module/
 │   │   ├── FinanceDashboard.js           ✅ 200 lines
 │   │   ├── VendorPaymentsTab.js          ✅ 250 lines
 │   │   ├── PendingBillingTab.js          ✅ 200 lines
-│   │   ├── BillsGeneratedTab.js          ✅ 180 lines
+│   │   ├── PendingPaymentTab.js          ✅ 180 lines
 │   │   ├── BillsClearedTab.js            ✅ 120 lines
 │   │   └── HistoricalRecordsTab.js       ✅ 150 lines
 │   ├── hooks/
@@ -90,8 +90,8 @@ Total Lines of Code: ~2,900+ lines
 - ✅ SLA tracking for billing
 - ✅ Inspection and testing amount breakdown
 
-### Section 3: Bills Generated
-- ✅ View all generated bills
+### Section 3: Pending Payment
+- ✅ View all bills awaiting payment
 - ✅ Record payment with UTR, date, mode
 - ✅ Multiple payment modes (NEFT, RTGS, IMPS, Cheque, DD)
 - ✅ Mark bills as cleared
@@ -168,7 +168,7 @@ All workflows are ready to test with mock data:
 - 2 Billing Pending
 - 1 Under Suspense
 
-### Bills Generated (3 records)
+### Pending Payment (3 records)
 - 2 Payment Pending
 - 1 Payment Recorded
 

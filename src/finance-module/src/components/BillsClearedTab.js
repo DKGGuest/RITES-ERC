@@ -3,11 +3,14 @@
  * Section 4: Bills Cleared (Read-only)
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import DataTable from '../../../components/DataTable';
 import { formatDateTime, formatCurrency, getBillStatusBadge } from '../utils/helpers';
+import PaymentHistoryModal from './PaymentHistoryModal';
 
 const BillsClearedTab = ({ bills = [], kpis = {} }) => {
+  const [selectedBill, setSelectedBill] = useState(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   // KPI Tiles
   const kpiTiles = [
     {
@@ -102,8 +105,29 @@ const BillsClearedTab = ({ bills = [], kpis = {} }) => {
           </span>
         );
       }
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <div className="action-buttons">
+          <button
+            className="btn btn-sm btn-info"
+            onClick={() => handleViewHistoryClick(row)}
+            title="View Payment History"
+            style={{ backgroundColor: '#6366f1', color: 'white', border: '1px solid #4f46e5' }}
+          >
+            📋 View History
+          </button>
+        </div>
+      )
     }
   ];
+
+  const handleViewHistoryClick = (bill) => {
+    setSelectedBill(bill);
+    setShowHistoryModal(true);
+  };
 
   return (
     <div className="tab-content">
@@ -135,6 +159,13 @@ const BillsClearedTab = ({ bills = [], kpis = {} }) => {
         columns={columns}
         data={bills}
         emptyMessage="No cleared bills found"
+      />
+
+      {/* Payment History Modal */}
+      <PaymentHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        record={selectedBill}
       />
     </div>
   );

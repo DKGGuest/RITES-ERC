@@ -39,7 +39,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
   // Fetch pending workflow transitions for logged-in user from Azure API
   // PERFORMANCE OPTIMIZATION: Returns data immediately, fetches vendor names in background
-  const fetchPendingData = useCallback(async () => {
+  const fetchPendingData = useCallback(async (forceRefresh = false) => {
     const startTime = performance.now();
     setIsLoading(true);
 
@@ -47,7 +47,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       console.log('🚀 Starting data fetch from Azure...');
 
       // Fetch workflow transitions immediately (without waiting for vendor names)
-      const apiCalls = await fetchUserPendingCalls();
+      const apiCalls = await fetchUserPendingCalls(forceRefresh);
 
       const fetchTime = performance.now() - startTime;
       console.log(`⚡ Data loaded in ${fetchTime.toFixed(0)}ms`);
@@ -246,8 +246,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         refreshCallback();
       }
 
-      // Refresh the pending calls list to update status immediately
-      await fetchPendingData();
+      // Refresh the pending calls list to update status immediately (force refresh to bypass cache)
+      await fetchPendingData(true);
 
       // Reset modal state
       setShowScheduleModal(false);
@@ -267,6 +267,15 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // Handle Start/Resume button - calls Azure API when status is IE_SCHEDULED
   const handleStart = async (call) => {
     console.log('🔍 handleStart called for:', call.call_no);
+    console.log('🔍 Call status:', call.status);
+
+    // TEMPORARY: Always route to inspection initiation page for VERIFY_PO_DETAILS status
+    // This allows IE to review/edit inspection initiation data before going to dashboard
+    if (call.status === 'VERIFY_PO_DETAILS') {
+      console.log('🔄 VERIFY_PO_DETAILS status - routing to inspection initiation page');
+      onStartInspection(call);
+      return;
+    }
 
     // Check if call is already initiated (has inspection data stored)
     const alreadyInitiated = isCallInitiated(call.call_no);
@@ -368,8 +377,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         await performTransitionAction(actionData);
         showNotification('Inspection initiated successfully!', 'success');
 
-        // Refresh the pending calls list
-        fetchPendingData();
+        // Refresh the pending calls list (force refresh to get updated status)
+        fetchPendingData(true);
 
         // Proceed to inspection page
         onStartInspection(call);

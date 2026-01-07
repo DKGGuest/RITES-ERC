@@ -1,16 +1,18 @@
 /**
- * Bills Generated Tab Component
- * Section 3: Bills Generated - Payment Pending
+ * Pending Payment Tab Component
+ * Section 3: Pending Payment - Bills Generated Awaiting Payment
  */
 
 import React, { useState } from 'react';
 import DataTable from '../../../components/DataTable';
 import { formatDateTime, formatCurrency, getBillStatusBadge } from '../utils/helpers';
 import { BILL_STATUS } from '../utils/constants';
+import PaymentHistoryModal from './PaymentHistoryModal';
 
-const BillsGeneratedTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill }) => {
+const PendingPaymentTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill }) => {
   const [selectedBill, setSelectedBill] = useState(null);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [paymentData, setPaymentData] = useState({
     paymentDate: '',
     paymentReference: '',
@@ -20,7 +22,7 @@ const BillsGeneratedTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill
   // KPI Tiles
   const kpiTiles = [
     {
-      label: 'Total Bills Generated',
+      label: 'Total Pending Payment',
       value: kpis.count || 0,
       icon: '📋',
       color: '#3b82f6'
@@ -99,7 +101,17 @@ const BillsGeneratedTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
-        <div className="action-buttons">
+        <div className="action-buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {/* View History button - shown for all bills */}
+          <button
+            className="btn btn-sm btn-info"
+            onClick={() => handleViewHistoryClick(row)}
+            title="View Payment History"
+            style={{ backgroundColor: '#6366f1', color: 'white', border: '1px solid #4f46e5' }}
+          >
+            📋 View History
+          </button>
+
           {row.billStatus === BILL_STATUS.PAYMENT_PENDING && (
             <button
               className="btn btn-sm btn-primary"
@@ -122,6 +134,11 @@ const BillsGeneratedTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill
       )
     }
   ];
+
+  const handleViewHistoryClick = (bill) => {
+    setSelectedBill(bill);
+    setShowHistoryModal(true);
+  };
 
   const handleRecordPaymentClick = (bill) => {
     setSelectedBill(bill);
@@ -167,7 +184,7 @@ const BillsGeneratedTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill
       <DataTable
         columns={columns}
         data={bills}
-        emptyMessage="No bills generated"
+        emptyMessage="No pending payments found"
       />
 
       {/* Record Payment Modal */}
@@ -182,7 +199,7 @@ const BillsGeneratedTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill
               <p><strong>Bill Number:</strong> {selectedBill?.billNumber}</p>
               <p><strong>Vendor:</strong> {selectedBill?.vendor?.name}</p>
               <p><strong>Total Amount:</strong> {formatCurrency(selectedBill?.totalAmount)}</p>
-              
+
               <div className="form-group">
                 <label className="form-label required">Payment Date</label>
                 <input
@@ -228,9 +245,16 @@ const BillsGeneratedTab = ({ bills = [], kpis = {}, onRecordPayment, onClearBill
           </div>
         </div>
       )}
+
+      {/* Payment History Modal */}
+      <PaymentHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        record={selectedBill}
+      />
     </div>
   );
 };
 
-export default BillsGeneratedTab;
+export default PendingPaymentTab;
 

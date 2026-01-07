@@ -7,7 +7,7 @@ import { useState } from 'react';
 import Tabs from '../../../components/Tabs';
 import VendorPaymentsTab from './VendorPaymentsTab';
 import PendingBillingTab from './PendingBillingTab';
-import BillsGeneratedTab from './BillsGeneratedTab';
+import PendingPaymentTab from './PendingPaymentTab';
 import BillsClearedTab from './BillsClearedTab';
 import HistoricalRecordsTab from './HistoricalRecordsTab';
 import useFinanceData from '../hooks/useFinanceData';
@@ -52,7 +52,7 @@ const FinanceDashboard = () => {
   const tabs = [
     {
       id: 'vendor-payments',
-      label: 'Vendor Payments',
+      label: 'Payment Updates by Vendor',
       count: dashboardKPIs?.pendingFinanceApproval?.count || 0
     },
     {
@@ -62,7 +62,7 @@ const FinanceDashboard = () => {
     },
     {
       id: 'bills-generated',
-      label: 'Bills Generated',
+      label: 'Pending Payments',
       count: dashboardKPIs?.billsGenerated?.count || 0
     },
     {
@@ -186,7 +186,7 @@ const FinanceDashboard = () => {
       )}
 
       {activeTab === 'bills-generated' && (
-        <BillsGeneratedTab
+        <PendingPaymentTab
           bills={billsGenerated}
           kpis={dashboardKPIs?.billsGenerated || {}}
           onRecordPayment={handleRecordPayment}
