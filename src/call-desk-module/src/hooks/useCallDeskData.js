@@ -1,6 +1,6 @@
 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { getStoredUser, getAuthHeaders } from '../../../services/authService';
 const BASE_URL =
@@ -17,9 +17,47 @@ export const useCallDeskData = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Simulate API call to fetch data
- // Fetch data from backend API
-const fetchData = async () => {
+  //  API: Fetch Pending Verification Calls
+const fetchPendingVerificationCalls = async () => {
+  const user = getStoredUser();
+
+  const response = await axios.get(
+    `${BASE_URL}/allPendingWorkflowTransition`,
+    {
+      params: {
+        roleName: 'RIO Help Desk',
+      },
+      headers: {
+        ...getAuthHeaders(),
+      },
+    }
+  );
+
+  if (response.data?.responseStatus?.statusCode !== 0) {
+    throw new Error('Failed to fetch pending verification calls');
+  }
+
+  //  Filter by assignedToUser == logged-in user
+  return response.data.responseData
+    .filter(
+      item => String(item.rio) === String(user.rio)
+    )
+    .map(item => ({
+      id: item.workflowTransitionId,
+      callNumber: item.requestId,
+      vendor: { name: item.vendorName || '-' },
+      submissionDateTime: item.createdDate,
+      poNumber: item.poNumber,
+      productStage: item.productType,
+      desiredInspectionDate: item.desiredInspectionDate,
+      placeOfInspection: '-',
+      status: item.status,
+      rio: item.rio,
+    }));
+};
+
+  // Fetch data from backend API
+const fetchData = useCallback(async () => {
   try {
     setLoading(true);
     setError(null);
@@ -55,52 +93,13 @@ const fetchData = async () => {
   } finally {
     setLoading(false);
   }
-};
-
-  //  API: Fetch Pending Verification Calls
-const fetchPendingVerificationCalls = async () => {
-  const user = getStoredUser();
-
-  const response = await axios.get(
-    `${BASE_URL}/allPendingWorkflowTransition`,
-    {
-      params: {
-        roleName: 'RIO Help Desk',
-      },
-      headers: {
-        ...getAuthHeaders(),
-      },
-    }
-  );
-
-  if (response.data?.responseStatus?.statusCode !== 0) {
-    throw new Error('Failed to fetch pending verification calls');
-  }
-
-  //  Filter by assignedToUser == logged-in user
-  return response.data.responseData
-    .filter(
-      item => String(item.rio) === String(user.rio)
-    )
-    .map(item => ({
-      id: item.workflowTransitionId,
-      callNumber: item.requestId,
-      vendor: { name: item.vendorName || '-' },
-      submissionDateTime: item.createdDate,
-      poNumber: item.poNo,
-      productStage: item.productType,
-      desiredInspectionDate: item.desiredInspectionDate,
-      placeOfInspection: '-',
-      status: item.status,
-      rio: item.rio,
-    }));
-};
+}, []);
 
 
   // Fetch data on mount
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // Get call by ID
   const getCallById = (callId) => {
