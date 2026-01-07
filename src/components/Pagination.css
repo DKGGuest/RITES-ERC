@@ -1,0 +1,57 @@
+.pg-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin: 8px 0 16px 0;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.pg-count {
+  font-weight: 500;
+  min-width: 90px;
+  text-align: center;
+}
+
+.pg-rows {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pg-rows select {
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  font-size: 13px;
+}
+
+.pg-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pg-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pg-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 768px) {
+  .pg-wrapper {
+    flex-direction: column;
+    gap: 6px;
+  }
+}

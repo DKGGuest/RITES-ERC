@@ -1,0 +1,233 @@
+import React, { useState } from 'react';
+import './MpiSection.css';
+
+const MpiSection = ({
+  data,
+  onDataChange,
+  availableLotNumbers,
+  hourLabels,
+  visibleRows,
+  showAll,
+  onToggleShowAll
+}) => {
+  const [expanded] = useState(true);
+
+  const updateData = (idx, field, value, arrayIndex = null) => {
+    const newData = [...data];
+    if (arrayIndex !== null) {
+      const arr = [...(newData[idx][field] || [])];
+      arr[arrayIndex] = value;
+      newData[idx][field] = arr;
+    } else {
+      newData[idx][field] = value;
+    }
+    onDataChange(newData);
+  };
+
+  return (
+    <div className="mpi-section">
+      <div className="mpi-section__header">
+        <div>
+          <h3 className="mpi-section__title">MPI Section</h3>
+          <p className="mpi-section__subtitle">Enter hourly MPI (Magnetic Particle Inspection) production data</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary mpi-section__toggle"
+          onClick={onToggleShowAll}
+          title={showAll ? 'Show current hour only' : 'Show all 8 hours'}
+        >
+          {showAll ? '\u2212' : '+'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mpi-table-wrapper">
+          {/* Desktop Table Layout */}
+          <table className="mpi-table">
+            <thead>
+              <tr>
+                <th className="mpi-th mpi-th--time">Time Range</th>
+                <th className="mpi-th mpi-th--checkbox">No Production</th>
+                <th className="mpi-th mpi-th--lot">Lot No.</th>
+                <th className="mpi-th mpi-th--results">MPI Results</th>
+                <th className="mpi-th mpi-th--remarks">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows(data, showAll).map(({ row, idx }) => (
+                <React.Fragment key={row.hour}>
+                  {/* Row 1: First dropdown */}
+                  <tr className="mpi-row">
+                    <td rowSpan="4" className="mpi-td mpi-td--time">
+                      <strong>{hourLabels[idx]}</strong>
+                    </td>
+                    <td rowSpan="4" className="mpi-td mpi-td--checkbox">
+                      <input
+                        type="checkbox"
+                        checked={row.noProduction}
+                        onChange={e => updateData(idx, 'noProduction', e.target.checked)}
+                        className="mpi-checkbox"
+                      />
+                    </td>
+                    <td rowSpan="3" className="mpi-td mpi-td--lot">
+                      <select
+                        className="form-control mpi-select"
+                        value={row.lotNo}
+                        onChange={e => updateData(idx, 'lotNo', e.target.value)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select Lot No.</option>
+                        {availableLotNumbers.map(lot => (
+                          <option key={lot} value={lot}>{lot}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="mpi-td mpi-td--results-input">
+                      <select
+                        className="form-control mpi-results-select"
+                        value={row.testResults[0] || ''}
+                        onChange={e => updateData(idx, 'testResults', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select</option>
+                        <option value="OK">OK</option>
+                        <option value="Not OK">Not OK</option>
+                      </select>
+                    </td>
+                    <td rowSpan="4" className="mpi-td mpi-td--remarks">
+                      <input
+                        type="text"
+                        className="form-control mpi-input"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
+                      />
+                    </td>
+                  </tr>
+                  {/* Row 2: Second dropdown */}
+                  <tr className="mpi-row">
+                    <td className="mpi-td mpi-td--results-input">
+                      <select
+                        className="form-control mpi-results-select"
+                        value={row.testResults[1] || ''}
+                        onChange={e => updateData(idx, 'testResults', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select</option>
+                        <option value="OK">OK</option>
+                        <option value="Not OK">Not OK</option>
+                      </select>
+                    </td>
+                  </tr>
+                  {/* Row 3: Third dropdown */}
+                  <tr className="mpi-row">
+                    <td className="mpi-td mpi-td--results-input">
+                      <select
+                        className="form-control mpi-results-select"
+                        value={row.testResults[2] || ''}
+                        onChange={e => updateData(idx, 'testResults', e.target.value, 2)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select</option>
+                        <option value="OK">OK</option>
+                        <option value="Not OK">Not OK</option>
+                      </select>
+                    </td>
+                  </tr>
+                  {/* Row 4: Rejected No. */}
+                  <tr className="mpi-row mpi-row--rejected">
+                    <td className="mpi-td mpi-td--rejected-label">
+                      <span className="mpi-rejected-label">Rejected No.</span>
+                    </td>
+                    <td className="mpi-td mpi-td--rejected-input">
+                      <input
+                        type="number"
+                        className="form-control mpi-input mpi-input--rejected"
+                        value={row.rejectedQty[0] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                  </tr>
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Mobile Card Layout */}
+          <div className="mpi-mobile-cards">
+            {visibleRows(data, showAll).map(({ row, idx }) => (
+              <div key={row.hour} className="mpi-mobile-card">
+                <div className="mpi-mobile-card__header">
+                  <span className="mpi-mobile-card__time">{hourLabels[idx]}</span>
+                  <input
+                    type="checkbox"
+                    checked={row.noProduction}
+                    onChange={e => updateData(idx, 'noProduction', e.target.checked)}
+                    className="mpi-checkbox"
+                  />
+                </div>
+                <div className="mpi-mobile-card__body">
+                  <div className="mpi-mobile-field">
+                    <span className="mpi-mobile-field__label">Lot No.</span>
+                    <div className="mpi-mobile-field__value">
+                      <select
+                        value={row.lotNo}
+                        onChange={e => updateData(idx, 'lotNo', e.target.value)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select Lot No.</option>
+                        {availableLotNumbers.map(lot => (
+                          <option key={lot} value={lot}>{lot}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {[0, 1, 2].map(sampleIdx => (
+                    <div key={sampleIdx} className="mpi-mobile-field">
+                      <span className="mpi-mobile-field__label">MPI Results (S{sampleIdx + 1})</span>
+                      <div className="mpi-mobile-field__value">
+                        <select
+                          value={row.testResults[sampleIdx] || ''}
+                          onChange={e => updateData(idx, 'testResults', e.target.value, sampleIdx)}
+                          disabled={row.noProduction}
+                        >
+                          <option value="">Select</option>
+                          <option value="OK">OK</option>
+                          <option value="Not OK">Not OK</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="mpi-mobile-field">
+                    <span className="mpi-mobile-field__label">Remarks</span>
+                    <div className="mpi-mobile-field__value">
+                      <input
+                        type="text"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="mpi-mobile-field mpi-mobile-field--rejected">
+                    <span className="mpi-mobile-field__label">Rejected No.</span>
+                    <div className="mpi-mobile-field__value">
+                      <input
+                        type="number"
+                        value={row.rejectedQty[0] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MpiSection;

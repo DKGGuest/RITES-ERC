@@ -1,0 +1,353 @@
+/* =====================================================
+   SHEARING SECTION STYLES
+   ===================================================== */
+
+.shearing-section {
+  margin-bottom: 20px;
+}
+
+.shearing-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.shearing-section__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.shearing-section__actions .btn {
+  padding: var(--space-8, 8px) var(--space-16, 16px);
+  font-size: var(--font-size-xl, 18px);
+}
+
+/* Table wrapper */
+.shearing-table-wrapper {
+  overflow-x: auto;
+  padding: 16px;
+}
+
+/* Table styles */
+.shearing-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #4a7c59;
+}
+
+.shearing-th {
+  background-color: #fef7f0;
+  border: 1px solid #4a7c59;
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.shearing-th--time {
+  min-width: 90px;
+  border-left: 1px solid #0d0d0d;
+}
+
+.shearing-th--checkbox {
+  min-width: 90px;
+}
+
+.shearing-th--lot {
+  min-width: 120px;
+}
+
+.shearing-th--rejected {
+  background-color: #e0f2fe;
+  min-width: 140px;
+}
+
+.shearing-th--length {
+  min-width: 120px;
+}
+
+.shearing-th--edges {
+  min-width: 120px;
+}
+
+.shearing-th--remarks {
+  min-width: 150px;
+}
+
+/* Table cells */
+.shearing-td {
+  border: 1px solid #4a7c59;
+  padding: 4px 8px;
+  text-align: center;
+  vertical-align: middle;
+  background-color: #fff;
+}
+
+.shearing-td--time {
+  font-weight: 600;
+  border-left: 1px solid #070707;
+  font-size: 12px;
+}
+
+.shearing-td--rejected {
+  background-color: #e0f2fe;
+}
+
+/* Form controls */
+.shearing-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.shearing-select {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.shearing-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.shearing-input--rejected {
+  background-color: #fff;
+}
+
+/* Length of Cut Bar input cells */
+.shearing-td--length-input {
+  padding: 2px 6px;
+}
+
+.shearing-length-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 12px;
+}
+
+/* No Sharp Edges checkbox cells */
+.shearing-td--edge-checkbox {
+  padding: 2px 6px;
+  text-align: center;
+}
+
+.shearing-edge-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* Rejected No. row styling */
+.shearing-row--rejected {
+  background-color: #e0f2fe;
+}
+
+.shearing-td--rejected-label {
+  background-color: #e0f2fe;
+  padding: 4px 8px;
+}
+
+.shearing-rejected-label {
+  font-weight: 500;
+  color: #333;
+  font-size: 11px;
+}
+
+.shearing-td--rejected-input {
+  background-color: #fff;
+  padding: 2px 6px;
+}
+
+.shearing-input--rejected {
+  width: 100%;
+  text-align: center;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+/* Hide mobile cards on desktop */
+.shearing-mobile-cards {
+  display: none;
+}
+
+/* =====================================================
+   TABLET RESPONSIVE (768px - 1024px)
+   ===================================================== */
+
+@media (max-width: 1024px) {
+  .shearing-th,
+  .shearing-td {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .shearing-th--time,
+  .shearing-td--time {
+    min-width: 90px;
+  }
+}
+
+/* =====================================================
+   MOBILE RESPONSIVE (≤768px) - Card Layout
+   ===================================================== */
+
+@media (max-width: 768px) {
+  .shearing-table-wrapper {
+    padding: 8px;
+  }
+
+  /* Hide table on mobile */
+  .shearing-table {
+    display: none;
+  }
+
+  /* Mobile card layout */
+  .shearing-mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .shearing-mobile-card {
+    background: #fff;
+    border: 1px solid #4a7c59;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .shearing-mobile-card__header {
+    background-color: #dc2626;
+    color: #fff;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .shearing-mobile-card__body {
+    padding: 0;
+  }
+
+  .shearing-mobile-field {
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .shearing-mobile-field:last-child {
+    border-bottom: none;
+  }
+
+  .shearing-mobile-field__label {
+    background-color: #fef7f0;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #333;
+  }
+
+  .shearing-mobile-field__value {
+    padding: 10px 16px;
+    background-color: #fff;
+  }
+
+  .shearing-mobile-field__value--rejected {
+    background-color: #e0f2fe;
+  }
+
+  .shearing-mobile-field__value .form-control {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .shearing-mobile-length-inputs {
+    display: flex;
+    gap: 10px;
+  }
+
+  .shearing-mobile-length-item {
+    flex: 1;
+  }
+
+  .shearing-mobile-length-item .form-control {
+    text-align: center;
+  }
+
+  .shearing-mobile-rejected-inputs {
+    display: flex;
+    gap: 10px;
+  }
+
+  .shearing-mobile-rejected-item {
+    flex: 1;
+  }
+
+  .shearing-mobile-rejected-item .form-control {
+    text-align: center;
+  }
+
+  .shearing-mobile-edges {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .shearing-mobile-edge-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .shearing-mobile-edge-item span {
+    font-size: 12px;
+    color: #666;
+  }
+
+  .shearing-mobile-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+  }
+}
+
+@media (max-width: 480px) {
+  .shearing-section__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .shearing-mobile-card__header {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .shearing-mobile-field__label {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .shearing-mobile-field__value {
+    padding: 8px 12px;
+  }
+
+  .shearing-mobile-field__value .form-control {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+}
+

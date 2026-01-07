@@ -1,0 +1,298 @@
+import { useState } from 'react';
+import './ShearingSection.css';
+
+const ShearingSection = ({ 
+  data, 
+  onDataChange, 
+  availableLotNumbers = [], 
+  hourLabels = [],
+  visibleRows,
+  showAll,
+  onToggleShowAll
+}) => {
+  const [expanded] = useState(true);
+
+  const updateData = (index, field, value, sampleIndex = null) => {
+    const updated = [...data];
+    if (sampleIndex !== null && Array.isArray(updated[index][field])) {
+      const fieldArray = [...updated[index][field]];
+      fieldArray[sampleIndex] = value;
+      updated[index][field] = fieldArray;
+    } else {
+      updated[index][field] = value;
+    }
+    onDataChange(updated);
+  };
+
+  return (
+    <div className="card shearing-section">
+      <div className="card-header shearing-section__header">
+        <div>
+          <h3 className="card-title">Shearing Section</h3>
+          <p className="card-subtitle">Enter hourly shearing production data</p>
+        </div>
+        <div className="shearing-section__actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onToggleShowAll}
+            title={showAll ? 'Show current hour only' : 'Show all 8 hours'}
+          >
+            {showAll ? '−' : '+'}
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="shearing-table-wrapper">
+          {/* Desktop Table Layout - 4 rows per time slot */}
+          <table className="shearing-table">
+            <thead>
+              <tr>
+                <th className="shearing-th shearing-th--time">Time Range</th>
+                <th className="shearing-th shearing-th--checkbox">No Production</th>
+                <th className="shearing-th shearing-th--lot">Lot No.</th>
+                <th className="shearing-th shearing-th--length">Length of Cut Bar</th>
+                <th className="shearing-th shearing-th--edges">No Sharp Edges</th>
+                <th className="shearing-th shearing-th--remarks">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows(data, showAll).map(({ row, idx }) => (
+                <>
+                  {/* Row 1: First input + First checkbox */}
+                  <tr key={`${row.hour}-r1`} className="shearing-row">
+                    <td rowSpan="4" className="shearing-td shearing-td--time">
+                      <strong>{hourLabels[idx]}</strong>
+                    </td>
+                    <td rowSpan="4" className="shearing-td shearing-td--checkbox">
+                      <input
+                        type="checkbox"
+                        checked={row.noProduction}
+                        onChange={e => updateData(idx, 'noProduction', e.target.checked)}
+                        className="shearing-checkbox"
+                      />
+                    </td>
+                    <td rowSpan="3" className="shearing-td shearing-td--lot">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.lotNo}
+                        onChange={e => updateData(idx, 'lotNo', e.target.value)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select Lot No.</option>
+                        {availableLotNumbers.map(lot => (
+                          <option key={lot} value={lot}>{lot}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="shearing-td shearing-td--length-input">
+                      <input
+                        type="text"
+                        className="form-control shearing-length-input"
+                        value={row.lengthCutBar[0] || ''}
+                        onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="shearing-td shearing-td--edge-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={row.sharpEdges[0] || false}
+                        onChange={e => updateData(idx, 'sharpEdges', e.target.checked, 0)}
+                        disabled={row.noProduction}
+                        className="shearing-edge-checkbox"
+                      />
+                    </td>
+                    <td rowSpan="4" className="shearing-td shearing-td--remarks">
+                      <input
+                        type="text"
+                        className="form-control shearing-input"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
+                      />
+                    </td>
+                  </tr>
+                  {/* Row 2: Second input + Second checkbox */}
+                  <tr key={`${row.hour}-r2`} className="shearing-row">
+                    <td className="shearing-td shearing-td--length-input">
+                      <input
+                        type="text"
+                        className="form-control shearing-length-input"
+                        value={row.lengthCutBar[1] || ''}
+                        onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="shearing-td shearing-td--edge-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={row.sharpEdges[1] || false}
+                        onChange={e => updateData(idx, 'sharpEdges', e.target.checked, 1)}
+                        disabled={row.noProduction}
+                        className="shearing-edge-checkbox"
+                      />
+                    </td>
+                  </tr>
+                  {/* Row 3: Third input + Third checkbox */}
+                  <tr key={`${row.hour}-r3`} className="shearing-row">
+                    <td className="shearing-td shearing-td--length-input">
+                      <input
+                        type="text"
+                        className="form-control shearing-length-input"
+                        value={row.lengthCutBar[2] || ''}
+                        onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 2)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="shearing-td shearing-td--edge-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={row.sharpEdges[2] || false}
+                        onChange={e => updateData(idx, 'sharpEdges', e.target.checked, 2)}
+                        disabled={row.noProduction}
+                        className="shearing-edge-checkbox"
+                      />
+                    </td>
+                  </tr>
+                  {/* Row 4: Rejected No. label + 2 input columns */}
+                  <tr key={`${row.hour}-r4`} className="shearing-row shearing-row--rejected">
+                    <td className="shearing-td shearing-td--rejected-label">
+                      <span className="shearing-rejected-label">Rejected No.</span>
+                    </td>
+                    <td className="shearing-td shearing-td--rejected-input">
+                      <input
+                        type="number"
+                        className="form-control shearing-input shearing-input--rejected"
+                        value={row.rejectedQty[0] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="shearing-td shearing-td--rejected-input">
+                      <input
+                        type="number"
+                        className="form-control shearing-input shearing-input--rejected"
+                        value={row.rejectedQty[1] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                  </tr>
+                </>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Mobile Card Layout */}
+          <div className="shearing-mobile-cards">
+            {visibleRows(data, showAll).map(({ row, idx }) => (
+              <div key={row.hour} className="shearing-mobile-card">
+                <div className="shearing-mobile-card__header">
+                  <span>{hourLabels[idx]}</span>
+                  <input
+                    type="checkbox"
+                    checked={row.noProduction}
+                    onChange={e => updateData(idx, 'noProduction', e.target.checked)}
+                    className="shearing-mobile-checkbox"
+                  />
+                  <span style={{ fontSize: '11px' }}>No Production</span>
+                </div>
+                <div className="shearing-mobile-card__body">
+                  <div className="shearing-mobile-field">
+                    <div className="shearing-mobile-field__label">Lot No.</div>
+                    <div className="shearing-mobile-field__value">
+                      <select
+                        className="form-control"
+                        value={row.lotNo}
+                        onChange={e => updateData(idx, 'lotNo', e.target.value)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select Lot No.</option>
+                        {availableLotNumbers.map(lot => (
+                          <option key={lot} value={lot}>{lot}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="shearing-mobile-field">
+                    <div className="shearing-mobile-field__label">Rejected No.</div>
+                    <div className="shearing-mobile-field__value shearing-mobile-field__value--rejected">
+                      <div className="shearing-mobile-rejected-inputs">
+                        {[0, 1].map(sampleIdx => (
+                          <div key={sampleIdx} className="shearing-mobile-rejected-item">
+                            <input
+                              type="number"
+                              className="form-control"
+                              value={row.rejectedQty[sampleIdx] || ''}
+                              onChange={e => updateData(idx, 'rejectedQty', e.target.value, sampleIdx)}
+                              disabled={row.noProduction}
+                              placeholder={`Qty ${sampleIdx + 1}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="shearing-mobile-field">
+                    <div className="shearing-mobile-field__label">Length of Cut Bar</div>
+                    <div className="shearing-mobile-field__value">
+                      <div className="shearing-mobile-length-inputs">
+                        {[0, 1, 2].map(sampleIdx => (
+                          <div key={sampleIdx} className="shearing-mobile-length-item">
+                            <input
+                              type="text"
+                              className="form-control"
+                              value={row.lengthCutBar[sampleIdx] || ''}
+                              onChange={e => updateData(idx, 'lengthCutBar', e.target.value, sampleIdx)}
+                              disabled={row.noProduction}
+                              placeholder={`S${sampleIdx + 1}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="shearing-mobile-field">
+                    <div className="shearing-mobile-field__label">No Sharp Edges</div>
+                    <div className="shearing-mobile-field__value">
+                      <div className="shearing-mobile-edges">
+                        {[0, 1, 2].map(sampleIdx => (
+                          <div key={sampleIdx} className="shearing-mobile-edge-item">
+                            <input
+                              type="checkbox"
+                              checked={row.sharpEdges[sampleIdx] || false}
+                              onChange={e => updateData(idx, 'sharpEdges', e.target.checked, sampleIdx)}
+                              disabled={row.noProduction}
+                              className="shearing-mobile-checkbox"
+                            />
+                            <span>S{sampleIdx + 1}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="shearing-mobile-field">
+                    <div className="shearing-mobile-field__label">Remarks</div>
+                    <div className="shearing-mobile-field__value">
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        placeholder="Enter remarks"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ShearingSection;
+
