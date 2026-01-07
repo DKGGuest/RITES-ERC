@@ -4,7 +4,6 @@
  */
 
 import { useState } from 'react';
-import { CALL_STATUS } from '../utils/constants';
 
 import axios from 'axios';
 import { getStoredUser, getAuthHeaders } from '../../../services/authService';

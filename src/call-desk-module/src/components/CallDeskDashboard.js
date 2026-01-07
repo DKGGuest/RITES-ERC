@@ -12,9 +12,6 @@ import useCallDeskData from '../hooks/useCallDeskData';
 import useCallActions from '../hooks/useCallActions';
 import '../styles/CallDeskDashboard.css';
 
-const RIO_OPTIONS = ['NRIO', 'CRIO', 'WRIO', 'SRIO'];
-
-
 const CallDeskDashboard = () => {
   const [activeTab, setActiveTab] = useState('pending');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -28,7 +25,7 @@ const CallDeskDashboard = () => {
   const [flaggedFields, setFlaggedFields] = useState([]);
 
   const [historyData, setHistoryData] = useState([]);
-const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
 
   // Hooks
@@ -37,10 +34,8 @@ const [historyLoading, setHistoryLoading] = useState(false);
     verifiedCalls,
     disposedCalls,
     dashboardKPIs,
-    rioOffices,
     loading,
     error,
-    getCallHistory,
     refreshData
   } = useCallDeskData();
 
