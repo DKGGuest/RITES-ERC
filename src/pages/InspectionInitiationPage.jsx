@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
 import { saveInspectionInitiation } from '../services/vendorInspectionService';
 import { markAsUnderInspection, markAsWithheld } from '../services/callStatusService';
+import { getStoredUser } from '../services/authService';
+import { fetchLatestWorkflowTransition, performTransitionAction } from '../services/workflowService';
 import '../styles/inspectionInitiationPage.css';
 
 // Helper to check if call is Process or Final Product (mock mode)
@@ -242,37 +244,72 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
 
     setIsSaving(true);
     try {
-      const actionData = {
-        inspectionRequestId: call.api_id || null,
-        callNo: call.call_no,
-        poNo: call.po_no,
-        actionType: callActionType,
-        reason: callActionReason,
-        remarks: callActionRemarks.trim(),
-        status: callActionType,
-        actionDate: new Date().toISOString()
-      };
+      // Get current user
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
 
-      // Skip API call for Process/Final Product (mock mode)
-      if (isProcessOrFinalProduct(call.product_type)) {
-        console.log('🏭 Process/Final Product: Withheld/Cancel saved to localStorage only (no API call)');
-        alert(`✅ Call ${callActionType === 'WITHHELD' ? 'withheld' : 'cancelled'} successfully (Mock Mode)`);
+      // Prepare remarks based on reason
+      const reasonText = CALL_ACTION_REASONS.find(r => r.value === callActionReason)?.label || callActionReason;
+      const finalRemarks = callActionReason === 'ANY_OTHER'
+        ? callActionRemarks.trim()
+        : `${reasonText}${callActionRemarks.trim() ? ': ' + callActionRemarks.trim() : ''}`;
+
+      // If CANCELLED, trigger workflow API
+      if (callActionType === 'CANCELLED') {
+        console.log('🔄 Triggering workflow API for Cancel Call...');
+
+        const workflowActionData = {
+          workflowTransitionId: call.workflowTransitionId || call.id,
+          requestId: call.call_no,
+          action: 'VERIFY_MATERIAL_AVAILABILITY',
+          remarks: finalRemarks,
+          actionBy: userId,
+          pincode: call.pincode || '560001',
+          materialAvailable: 'NO'
+        };
+
+        console.log('Workflow Action Data:', workflowActionData);
+
+        try {
+          await performTransitionAction(workflowActionData);
+          console.log('✅ Workflow transition successful');
+          alert(`Call ${call.call_no} cancelled successfully`);
+        } catch (workflowError) {
+          console.error('❌ Workflow API error:', workflowError);
+          throw new Error(workflowError.message || 'Failed to cancel call via workflow');
+        }
       } else {
-        // Raw Material: Call real API
-        await saveInspectionInitiation(actionData);
-        alert(`Call ${callActionType === 'WITHHELD' ? 'withheld' : 'cancelled'} successfully`);
-      }
+        // WITHHELD - use existing logic
+        const actionData = {
+          inspectionRequestId: call.api_id || null,
+          callNo: call.call_no,
+          poNo: call.po_no,
+          actionType: callActionType,
+          reason: callActionReason,
+          remarks: finalRemarks,
+          status: callActionType,
+          actionDate: new Date().toISOString()
+        };
 
-      // Mark call as withheld in local storage
-      if (callActionType === 'WITHHELD') {
-        markAsWithheld(call.call_no, callActionRemarks.trim());
+        // Skip API call for Process/Final Product (mock mode)
+        if (isProcessOrFinalProduct(call.product_type)) {
+          console.log('🏭 Process/Final Product: Withheld saved to localStorage only (no API call)');
+          alert(`✅ Call withheld successfully (Mock Mode)`);
+        } else {
+          // Raw Material: Call real API
+          await saveInspectionInitiation(actionData);
+          alert(`Call withheld successfully`);
+        }
+
+        // Mark call as withheld in local storage
+        markAsWithheld(call.call_no, finalRemarks);
       }
 
       handleCloseCallActionModal();
       onBack();
     } catch (error) {
       console.error('Error saving call action:', error);
-      setCallActionError('Failed to save. Please try again.');
+      setCallActionError(error.message || 'Failed to save. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -318,6 +355,24 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
 
     setIsSaving(true);
     try {
+      // Get current user for actionBy field
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
+
+      // Fetch the latest workflow transition ID for this call
+      let workflowTransitionId = call.id || call.workflowTransitionId || null;
+
+      try {
+        const latestTransition = await fetchLatestWorkflowTransition(call.call_no);
+        if (latestTransition && latestTransition.workflowTransitionId) {
+          workflowTransitionId = latestTransition.workflowTransitionId;
+          console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${call.call_no}`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
+        // Continue with the original workflowTransitionId from call object
+      }
+
       const initiationData = {
         inspectionRequestId: call.api_id || null,
         callNo: call.call_no,
@@ -333,7 +388,9 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
         multipleLinesActive,
         productionLines,
         productType: call.product_type,
-        status: 'INITIATED'
+        status: 'INITIATED',
+        workflowTransitionId: workflowTransitionId,
+        actionBy: userId
       };
 
       // Skip API call for Process/Final Product (mock mode)

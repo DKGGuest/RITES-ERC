@@ -11,6 +11,7 @@
  */
 export const API_STATUS = {
   CALL_REGISTERED: 'CALL_REGISTERED',
+  IE_SCHEDULED: 'IE_SCHEDULED',
   SCHEDULED: 'SCHEDULED',
   VERIFY_PO_DETAILS: 'VERIFY_PO_DETAILS',
   // Add more statuses as needed
@@ -34,6 +35,7 @@ export const DISPLAY_STATUS = {
 export const getDisplayStatus = (apiStatus) => {
   const statusMap = {
     [API_STATUS.CALL_REGISTERED]: DISPLAY_STATUS.PENDING,
+    [API_STATUS.IE_SCHEDULED]: DISPLAY_STATUS.SCHEDULED,
     [API_STATUS.SCHEDULED]: DISPLAY_STATUS.SCHEDULED,
     [API_STATUS.VERIFY_PO_DETAILS]: DISPLAY_STATUS.UNDER_INSPECTION,
   };
@@ -51,6 +53,7 @@ export const getDisplayStatus = (apiStatus) => {
 export const getAvailableActions = (apiStatus) => {
   const actionMap = {
     [API_STATUS.CALL_REGISTERED]: ['schedule'],
+    [API_STATUS.IE_SCHEDULED]: ['start', 'reschedule'],
     [API_STATUS.SCHEDULED]: ['start', 'reschedule'],
     [API_STATUS.VERIFY_PO_DETAILS]: ['resume', 'reschedule'],
   };
@@ -64,9 +67,11 @@ export const getAvailableActions = (apiStatus) => {
  * @returns {boolean} True if schedule date should be shown
  */
 export const shouldShowScheduleDate = (apiStatus) => {
-  // Show schedule date for SCHEDULED and VERIFY_PO_DETAILS (Under Inspection)
+  // Show schedule date for IE_SCHEDULED, SCHEDULED and VERIFY_PO_DETAILS (Under Inspection)
   // because the call was scheduled before inspection started
-  return apiStatus === API_STATUS.SCHEDULED || apiStatus === API_STATUS.VERIFY_PO_DETAILS;
+  return apiStatus === API_STATUS.IE_SCHEDULED ||
+         apiStatus === API_STATUS.SCHEDULED ||
+         apiStatus === API_STATUS.VERIFY_PO_DETAILS;
 };
 
 /**
@@ -77,6 +82,7 @@ export const shouldShowScheduleDate = (apiStatus) => {
 export const getStatusVariant = (apiStatus) => {
   const variantMap = {
     [API_STATUS.CALL_REGISTERED]: 'warning', // Yellow/Orange for pending
+    [API_STATUS.IE_SCHEDULED]: 'info',       // Blue for scheduled
     [API_STATUS.SCHEDULED]: 'info',          // Blue for scheduled
     [API_STATUS.VERIFY_PO_DETAILS]: 'success', // Green for under inspection
   };

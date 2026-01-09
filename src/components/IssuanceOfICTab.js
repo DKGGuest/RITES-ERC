@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DataTable from './DataTable';
 import StatusBadge from './StatusBadge';
 import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import CallsFilterSection from './common/CallsFilterSection';
 import { createStageValidationHandler } from '../utils/stageValidation';
+import { generateRawMaterialCertificate } from '../services/certificateService';
+import { fetchCompletedCallsForIC, getCurrentUserId } from '../services/workflowApiService';
 
 const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
   const [showFilters, setShowFilters] = useState(false);
@@ -12,6 +14,10 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
   const [selectedCategory, setSelectedCategory] = useState('Call Number');
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectionError, setSelectionError] = useState('');
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  const [isLoadingCertificate, setIsLoadingCertificate] = useState(false);
+  const [completedCalls, setCompletedCalls] = useState([]);
+  const [isLoadingCalls, setIsLoadingCalls] = useState(false);
   const [filters, setFilters] = useState({
     productTypes: [],
     vendors: [],
@@ -22,8 +28,43 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
     callNumbers: []
   });
 
-  // Filter calls that are completed and ready for IC issuance
-  const icCalls = calls.filter(c => c.status === 'Completed');
+  // Helper function to show notifications
+  const showNotification = (message, type = 'info') => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: '' });
+    }, 5000);
+  };
+
+  // Fetch completed calls from API on component mount
+  useEffect(() => {
+    const loadCompletedCalls = async () => {
+      try {
+        setIsLoadingCalls(true);
+        const userId = getCurrentUserId();
+
+        if (!userId) {
+          console.warn('⚠️ User ID not found, cannot fetch completed calls');
+          return;
+        }
+
+        const calls = await fetchCompletedCallsForIC(userId);
+        setCompletedCalls(calls);
+        console.log('✅ Loaded completed calls:', calls);
+      } catch (error) {
+        console.error('❌ Failed to load completed calls:', error);
+        showNotification('Failed to load completed calls. Please refresh the page.', 'error');
+      } finally {
+        setIsLoadingCalls(false);
+      }
+    };
+
+    loadCompletedCalls();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Use completed calls from API instead of filtering from props
+  const icCalls = completedCalls;
 
   // Apply filters to data
   const filteredCalls = useMemo(() => {
@@ -81,12 +122,13 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
 
   const columns = [
     { key: 'call_no', label: 'Call No.' },
+    { key: 'icNo', label: 'IC Number' },
     { key: 'po_no', label: 'PO No.' },
     { key: 'vendor_name', label: 'Vendor Name' },
     { key: 'product_type', label: 'Product Type', render: (val) => getProductTypeDisplayName(val) },
     { key: 'requested_date', label: 'Inspection Date', render: (val) => formatDate(val) },
     { key: 'stage', label: 'Stage' },
-    { key: 'status', label: 'IC Status', render: () => <StatusBadge status="Ready for IC" /> },
+    { key: 'status', label: 'IC Status', render: (_val, row) => <StatusBadge status={row.displayStatus || 'IC Pending'} /> },
   ];
 
   const selectedICCalls = filteredCalls.filter(call => selectedRows.includes(call.id));
@@ -108,6 +150,90 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
     console.log('View selected IC calls:', selectedICCalls.map(call => call.call_no));
   };
 
+  /**
+   * Extract core IC number from formatted IC number
+   * Examples:
+   *   - "N/RM-IC-1767618858167/RAJK" -> "RM-IC-1767618858167"
+   *   - "RM-IC-1767772023499" -> "RM-IC-1767772023499"
+   */
+  const extractCoreIcNumber = (icNumber) => {
+    if (!icNumber) return null;
+
+    // If IC number contains slashes, extract the middle part (RM-IC-XXXXXXXXX)
+    // Pattern: N/RM-IC-XXXXXXXXX/RAJK -> RM-IC-XXXXXXXXX
+    const match = icNumber.match(/RM-IC-\d+/);
+    if (match) {
+      return match[0];
+    }
+
+    // If no match, return as-is (might already be in correct format)
+    return icNumber;
+  };
+
+  /**
+   * Handle Issue IC button click
+   * Fetches certificate data from backend and navigates to certificate page
+   */
+  const handleIssueIC = async (row) => {
+    try {
+      setIsLoadingCertificate(true);
+      showNotification('Loading certificate data...', 'info');
+
+      // Try to get IC number from the row data
+      const rawIcNumber = row.icNo || row.ic_number || row.call_no;
+
+      if (!rawIcNumber) {
+        throw new Error('IC Number not found for this call');
+      }
+
+      // Extract core IC number (remove N/ prefix and /RAJK suffix if present)
+      const coreIcNumber = extractCoreIcNumber(rawIcNumber);
+
+      console.log('🔍 Raw IC Number:', rawIcNumber);
+      console.log('🔍 Core IC Number for API:', coreIcNumber);
+
+      // Call the certificate generation API with core IC number
+      const certificateData = await generateRawMaterialCertificate(coreIcNumber);
+
+      console.log('✅ Certificate data received:', certificateData);
+      console.log('📋 Certificate Number from backend:', certificateData.certificateNo);
+
+      // Merge API data with row data for the certificate component
+      // Use certificate number from backend (fetched from inspection_complete_details table)
+      const enrichedCallData = {
+        ...row,
+        ...certificateData,
+        // Keep the original IC number
+        icNo: rawIcNumber,
+        ic_number: rawIcNumber,
+        call_no: rawIcNumber
+      };
+
+      // Set the selected call with enriched data and navigate to the appropriate IC page
+      if (setSelectedCall) setSelectedCall(enrichedCallData);
+      if (setCurrentPage) setCurrentPage(getICPageForStage(row.stage));
+
+      showNotification('Certificate loaded successfully!', 'success');
+    } catch (error) {
+      console.error('❌ Error loading certificate:', error);
+      showNotification(
+        error.message || 'Failed to load certificate data. Please try again.',
+        'error'
+      );
+    } finally {
+      setIsLoadingCertificate(false);
+    }
+  };
+
+  /**
+   * Handle View Certificate button click
+   * Fetches certificate data from backend and displays it
+   */
+  const handleViewCertificate = async (row) => {
+    // Use the same logic as Issue IC
+    await handleIssueIC(row);
+  };
+
   const getICPageForStage = (stage) => {
     if (stage === 'Raw Material Inspection' || stage === 'Raw Material') {
       return 'ic-rawmaterial';
@@ -124,22 +250,18 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
       <div style={{ display: 'flex', gap: 'var(--space-8)' }}>
         <button
           className="btn btn-sm btn-primary"
-          onClick={() => {
-            if (setSelectedCall) setSelectedCall(row);
-            if (setCurrentPage) setCurrentPage(getICPageForStage(row.stage));
-          }}
+          onClick={() => handleIssueIC(row)}
+          disabled={isLoadingCertificate}
         >
-          Issue IC
+          {isLoadingCertificate ? 'Loading...' : 'Issue IC'}
         </button>
 
         <button
           className="btn btn-sm btn-outline"
-          onClick={() => {
-            if (setSelectedCall) setSelectedCall(row);
-            if (setCurrentPage) setCurrentPage(getICPageForStage(row.stage));
-          }}
+          onClick={() => handleViewCertificate(row)}
+          disabled={isLoadingCertificate}
         >
-          View
+          {isLoadingCertificate ? 'Loading...' : 'View'}
         </button>
       </div>
     ) : null
@@ -154,64 +276,94 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
         </div>
       </div>
 
-      <CallsFilterSection
-        allCalls={icCalls}
-        filteredCalls={filteredCalls}
-        filters={filters}
-        setFilters={setFilters}
-        showFilters={showFilters}
-        setShowFilters={setShowFilters}
-        filterSearch={filterSearch}
-        setFilterSearch={setFilterSearch}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
-        clearAllFilters={clearAllFilters}
-        handleFilterChange={handleFilterChange}
-        handleMultiSelectToggle={handleMultiSelectToggle}
-        summaryLabel="IC-ready calls"
-      />
-
-      {/* Selection Error Message */}
-      <Notification
-        message={selectionError}
-        type="error"
-        autoClose={true}
-        autoCloseDelay={5000}
-        onClose={() => setSelectionError('')}
-      />
-
-      {selectedRows.length > 1 && (
-        <div className="pending-calls-bulk-actions" style={{
-          marginBottom: 'var(--space-16)',
-          padding: 'var(--space-16)',
-          background: 'var(--color-bg-1)',
-          borderRadius: 'var(--radius-base)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{ fontWeight: 'var(--font-weight-medium)' }}>
-            {selectedRows.length} inspection calls selected
-          </div>
-          <div className="pending-calls-bulk-actions-buttons" style={{ display: 'flex', gap: 'var(--space-12)' }}>
-            <button className="btn btn-secondary" onClick={handleBulkView} style={{ minHeight: '44px' }}>
-              VIEW SELECTED
-            </button>
-            <button className="btn btn-primary" onClick={handleBulkIssue} style={{ minHeight: '44px' }}>
-              ISSUE IC FOR ALL
-            </button>
-          </div>
+      {/* Loading State */}
+      {isLoadingCalls && (
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--space-32)' }}>
+          <p>Loading completed calls...</p>
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        data={filteredCalls}
-        actions={actions}
-        selectable
-        selectedRows={selectedRows}
-        onSelectionChange={handleSelectionChange}
-      />
+      {/* No Data State */}
+      {!isLoadingCalls && icCalls.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', padding: 'var(--space-32)' }}>
+          <p>No completed calls found for IC issuance.</p>
+        </div>
+      )}
+
+      {/* Data Display */}
+      {!isLoadingCalls && icCalls.length > 0 && (
+        <>
+          <CallsFilterSection
+            allCalls={icCalls}
+            filteredCalls={filteredCalls}
+            filters={filters}
+            setFilters={setFilters}
+            showFilters={showFilters}
+            setShowFilters={setShowFilters}
+            filterSearch={filterSearch}
+            setFilterSearch={setFilterSearch}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            clearAllFilters={clearAllFilters}
+            handleFilterChange={handleFilterChange}
+            handleMultiSelectToggle={handleMultiSelectToggle}
+            summaryLabel="IC-ready calls"
+          />
+
+          {/* Selection Error Message */}
+          <Notification
+            message={selectionError}
+            type="error"
+            autoClose={true}
+            autoCloseDelay={5000}
+            onClose={() => setSelectionError('')}
+          />
+
+          {/* Certificate Generation Notification */}
+          {notification.show && (
+            <Notification
+              message={notification.message}
+              type={notification.type}
+              autoClose={true}
+              autoCloseDelay={5000}
+              onClose={() => setNotification({ show: false, message: '', type: '' })}
+            />
+          )}
+
+          {selectedRows.length > 1 && (
+            <div className="pending-calls-bulk-actions" style={{
+              marginBottom: 'var(--space-16)',
+              padding: 'var(--space-16)',
+              background: 'var(--color-bg-1)',
+              borderRadius: 'var(--radius-base)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ fontWeight: 'var(--font-weight-medium)' }}>
+                {selectedRows.length} inspection calls selected
+              </div>
+              <div className="pending-calls-bulk-actions-buttons" style={{ display: 'flex', gap: 'var(--space-12)' }}>
+                <button className="btn btn-secondary" onClick={handleBulkView} style={{ minHeight: '44px' }}>
+                  VIEW SELECTED
+                </button>
+                <button className="btn btn-primary" onClick={handleBulkIssue} style={{ minHeight: '44px' }}>
+                  ISSUE IC FOR ALL
+                </button>
+              </div>
+            </div>
+          )}
+
+          <DataTable
+            columns={columns}
+            data={filteredCalls}
+            actions={actions}
+            selectable
+            selectedRows={selectedRows}
+            onSelectionChange={handleSelectionChange}
+          />
+        </>
+      )}
     </div>
   );
 };

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
 import { saveInspectionInitiation } from '../services/vendorInspectionService';
+import { getStoredUser } from '../services/authService';
+import { fetchLatestWorkflowTransition, performTransitionAction } from '../services/workflowService';
 import '../styles/inspectionInitiationPage.css';
 
 // Reason options for withheld/cancel call
@@ -121,23 +123,61 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
 
     setIsSaving(true);
     try {
-      const actionData = {
-        inspectionRequestId: currentCall.api_id || null,
-        callNo: currentCall.call_no,
-        poNo: currentCall.po_no,
-        actionType: callActionType,
-        reason: callActionReason,
-        remarks: callActionRemarks.trim(),
-        status: callActionType,
-        actionDate: new Date().toISOString()
-      };
-      await saveInspectionInitiation(actionData);
-      alert(`Call ${currentCall.call_no} ${callActionType === 'WITHHELD' ? 'withheld' : 'cancelled'} successfully`);
+      // Get current user
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
+
+      // Prepare remarks based on reason
+      const reasonText = CALL_ACTION_REASONS.find(r => r.value === callActionReason)?.label || callActionReason;
+      const finalRemarks = callActionReason === 'ANY_OTHER'
+        ? callActionRemarks.trim()
+        : `${reasonText}${callActionRemarks.trim() ? ': ' + callActionRemarks.trim() : ''}`;
+
+      // If CANCELLED, trigger workflow API
+      if (callActionType === 'CANCELLED') {
+        console.log('🔄 Triggering workflow API for Cancel Call...');
+
+        const workflowActionData = {
+          workflowTransitionId: currentCall.workflowTransitionId || currentCall.id,
+          requestId: currentCall.call_no,
+          action: 'VERIFY_MATERIAL_AVAILABILITY',
+          remarks: finalRemarks,
+          actionBy: userId,
+          pincode: currentCall.pincode || '560001',
+          materialAvailable: 'NO'
+        };
+
+        console.log('Workflow Action Data:', workflowActionData);
+
+        try {
+          await performTransitionAction(workflowActionData);
+          console.log('✅ Workflow transition successful');
+          alert(`Call ${currentCall.call_no} cancelled successfully`);
+        } catch (workflowError) {
+          console.error('❌ Workflow API error:', workflowError);
+          throw new Error(workflowError.message || 'Failed to cancel call via workflow');
+        }
+      } else {
+        // WITHHELD - use existing logic
+        const actionData = {
+          inspectionRequestId: currentCall.api_id || null,
+          callNo: currentCall.call_no,
+          poNo: currentCall.po_no,
+          actionType: callActionType,
+          reason: callActionReason,
+          remarks: finalRemarks,
+          status: callActionType,
+          actionDate: new Date().toISOString()
+        };
+        await saveInspectionInitiation(actionData);
+        alert(`Call ${currentCall.call_no} withheld successfully`);
+      }
+
       handleCloseCallActionModal();
       onBack();
     } catch (error) {
       console.error('Error saving call action:', error);
-      setCallActionError('Failed to save. Please try again.');
+      setCallActionError(error.message || 'Failed to save. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -179,9 +219,27 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
 
     setIsSaving(true);
     try {
+      // Get current user for actionBy field
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
+
       // Save initiation for all calls
       const savedCalls = [];
       for (const call of calls) {
+        // Fetch the latest workflow transition ID for this call
+        let workflowTransitionId = call.id || call.workflowTransitionId || null;
+
+        try {
+          const latestTransition = await fetchLatestWorkflowTransition(call.call_no);
+          if (latestTransition && latestTransition.workflowTransitionId) {
+            workflowTransitionId = latestTransition.workflowTransitionId;
+            console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${call.call_no}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch latest workflow transition for ${call.call_no}, using call.id:`, error);
+          // Continue with the original workflowTransitionId from call object
+        }
+
         const initiationData = {
           inspectionRequestId: call.api_id || null,
           callNo: call.call_no,
@@ -189,7 +247,9 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
           shiftOfInspection: initiateShift,
           dateOfInspection: initiateDate,
           status: 'INITIATED',
-          initiatedDate: new Date().toISOString()
+          initiatedDate: new Date().toISOString(),
+          workflowTransitionId: workflowTransitionId,
+          actionBy: userId
         };
         console.log('Saving initiation for call:', call.call_no, initiationData);
         const result = await saveInspectionInitiation(initiationData);

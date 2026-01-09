@@ -81,6 +81,22 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
     }
   };
 
+  // Handle row click - if selectable, toggle selection; otherwise call onRowClick
+  const handleRowClick = (row, e) => {
+    // Don't handle row click if clicking on action buttons or other interactive elements
+    if (e.target.closest('button') || e.target.closest('a')) {
+      return;
+    }
+
+    if (selectable) {
+      // Toggle selection when row is clicked
+      handleSelectRow(row.id);
+    } else if (onRowClick) {
+      // Only call onRowClick if not selectable
+      onRowClick(row);
+    }
+  };
+
   const isAllSelected = selectable && paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(row.id));
 
   return (
@@ -130,8 +146,15 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
           </tr>
         </thead>
         <tbody>
-          {paginatedData.map((row, idx) => (
-            <tr key={idx} onClick={() => onRowClick && onRowClick(row)}>
+          {paginatedData.map((row, idx) => {
+            const isSelected = selectable && selectedRows.includes(row.id);
+            return (
+              <tr
+                key={idx}
+                onClick={(e) => handleRowClick(row, e)}
+                className={isSelected ? 'selected' : ''}
+                style={{ cursor: selectable ? 'pointer' : 'default' }}
+              >
               {selectable && (
                 <td onClick={(e) => e.stopPropagation()}>
                   <input
@@ -148,7 +171,8 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
               ))}
               {actions && <td data-label="Actions">{actions(row)}</td>}
             </tr>
-          ))}
+            );
+          })}
           {paginatedData.length === 0 && (
             <tr>
               <td colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>

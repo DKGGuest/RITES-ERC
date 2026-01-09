@@ -1,7 +1,7 @@
 // src/IC/erc/RawMaterialCertificate.jsx
 
-import React, { useRef } from "react";
-import RawMaterialPreview from "./RawMaterialPreview";
+import { useRef } from "react";
+import ErcRmIC from "./ErcRmIc";
 import { exportToPdf } from "../../utils/exportUtils";
 
 /**
@@ -16,7 +16,7 @@ import { exportToPdf } from "../../utils/exportUtils";
 export default function RawMaterialCertificate({ call = {}, onBack }) {
   const printAreaRef = useRef();
 
-  /** 
+  /**
    * Transform API response to component format.
    * KEEP IT MINIMAL: Do NOT insert default values.
    */
@@ -24,39 +24,40 @@ export default function RawMaterialCertificate({ call = {}, onBack }) {
     if (!c || Object.keys(c).length === 0) return {};
 
     return {
-      certificateNo: c.icNo || "",
-      date: c.inspectionDate || "",
+      certificateNo: c.certificateNo || c.icNo || "",
+      certificateDate: c.certificateDate || "",
       offeredInstNo: c.offeredInstNo || "",
       passedInstNo: c.passedInstNo || "",
 
-      contractor: c.vendorName || "",
+      contractor: c.contractor || c.vendorName || c.vendor_name || "",
       manufacturer: c.manufacturer || "",
-      placeOfInspection: c.inspectionPlace || "",
+      placeOfInspection: c.placeOfInspection || c.inspectionPlace || c.place_of_inspection || "",
       contractRef: c.contractRef || "",
-      poNoContractor: c.poNo || "",
-      billPayingOfficer: c.billOfficer || "",
-      consigneeRailway: c.consignee || "",
+      contractorPo: c.contractorPo || c.poNo || c.po_no || "",
+      billPayingOfficer: c.billPayingOfficer || c.billOfficer || "",
+      consigneeRailway: c.consigneeRailway || c.consignee || "",
       purchasingAuthority: c.purchasingAuthority || "",
-      consigneeManufacturer: c.consigneeFinished || "",
+      consigneeManufacturer: c.consigneeManufacturer || c.consigneeFinished || "",
 
-      description: c.productDescription || c.productType || "",
+      description: c.description || c.productDescription || c.productType || "",
       drgNo: c.drgNo || "",
       specNo: c.specNo || "",
       qapNo: c.qapNo || "",
-      detailsOfInspection: c.detailsOfInspection || "",
+      inspectionType: c.inspectionType || "",
+      inspectionDetails: c.inspectionDetails || c.detailsOfInspection || "",
       chpClause: c.chpClause || "",
       contractChpReq: c.contractChpReq || "",
 
       result: c.result || "",
-      qtyCleared: c.qtyCleared || "",
+      clearedQty: c.clearedQty || c.qtyCleared || "",
       qtyRejected: c.qtyRejected || "",
 
       remarks: c.remarks || "",
-      dateOfCall: c.dateOfCall || "",
-      noOfVisits: c.noOfVisits || "",
-      dateOfInspection: c.dateOfInspection || "",
+      callDate: c.dateOfCall || "",
+      visitsNo: c.noOfVisits || "",
+      inspectionDate: c.dateOfInspection || "",
       sealingPattern: c.sealingPattern || "",
-      facsimile: c.facsimile || "",
+      sealFacsimile: c.sealFacsimile || c.facsimile || "",
       inspectingEngineer: c.inspectingEngineer || ""
     };
   };
@@ -66,13 +67,19 @@ export default function RawMaterialCertificate({ call = {}, onBack }) {
 
   const handleExport = async () => {
     if (!printAreaRef.current) return;
-    await exportToPdf(printAreaRef.current, "RawMaterialIC.pdf");
+
+    // Use certificate number as filename, fallback to default if not available
+    const certificateNo = data.certificateNo || "RawMaterialIC";
+    // Sanitize filename: remove special characters that are invalid in filenames
+    const sanitizedFilename = certificateNo.replace(/[/\\?%*:|"<>]/g, '-');
+
+    await exportToPdf(printAreaRef.current, `${sanitizedFilename}.pdf`);
   };
 
   return (
     <div style={{ padding: 18 }}>
-      {/* Top Buttons */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+      {/* Top Buttons - Hidden during print */}
+      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
         <button onClick={onBack} className="btn btn-outline">← Back</button>
 
         <div style={{ display: "flex", gap: 8 }}>
@@ -81,9 +88,11 @@ export default function RawMaterialCertificate({ call = {}, onBack }) {
         </div>
       </div>
 
-      {/* Printable content */}
-      <div ref={printAreaRef}>
-        <RawMaterialPreview data={data} />
+      {/* Printable content - Wrapped for proper print isolation */}
+      <div className="certificate-print-wrapper" ref={printAreaRef}>
+        <div className="certificate-page">
+          <ErcRmIC data={data} />
+        </div>
       </div>
     </div>
   );

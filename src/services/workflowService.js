@@ -274,3 +274,51 @@ export const performTransitionAction = async (actionData) => {
 //   }
 // };
 
+/**
+ * Fetch the latest workflow transition for a specific requestId
+ * Azure API: GET /workflowTransitionHistory?requestId={requestId}
+ * @param {string} requestId - The request ID (call number)
+ * @returns {Promise<Object|null>} Latest workflow transition or null
+ */
+export const fetchLatestWorkflowTransition = async (requestId) => {
+  try {
+    console.log(`🔍 Fetching latest workflow transition for ${requestId}...`);
+    const response = await fetch(
+      `${API_BASE_URL}/workflowTransitionHistory?requestId=${encodeURIComponent(requestId)}`,
+      {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.responseStatus?.message || 'Failed to fetch workflow transition history');
+    }
+
+    const data = await response.json();
+
+    // Check for successful status (statusCode === 0 means success)
+    if (data.responseStatus?.statusCode !== 0) {
+      throw new Error(data.responseStatus?.message || 'Failed to fetch workflow transition history');
+    }
+
+    const transitions = data.responseData || [];
+
+    if (transitions.length === 0) {
+      console.warn(`⚠️ No workflow transitions found for ${requestId}`);
+      return null;
+    }
+
+    // Get the latest transition (highest workflowTransitionId)
+    const latestTransition = transitions.reduce((latest, current) => {
+      return (current.workflowTransitionId > latest.workflowTransitionId) ? current : latest;
+    }, transitions[0]);
+
+    console.log(`✅ Latest workflow transition for ${requestId}: ID ${latestTransition.workflowTransitionId}`);
+    return latestTransition;
+  } catch (error) {
+    console.error(`Error fetching latest workflow transition for ${requestId}:`, error);
+    throw error;
+  }
+};

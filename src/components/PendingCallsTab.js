@@ -280,14 +280,15 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
       key: 'status',
       label: 'Status',
       render: (_val, row) => {
-        // Check if this is a Raw Material call from API
-        const isRawMaterialFromAPI = row.product_type === 'Raw Material' &&
-                                      (row.status === 'CALL_REGISTERED' ||
-                                       row.status === 'IE_SCHEDULED' ||
-                                       row.status === 'VERIFY_PO_DETAILS');
+        // Check if this is a call from workflow API (has workflow status)
+        // Check for workflow statuses instead of product type to be more reliable
+        const isFromWorkflowAPI = row.status === 'CALL_REGISTERED' ||
+                                   row.status === 'IE_SCHEDULED' ||
+                                   row.status === 'VERIFY_PO_DETAILS' ||
+                                   row.status === 'INSPECTION_COMPLETE_CONFIRM';
 
         let displayStatus;
-        if (isRawMaterialFromAPI) {
+        if (isFromWorkflowAPI) {
           // Apply status mapper for API calls (maps IE_SCHEDULED -> Scheduled, etc.)
           const apiStatus = row.status || API_STATUS.CALL_REGISTERED;
           displayStatus = getDisplayStatusFromMapper(apiStatus);
@@ -331,15 +332,15 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
   // Show individual actions only when exactly one row is selected
   // Actions are determined by API status for Raw Material, or by schedule status for mock data
   const actions = selectedRows.length === 1 ? (row) => {
-    // Check if this is a Raw Material call from API
-    const isRawMaterialFromAPI = row.product_type === 'Raw Material' &&
-                                  (row.status === 'CALL_REGISTERED' ||
-                                   row.status === 'IE_SCHEDULED' ||
-                                   row.status === 'VERIFY_PO_DETAILS');
+    // Check if this is a call from workflow API (has workflow status)
+    const isFromWorkflowAPI = row.status === 'CALL_REGISTERED' ||
+                               row.status === 'IE_SCHEDULED' ||
+                               row.status === 'VERIFY_PO_DETAILS' ||
+                               row.status === 'INSPECTION_COMPLETE_CONFIRM';
 
     let availableActions = [];
 
-    if (isRawMaterialFromAPI) {
+    if (isFromWorkflowAPI) {
       // Use new workflow for API calls
       const apiStatus = row.status || API_STATUS.CALL_REGISTERED;
       availableActions = getAvailableActions(apiStatus);

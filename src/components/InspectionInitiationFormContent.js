@@ -159,18 +159,21 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             // Transform RM Heat Details to subPoList for Section C
             if (poDataFromDb.rmHeatDetails && poDataFromDb.rmHeatDetails.length > 0) {
               const transformedSubPoList = poDataFromDb.rmHeatDetails.map(heat => ({
-                rawMaterialName: heat.rawMaterialName,
-                grade: heat.grade,
-                heatNumber: heat.heatNumber,
+                raw_material_name: heat.rawMaterialName,
+                grade_spec: heat.grade,
+                heat_no: heat.heatNumber,
                 manufacturer: heat.manufacturer,
-                tcNumber: heat.tcNumber,
-                tcDate: heat.tcDate,
-                subPoNumber: heat.subPoNumber,
-                subPoDate: heat.subPoDate,
-                subPoQty: heat.subPoQty,
-                invoiceNo: heat.invoiceNumber,
-                invoiceDate: heat.invoiceDate,
-                offeredQty: heat.offeredQty
+                manufacturer_steel_bars: heat.manufacturer,
+                tc_no: heat.tcNumber,
+                tc_date: heat.tcDate,
+                sub_po_no: heat.subPoNumber,
+                sub_po_date: heat.subPoDate,
+                sub_po_qty: heat.subPoQty,
+                invoice_no: heat.invoiceNumber,
+                invoice_date: heat.invoiceDate,
+                qty: heat.offeredQty,
+                unit: 'MT',
+                place_of_inspection: call.place_of_inspection
               }));
               setSubPoList(transformedSubPoList);
               console.log(`✅ Loaded ${transformedSubPoList.length} RM heat details for Section C`);
@@ -262,25 +265,15 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
   /* Build Section A payload for API */
   const buildSectionAPayload = () => ({
     inspectionCallNo: call.call_no,
-    poNo: poData.po_no || call.po_no,
+    poNo: poData.rly_po_no || poData.po_no || call.po_no,
     poDate: convertDateToISO(poData.po_date || call.po_date),
-    vendorCode: poData.vendor_code || '',
-    vendorName: poData.vendor_name || call.vendor_name,
-    vendorAddress: poData.vendor_address || '',
-    placeOfInspection: poData.place_of_inspection || call.place_of_inspection,
-    manufacturer: poData.manufacturer || '',
-    consigneeRly: poData.consignee_rly || '',
-    consignee: poData.consignee || call.consignee,
-    itemDescription: poData.product_name || call.product_name,
     poQty: poData.po_qty || call.po_qty,
-    unit: poData.unit || 'Nos',
-    origDp: convertDateToISO(poData.orig_dp || call.delivery_period),
-    extDp: convertDateToISO(poData.ext_dp),
-    origDpStart: convertDateToISO(poData.orig_dp_start || poData.po_date),
-    bpo: poData.bpo || '',
-    dateOfInspection: formData.dateOfInspection,
-    shiftOfInspection: formData.shiftOfInspection,
-    offeredQty: formData.offeredQty,
+    placeOfInspection: poData.place_of_inspection || call.place_of_inspection,
+    vendorName: poData.vendor_name || call.vendor_name,
+    maNo: poData.po_amend_no || null,
+    maDate: poData.po_amend_dates || null,
+    purchasingAuthority: poData.purchasing_authority || 'Manager, Procurement',
+    billPayingOfficer: poData.bpo || 'BPO-001',
     status: 'approved'
   });
 
@@ -300,6 +293,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       rlyPoNoSr: poData.rly_po_no_serial || `${call.po_no || ''} / ${call.po_sr || ''}`,
       itemDesc: poData.product_name || call.product_name,
       productType: call.product_type,
+      typeOfErc: poData.erc_type || call.erc_type || null, // Type of ERC: MK-III, MK-V, etc.
       poQty: poData.po_qty || call.po_qty,
       unit: poData.unit || 'Nos',
       consigneeRly: poData.consignee_rly || '',
@@ -320,7 +314,11 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
   /* Build Section C payload for API (batch) */
   const buildSectionCPayload = () => {
     const dataList = subPoList.length > 0 ? subPoList : [subPoData];
-    return dataList.map(item => ({
+    console.log('🔍 [buildSectionCPayload] Using data source:', subPoList.length > 0 ? 'subPoList' : 'subPoData');
+    console.log('🔍 [buildSectionCPayload] Data count:', dataList.length);
+    console.log('🔍 [buildSectionCPayload] Raw data:', dataList);
+
+    const payload = dataList.map(item => ({
       inspectionCallNo: call.call_no,
       rawMaterialName: item.raw_material_name || item.product_name || '',
       gradeSpec: item.grade_spec || item.grade || '',
@@ -333,10 +331,13 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       invoiceNo: item.invoice_no || '',
       invoiceDate: convertDateToISO(item.invoice_date) || null,
       subPoQty: item.sub_po_qty || item.qty || null,
-      unit: item.unit || 'Nos',
+      unit: item.unit || 'MT',
       placeOfInspection: item.place_of_inspection || call.place_of_inspection,
       status: 'approved'
     }));
+
+    console.log('🔍 [buildSectionCPayload] Final payload:', payload);
+    return payload;
   };
 
   /* Handle Section A OK/Not OK - Azure API Integration */
@@ -983,24 +984,24 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                       flexWrap: 'wrap',
                       gap: 'var(--space-8)'
                     }}>
-                      <span>Heat {index + 1}: {subPo.heatNumber || subPo.heatNumbers?.[0] || ''}</span>
+                      <span>Heat {index + 1}: {subPo.heat_no || ''}</span>
                       <span style={{ color: 'var(--color-gray-600)', fontWeight: 'var(--font-weight-normal)' }}>
-                        Sub PO: {subPo.subPoNumber}
+                        Sub PO: {subPo.sub_po_no}
                       </span>
                     </h4>
                   )}
                   <div className="form-grid">
                     <div className="form-group">
                       <label className="form-label">RAW MATERIAL NAME</label>
-                      <input type="text" className="form-input" value={subPo.rawMaterialName || poData.product_name || poData.po_description || 'Raw Material'} disabled />
+                      <input type="text" className="form-input" value={subPo.raw_material_name || poData.product_name || poData.po_description || 'Raw Material'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">GRADE / SPEC</label>
-                      <input type="text" className="form-input" value={subPo.grade || subPo.spec || poData.grade || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.grade_spec || poData.grade || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">HEAT NO./ NO.S</label>
-                      <input type="text" className="form-input" value={subPo.heatNumber || subPo.heatNumbers?.join(', ') || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.heat_no || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">MANUFACTURER OF STEEL BARS</label>
@@ -1008,35 +1009,35 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                     </div>
                     <div className="form-group">
                       <label className="form-label">TC NO</label>
-                      <input type="text" className="form-input" value={subPo.tcNumber || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.tc_no || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">TC DATE</label>
-                      <input type="text" className="form-input" value={subPo.tcDate || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.tc_date || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">SUB PO NO.</label>
-                      <input type="text" className="form-input" value={subPo.subPoNumber || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.sub_po_no || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">SUB PO DATE</label>
-                      <input type="text" className="form-input" value={subPo.subPoDate || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.sub_po_date || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">SUB PO QTY</label>
-                      <input type="text" className="form-input" value={subPo.subPoQty || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.sub_po_qty || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">INVOICE NO.</label>
-                      <input type="text" className="form-input" value={subPo.invoiceNo || subPo.invoice_no || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.invoice_no || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">INVOICE DATE</label>
-                      <input type="text" className="form-input" value={subPo.invoiceDate || subPo.invoice_date || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.invoice_date || 'N/A'} disabled />
                     </div>
                     <div className="form-group">
                       <label className="form-label">OFFERED QTY</label>
-                      <input type="text" className="form-input" value={subPo.offeredQty || 'N/A'} disabled />
+                      <input type="text" className="form-input" value={subPo.qty || 'N/A'} disabled />
                     </div>
                   </div>
                 </div>

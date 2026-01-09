@@ -13,9 +13,14 @@ import { raiseBill, updateBillingStatus, approvePayment, BILLING_STATUS } from '
 import { getStoredUser } from '../services/authService';
 import { fetchUserPendingCalls, performTransitionAction, clearWorkflowCache } from '../services/workflowService';
 import { markAsScheduled, isCallInitiated, getCallStatusData } from '../services/callStatusService';
+// import { fetchRawMaterialCallsByStatus } from '../services/rawMaterial/rawMaterialApiService';
 
 const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending' }) => {
-  const [activeTab, setActiveTab] = useState(initialTab);
+  // Restore active tab from sessionStorage on page load, fallback to initialTab
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = sessionStorage.getItem('ie_landing_active_tab');
+    return savedTab || initialTab;
+  });
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedCallLocal, setSelectedCallLocal] = useState(null);
   const [selectedCalls, setSelectedCalls] = useState([]);
@@ -36,6 +41,9 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // State for API-fetched pending calls from Azure workflow API
   const [pendingCalls, setPendingCalls] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // State for completed calls (for IC issuance)
+  const [completedCalls, setCompletedCalls] = useState([]);
 
   // Fetch pending workflow transitions for logged-in user from Azure API
   // PERFORMANCE OPTIMIZATION: Returns data immediately, fetches vendor names in background
@@ -65,8 +73,51 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     }
   }, []);
 
+  // Save active tab to sessionStorage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('ie_landing_active_tab', activeTab);
+  }, [activeTab]);
+
+  // Fetch completed calls for IC issuance
+  const fetchCompletedCalls = useCallback(async () => {
+    try {
+      console.log('🔍 Fetching completed calls for IC issuance...');
+
+      // TEMPORARY: Use mock data for testing IC generation
+      // TODO: Switch back to API when backend has completed calls
+      const mockCompletedCalls = MOCK_INSPECTION_CALLS.filter(c => c.status?.toUpperCase() === 'COMPLETED');
+      console.log('✅ Using mock completed calls for testing:', mockCompletedCalls);
+      setCompletedCalls(mockCompletedCalls);
+
+      /* ORIGINAL API CALL - Uncomment when backend is ready
+      const calls = await fetchRawMaterialCallsByStatus('COMPLETED');
+      console.log('✅ Completed calls fetched:', calls);
+
+      // Transform backend data to match frontend expectations
+      const transformedCalls = (calls || []).map(call => ({
+        id: call.id,
+        call_no: call.icNumber,
+        po_no: call.poNo,
+        vendor_name: call.companyName,
+        product_type: call.rmInspectionDetails?.materialName || 'Raw Material',
+        requested_date: call.desiredInspectionDate,
+        stage: call.typeOfCall || 'Raw Material Inspection',
+        status: call.status,
+        // Keep original data for IC generation
+        ...call
+      }));
+
+      setCompletedCalls(transformedCalls);
+      */
+    } catch (error) {
+      console.error('❌ Error fetching completed calls:', error);
+      setCompletedCalls([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPendingData();
+    fetchCompletedCalls();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
@@ -526,7 +577,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       {/* 2. Issuance of IC - Second */}
       {activeTab === 'certificates' && (
         <IssuanceOfICTab
-          calls={MOCK_INSPECTION_CALLS}
+          calls={completedCalls}
           setSelectedCall={setSelectedCall}
           setCurrentPage={setCurrentPage}
         />

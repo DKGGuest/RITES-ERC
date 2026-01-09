@@ -4,8 +4,10 @@ import HeatNumberDetails from '../components/HeatNumberDetails';
 import { fetchPoDataForSections, updateColorCode } from '../services/poDataService';
 import { finishInspection } from '../services/rmInspectionService';
 import { useInspection } from '../context/InspectionContext';
-import { markAsWithheld } from '../services/callStatusService';
+import { markAsWithheld, markAsPaused } from '../services/callStatusService';
 import { saveInspectionInitiation } from '../services/vendorInspectionService';
+import { performTransitionAction } from '../services/workflowService';
+import { getStoredUser } from '../services/authService';
 import './RawMaterialDashboard.css';
 
 // Reason options for withheld inspection
@@ -182,7 +184,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             sub_po_no: firstHeat?.subPoNumber || response.poNo,
             sub_po_date: firstHeat?.subPoDate || response.poDate,
             sub_po_qty: firstHeat?.subPoQty || response.poQty,
-            product_name: response.itemDescription || response.itemDesc
+            product_name: response.itemDescription || response.itemDesc,
+            erc_type: response.ercType || null // Type of ERC from Section B (MK-III, MK-V, etc.)
           };
           setFetchedPoData(poData);
           updateRmPoDataCache(callNo, poData); // Cache it!
@@ -287,13 +290,23 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     return fetchedHeatData;
   }, [fetchedHeatData]);
 
-  // Determine product model/type from PO data — fall back to MK-III if not specified
+  // Determine product model/type from Type of ERC field (Section B) — fall back to product name parsing
   const productModel = useMemo(() => {
+    // Priority 1: Use Type of ERC from Section B (inspection_call_details.type_of_erc)
+    if (poData.erc_type) {
+      const ercType = poData.erc_type.toString();
+      if (/MK-III/i.test(ercType) || /MK III/i.test(ercType)) return 'MK-III';
+      if (/MK-V/i.test(ercType) || /MK V/i.test(ercType)) return 'MK-V';
+    }
+
+    // Priority 2: Fall back to product name parsing (legacy behavior)
     const name = (poData.product_name || poData.po_description || '').toString();
     if (/MK-III/i.test(name) || /MK III/i.test(name)) return 'MK-III';
     if (/MK-V/i.test(name) || /MK V/i.test(name)) return 'MK-V';
     if (poData.model && /MK-III/i.test(poData.model)) return 'MK-III';
     if (poData.model && /MK-V/i.test(poData.model)) return 'MK-V';
+
+    // Default: MK-III
     return 'MK-III';
   }, [poData]);
 
@@ -782,8 +795,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         sourceOfRawMaterial: sourceOfRawMaterial || null
       };
 
-      // Collect final results per heat (status, weights, remarks) + all heat pre-inspection data
-      const heatFinalResults = activeHeats.map((heat, heatIndex) => {
+      // Collect final results per heat (status, weights, remarks)
+      // NOTE: Heat pre-inspection data (TC, manufacturer, invoice, etc.) is now stored in rm_heat_quantities table
+      const heatFinalResults = activeHeats.map((heat) => {
         const heatNo = heat.heatNo || heat.heat_no;
         const heatStatuses = heatSubmoduleStatuses[heatNo] || {
           calibration: 'Pending',
@@ -798,37 +812,63 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         const isRejected = hasNotOk;
         const weight = parseFloat(heat.weight) || parseFloat(heat.offeredQty) || 0;
 
+        // Determine overall status for this heat
+        let overallStatus = 'PENDING';
+        if (isAccepted) {
+          overallStatus = 'ACCEPTED';
+        } else if (isRejected) {
+          overallStatus = 'REJECTED';
+        } else if (isAccepted && isRejected) {
+          overallStatus = 'PARTIALLY_ACCEPTED';
+        }
+
         return {
+          // Identification
           inspectionCallNo,
-          heatIndex,
           heatNo,
-          // Heat Pre-Inspection Data (from vendor call / HeatNumberDetails)
-          tcNo: heat.tcNo || null,
-          tcDate: heat.tcDate || null,
-          manufacturerName: heat.manufacturerName || null,
-          invoiceNumber: heat.invoiceNumber || null,
-          invoiceDate: heat.invoiceDate || null,
-          subPoNumber: heat.subPoNumber || null,
-          subPoDate: heat.subPoDate || null,
-          subPoQty: parseDecimal(heat.subPoQty),
-          totalValueOfPo: heat.totalValueOfPo || null,
-          tcQuantity: parseDecimal(heat.tcQuantity),
-          offeredQty: parseDecimal(heat.offeredQty),
-          colorCode: heat.colorCode || null, // Manual entry by inspector
-          // Final Inspection Status
-          status: isRejected ? 'REJECTED' : isAccepted ? 'ACCEPTED' : 'PENDING',
+
+          // Weights (MT)
           weightOfferedMt: weight,
           weightAcceptedMt: isAccepted ? weight : 0,
           weightRejectedMt: isRejected ? weight : 0,
+
           // Per-Submodule Status
           calibrationStatus: heatStatuses.calibration,
           visualStatus: heatStatuses.visual,
           dimensionalStatus: heatStatuses.dimensional,
           materialTestStatus: heatStatuses.materialTest,
           packingStatus: heatStatuses.packing,
+
+          // Final Status
+          status: isRejected ? 'REJECTED' : isAccepted ? 'ACCEPTED' : 'PENDING',
+          overallStatus: overallStatus,
+
+          // Cumulative Summary (same for all heats in this call)
+          totalHeatsOffered: activeHeats.length,
+          totalQtyOfferedMt: activeHeats.reduce((sum, h) => sum + (parseFloat(h.weight) || parseFloat(h.offeredQty) || 0), 0),
+          noOfBundles: numberOfBundles ? parseInt(numberOfBundles) : 0,
+          noOfErcFinished: numberOfERC ? parseInt(numberOfERC) : 0,
+
+          // Remarks
           remarks: heatRemarks[heatNo] || null
         };
       });
+
+      // Calculate overall inspection status based on all heat results
+      const acceptedHeats = heatFinalResults.filter(h => h.status === 'ACCEPTED').length;
+      const rejectedHeats = heatFinalResults.filter(h => h.status === 'REJECTED').length;
+      const totalHeats = heatFinalResults.length;
+
+      let overallInspectionStatus = 'PENDING';
+      if (acceptedHeats === totalHeats) {
+        overallInspectionStatus = 'ACCEPTED';
+      } else if (rejectedHeats === totalHeats) {
+        overallInspectionStatus = 'REJECTED';
+      } else if (acceptedHeats > 0 && rejectedHeats > 0) {
+        overallInspectionStatus = 'PARTIALLY_ACCEPTED';
+      }
+
+      console.log(`📊 Overall Inspection Status: ${overallInspectionStatus} (${acceptedHeats} accepted, ${rejectedHeats} rejected out of ${totalHeats} heats)`);
 
       // Build the complete payload
       const payload = {
@@ -872,6 +912,32 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
       // Step 2: Call the backend API to save inspection data
       await finishInspection(payload);
+
+      // Step 3: Trigger workflow API for Finish Inspection
+      console.log('🔄 Triggering workflow API for Finish Inspection...');
+
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
+
+      const workflowActionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: inspectionCallNo,
+        action: 'INSPECTION_COMPLETE_CONFIRM',
+        remarks: `Inspection completed with status: ${overallInspectionStatus}`,
+        actionBy: userId,
+        pincode: call.pincode || '560001'
+      };
+
+      console.log('Workflow Action Data:', workflowActionData);
+
+      try {
+        await performTransitionAction(workflowActionData);
+        console.log('✅ Workflow transition successful');
+      } catch (workflowError) {
+        console.error('❌ Workflow API error:', workflowError);
+        // Don't fail the entire operation if workflow fails
+        console.warn('Inspection saved but workflow transition failed');
+      }
 
       // Clear localStorage after successful save
       localStorage.removeItem(visualKey);
@@ -962,6 +1028,57 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       setIsSaving(false);
     }
   };
+
+  // Pause Inspection handler
+  const handlePauseInspection = useCallback(async () => {
+    const inspectionCallNo = call?.call_no;
+    if (!inspectionCallNo) {
+      alert('No inspection call number found');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to pause this inspection? You can resume it later.')) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Get current user
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
+
+      // Save draft first
+      handleSaveDraft();
+
+      // Trigger workflow API
+      console.log('🔄 Triggering workflow API for Pause Inspection...');
+
+      const workflowActionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: inspectionCallNo,
+        action: 'PAUSE_INSPECTION_RESUME_NEXT_DAY',
+        remarks: 'Inspection paused by IE',
+        actionBy: userId,
+        pincode: call.pincode || '560001'
+      };
+
+      console.log('Workflow Action Data:', workflowActionData);
+
+      await performTransitionAction(workflowActionData);
+      console.log('✅ Workflow transition successful');
+
+      // Mark as paused in local storage
+      markAsPaused(inspectionCallNo);
+
+      alert('Inspection has been paused successfully. You can resume it from the landing page.');
+      onBack();
+    } catch (error) {
+      console.error('Error pausing inspection:', error);
+      alert(`Failed to pause inspection: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [call, onBack]);
 
   // Save Draft handler
   const handleSaveDraft = useCallback(() => {
@@ -1221,7 +1338,64 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
         {/* Final Results - Raw Material - One Block Per Heat */}
         <div style={{ marginBottom: '24px' }}>
-          <h4 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>Final Inspection Results</h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Final Inspection Results</h4>
+
+            {/* Overall Status Badge */}
+            {(() => {
+              const acceptedCount = activeHeats.filter(heat => {
+                const heatNo = heat.heatNo || heat.heat_no;
+                const heatStatuses = heatSubmoduleStatuses[heatNo] || {};
+                const hasNotOk = Object.values(heatStatuses).some(s => s === 'NOT OK');
+                const allOk = Object.values(heatStatuses).every(s => s === 'OK');
+                return allOk && !hasNotOk;
+              }).length;
+
+              const rejectedCount = activeHeats.filter(heat => {
+                const heatNo = heat.heatNo || heat.heat_no;
+                const heatStatuses = heatSubmoduleStatuses[heatNo] || {};
+                return Object.values(heatStatuses).some(s => s === 'NOT OK');
+              }).length;
+
+              const totalHeats = activeHeats.length;
+
+              let overallStatus = 'PENDING';
+              let statusBg = '#fef3c7';
+              let statusColor = '#92400e';
+              let statusBorder = '#fcd34d';
+
+              if (acceptedCount === totalHeats && totalHeats > 0) {
+                overallStatus = 'ACCEPTED';
+                statusBg = '#dcfce7';
+                statusColor = '#166534';
+                statusBorder = '#86efac';
+              } else if (rejectedCount === totalHeats && totalHeats > 0) {
+                overallStatus = 'REJECTED';
+                statusBg = '#fee2e2';
+                statusColor = '#991b1b';
+                statusBorder = '#fca5a5';
+              } else if (acceptedCount > 0 && rejectedCount > 0) {
+                overallStatus = 'PARTIALLY ACCEPTED';
+                statusBg = '#fef3c7';
+                statusColor = '#92400e';
+                statusBorder = '#fcd34d';
+              }
+
+              return (
+                <div style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  background: statusBg,
+                  color: statusColor,
+                  border: `2px solid ${statusBorder}`
+                }}>
+                  Overall Status: {overallStatus} ({acceptedCount} Accepted, {rejectedCount} Rejected)
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Heat Blocks - Each heat has its own section with status tags */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1407,7 +1581,13 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           >
             {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
           </button>
-          <button className="btn btn-outline">Pause Inspection</button>
+          <button
+            className="btn btn-outline"
+            onClick={handlePauseInspection}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Pausing...' : 'Pause Inspection'}
+          </button>
           <button className="btn btn-outline" onClick={handleOpenWithheldModal}>Withheld Inspection</button>
           <button
             className="btn btn-primary"
