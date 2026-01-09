@@ -151,22 +151,29 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
   };
 
   /**
-   * Extract core IC number from formatted IC number
+   * Extract core IC number (call number) from formatted certificate number
    * Examples:
    *   - "N/RM-IC-1767618858167/RAJK" -> "RM-IC-1767618858167"
+   *   - "N/ER-01080001/" -> "ER-01080001"
    *   - "RM-IC-1767772023499" -> "RM-IC-1767772023499"
+   *   - "ER-01080001" -> "ER-01080001"
    */
   const extractCoreIcNumber = (icNumber) => {
     if (!icNumber) return null;
 
-    // If IC number contains slashes, extract the middle part (RM-IC-XXXXXXXXX)
-    // Pattern: N/RM-IC-XXXXXXXXX/RAJK -> RM-IC-XXXXXXXXX
-    const match = icNumber.match(/RM-IC-\d+/);
-    if (match) {
-      return match[0];
+    // If IC number contains slashes, extract the middle part
+    // Pattern: N/CALL-NUMBER/SUFFIX -> CALL-NUMBER
+    if (icNumber.includes('/')) {
+      const parts = icNumber.split('/');
+      // The call number is typically the middle part (index 1)
+      // N/ER-01080001/ -> parts = ['N', 'ER-01080001', '']
+      // N/RM-IC-1767618858167/RAJK -> parts = ['N', 'RM-IC-1767618858167', 'RAJK']
+      if (parts.length >= 2 && parts[1]) {
+        return parts[1].trim();
+      }
     }
 
-    // If no match, return as-is (might already be in correct format)
+    // If no slashes, return as-is (already in correct format)
     return icNumber;
   };
 
