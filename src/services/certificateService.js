@@ -2,10 +2,10 @@
  * Certificate Service
  * Handles certificate generation API calls
  */
-const API_ROOT = 'http://localhost:8080/sarthi-backend';
+// const API_ROOT = 'http://localhost:8080/sarthi-backend';
 
-// const API_ROOT = process.env.REACT_APP_API_URL ||
-//   'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+const API_ROOT = process.env.REACT_APP_API_URL ||
+  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 const API_BASE_URL = `${API_ROOT}/api/certificate`;
 
 /**
