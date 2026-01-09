@@ -954,7 +954,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     } finally {
       setIsSaving(false);
     }
-  }, [call?.call_no, activeHeats, onBack, numberOfBundles, numberOfERC, sourceOfRawMaterial, poData, productModel, heatSubmoduleStatuses, heatRemarks]);
+  }, [call?.call_no, call?.id, call?.pincode, call?.workflowTransitionId, activeHeats, onBack, numberOfBundles, numberOfERC, sourceOfRawMaterial, poData, productModel, heatSubmoduleStatuses, heatRemarks]);
 
   // Withheld modal handlers
   const handleOpenWithheldModal = () => {
@@ -1078,6 +1078,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     } finally {
       setIsSaving(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call, onBack]);
 
   // Save Draft handler
