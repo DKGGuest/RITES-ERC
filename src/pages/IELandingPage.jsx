@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { MOCK_INSPECTION_CALLS, MOCK_PENDING_PROCESS_FINAL_CALLS } from '../data/mockData';
+import { MOCK_INSPECTION_CALLS } from '../data/mockData';
 import Tabs from '../components/Tabs';
 import PendingCallsTab from '../components/PendingCallsTab';
 import CompletedCallsTab from '../components/CompletedCallsTab';
@@ -13,6 +13,7 @@ import { raiseBill, updateBillingStatus, approvePayment, BILLING_STATUS } from '
 import { getStoredUser } from '../services/authService';
 import { fetchUserPendingCalls, performTransitionAction, clearWorkflowCache } from '../services/workflowService';
 import { markAsScheduled, isCallInitiated, getCallStatusData } from '../services/callStatusService';
+import { fetchCompletedCallsForIC, getCurrentUserId } from '../services/workflowApiService';
 // import { fetchRawMaterialCallsByStatus } from '../services/rawMaterial/rawMaterialApiService';
 
 const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending' }) => {
@@ -83,32 +84,16 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     try {
       console.log('🔍 Fetching completed calls for IC issuance...');
 
-      // TEMPORARY: Use mock data for testing IC generation
-      // TODO: Switch back to API when backend has completed calls
-      const mockCompletedCalls = MOCK_INSPECTION_CALLS.filter(c => c.status?.toUpperCase() === 'COMPLETED');
-      console.log('✅ Using mock completed calls for testing:', mockCompletedCalls);
-      setCompletedCalls(mockCompletedCalls);
+      const userId = getCurrentUserId();
+      if (!userId) {
+        console.warn('⚠️ User ID not found, cannot fetch completed calls');
+        setCompletedCalls([]);
+        return;
+      }
 
-      /* ORIGINAL API CALL - Uncomment when backend is ready
-      const calls = await fetchRawMaterialCallsByStatus('COMPLETED');
-      console.log('✅ Completed calls fetched:', calls);
-
-      // Transform backend data to match frontend expectations
-      const transformedCalls = (calls || []).map(call => ({
-        id: call.id,
-        call_no: call.icNumber,
-        po_no: call.poNo,
-        vendor_name: call.companyName,
-        product_type: call.rmInspectionDetails?.materialName || 'Raw Material',
-        requested_date: call.desiredInspectionDate,
-        stage: call.typeOfCall || 'Raw Material Inspection',
-        status: call.status,
-        // Keep original data for IC generation
-        ...call
-      }));
-
-      setCompletedCalls(transformedCalls);
-      */
+      const calls = await fetchCompletedCallsForIC(userId);
+      console.log('✅ Completed calls fetched from API:', calls);
+      setCompletedCalls(calls);
     } catch (error) {
       console.error('❌ Error fetching completed calls:', error);
       setCompletedCalls([]);
@@ -121,21 +106,21 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
-  // Combine Real Raw Material calls from API with Mock Process/Final Product calls
+  // Use pending calls directly from API (includes Raw Material, Process, and Final)
+  // No need to combine with mock data anymore
   const combinedPendingCalls = useMemo(() => {
-    console.log('🔄 Combining pending calls:');
-    console.log('  📦 Raw Material calls from API:', pendingCalls.length);
-    console.log('  🏭 Process/Final mock calls:', MOCK_PENDING_PROCESS_FINAL_CALLS.length);
+    console.log('📊 Pending calls from API:');
+    console.log('  - Total calls:', pendingCalls.length);
+    console.log('  - Raw Material:', pendingCalls.filter(c => c.product_type === 'Raw Material').length);
+    console.log('  - Process:', pendingCalls.filter(c => c.product_type === 'Process').length);
+    console.log('  - Final:', pendingCalls.filter(c => c.product_type === 'Final').length);
 
-    const combined = [...pendingCalls, ...MOCK_PENDING_PROCESS_FINAL_CALLS];
-    console.log('  ✅ Total combined calls:', combined.length);
-
-    return combined;
+    return pendingCalls;
   }, [pendingCalls]);
 
-  // Azure API data for pending tab; mock data for other tabs (completed, billing, etc.)
+  // Azure API data for pending tab and IC issuance; mock data for other tabs (billing, etc.)
   const pendingCount = combinedPendingCalls.length;
-  const completedCount = MOCK_INSPECTION_CALLS.filter(call => call.status === 'Completed').length;
+  const completedCount = completedCalls.length; // Use actual completed calls from API
   const billingCount = MOCK_INSPECTION_CALLS.filter(call =>
     call.ic_issued === true &&
     call.billing_status &&
@@ -159,7 +144,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     setPreviousSchedule(null);
     setScheduleDate('');
     setRemarks('');
-    setRefreshCallback(() => refreshFn);
+    // Store the refresh function directly (not wrapped in arrow function)
+    setRefreshCallback(() => () => refreshFn?.());
     setShowScheduleModal(true);
   };
 
@@ -169,7 +155,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     setSelectedCalls([call]);
     setIsBulkSchedule(false);
     setIsReschedule(true);
-    setRefreshCallback(() => refreshFn);
+    // Store the refresh function directly (not wrapped in arrow function)
+    setRefreshCallback(() => () => refreshFn?.());
     setPreviousSchedule(null);
 
     // Fetch existing schedule data to prefill the form
@@ -207,7 +194,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     setScheduleDate('');
     setRemarks('');
     // Store the refresh callback to call after successful scheduling
-    setRefreshCallback(() => refreshSchedules);
+    setRefreshCallback(() => () => refreshSchedules?.());
     setShowScheduleModal(true);
   };
 

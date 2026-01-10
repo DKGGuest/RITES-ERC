@@ -145,7 +145,8 @@ export const fetchPendingWorkflowTransitions = async (roleName, forceRefresh = f
 
 /**
  * Fetch pending workflow transitions filtered by current user
- * Filters results where assignedToUser matches logged-in user's userId
+ * Filters results where assignedToUser matches logged-in user's userId (for Raw Material)
+ * OR where userId is in processIes/finalIes arrays (for Process/Final)
  *
  * PERFORMANCE OPTIMIZATIONS:
  * - Uses caching to prevent duplicate API calls
@@ -172,12 +173,44 @@ export const fetchUserPendingCalls = async (forceRefresh = false) => {
     const fetchTime = performance.now() - startTime;
     console.log(`✅ Workflow transitions fetched in ${fetchTime.toFixed(0)}ms`);
 
-    // Filter transitions where assignedToUser matches logged-in userId
-    const userTransitions = allTransitions.filter(
-      (transition) => transition.assignedToUser === userId
-    );
+    // Debug: Log all transitions before filtering
+    console.log('🔍 All transitions from API:', allTransitions.length);
+    console.log('🔍 Sample transition:', allTransitions[0]);
+    console.log('🔍 Product types in API:', [...new Set(allTransitions.map(t => t.productType))]);
+
+    // Filter transitions based on product type:
+    // - Raw Material: assignedToUser matches logged-in userId
+    // - Process: userId is in processIes array
+    // - Final: userId is in finalIes array
+    const userTransitions = allTransitions.filter((transition) => {
+      const productType = transition.productType;
+
+      if (productType === 'Raw Material') {
+        // Raw Material: Filter by assignedToUser
+        const matches = transition.assignedToUser === userId;
+        console.log(`🔍 Raw Material: ${transition.requestId} - assignedToUser=${transition.assignedToUser} vs userId=${userId} => ${matches ? '✅' : '❌'}`);
+        return matches;
+      } else if (productType === 'Process') {
+        // Process: Filter by processIes array
+        const matches = Array.isArray(transition.processIes) && transition.processIes.includes(userId);
+        console.log(`🔍 Process: ${transition.requestId} - processIes=${JSON.stringify(transition.processIes)} includes userId=${userId} => ${matches ? '✅' : '❌'}`);
+        return matches;
+      } else if (productType === 'Final') {
+        // Final: Filter by finalIes array
+        const matches = Array.isArray(transition.finalIes) && transition.finalIes.includes(userId);
+        console.log(`🔍 Final: ${transition.requestId} - finalIes=${JSON.stringify(transition.finalIes)} includes userId=${userId} => ${matches ? '✅' : '❌'}`);
+        return matches;
+      }
+
+      // Default: fallback to assignedToUser for unknown product types
+      console.log(`⚠️ Unknown product type: ${productType} for ${transition.requestId}`);
+      return transition.assignedToUser === userId;
+    });
 
     console.log(`📊 Found ${userTransitions.length} transitions for user ${userId}`);
+    console.log(`  - Raw Material: ${userTransitions.filter(t => t.productType === 'Raw Material').length}`);
+    console.log(`  - Process: ${userTransitions.filter(t => t.productType === 'Process').length}`);
+    console.log(`  - Final: ${userTransitions.filter(t => t.productType === 'Final').length}`);
 
     // Transform API response - use vendor name directly from workflow API
     const transformedCalls = userTransitions.map((transition) => {
@@ -214,6 +247,9 @@ export const fetchUserPendingCalls = async (forceRefresh = false) => {
         product_type: transition.productType || '-',
         call_date: transition.createdDate ? transition.createdDate.split('T')[0] : null,
         desired_inspection_date: transition.desiredInspectionDate || null,
+        // Keep processIes and finalIes for reference
+        processIes: transition.processIes,
+        finalIes: transition.finalIes,
       };
     });
 

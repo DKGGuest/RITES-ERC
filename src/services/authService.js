@@ -97,6 +97,7 @@ export const storeAuthData = (authData) => {
   localStorage.setItem('userName', authData.userName);
   localStorage.setItem('roleName', authData.roleName);
   localStorage.setItem('shortName', authData.shortName || '');  // IE short name for IC generation
+  localStorage.setItem('rio', authData.rio || '');  // RIO for Call Desk filtering
 };
 
 /**
@@ -120,6 +121,7 @@ export const getStoredUser = () => {
     userName: localStorage.getItem('userName'),
     roleName: localStorage.getItem('roleName'),
     shortName: localStorage.getItem('shortName'),
+    rio: localStorage.getItem('rio'),
     token: token,
   };
 };
@@ -141,6 +143,7 @@ export const logoutUser = () => {
   localStorage.removeItem('userName');
   localStorage.removeItem('roleName');
   localStorage.removeItem('shortName');
+  localStorage.removeItem('rio');
 };
 
 /**

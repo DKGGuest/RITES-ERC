@@ -4,11 +4,11 @@
 
 import { getAuthToken } from './authService';
 
-// Azure API URL
+// Azure API URL (commented out for local testing)
 const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend/api/inspection-schedule';
 
-// Local API URL (commented out)
-// const API_BASE_URL = 'http://localhost:8081/sarthi-backend/api/inspection-schedule';
+// Local API URL
+// const API_BASE_URL = 'http://localhost:8080/sarthi-backend/api/inspection-schedule';
 
 /**
  * Get auth headers with JWT token

@@ -21,6 +21,9 @@ export const useCallDeskData = () => {
 const fetchPendingVerificationCalls = async () => {
   const user = getStoredUser();
 
+  console.log('🔍 Call Desk - Logged in user:', user);
+  console.log('🔍 Call Desk - User RIO:', user?.rio);
+
   const response = await axios.get(
     `${BASE_URL}/allPendingWorkflowTransition`,
     {
@@ -37,23 +40,43 @@ const fetchPendingVerificationCalls = async () => {
     throw new Error('Failed to fetch pending verification calls');
   }
 
-  //  Filter by assignedToUser == logged-in user
-  return response.data.responseData
-    .filter(
-      item => String(item.rio) === String(user.rio)
-    )
-    .map(item => ({
-      id: item.workflowTransitionId,
-      callNumber: item.requestId,
-      vendor: { name: item.vendorName || '-' },
-      submissionDateTime: item.createdDate,
-      poNumber: item.poNumber,
-      productStage: item.productType,
-      desiredInspectionDate: item.desiredInspectionDate,
-      placeOfInspection: '-',
-      status: item.status,
-      rio: item.rio,
-    }));
+  const allCalls = response.data.responseData || [];
+  console.log('🔍 Call Desk - Total calls from API:', allCalls.length);
+  console.log('🔍 Call Desk - All calls:', allCalls);
+
+  //  Filter by RIO - match logged-in user's RIO with call's RIO
+  //  Exclude calls where RIO is null or empty
+  const filteredCalls = allCalls.filter(item => {
+    // Skip calls with null or empty RIO
+    if (!item.rio || item.rio === null || item.rio === '') {
+      console.log(`🔍 Skipping call ${item.requestId}: RIO is null/empty`);
+      return false;
+    }
+
+    const itemRio = String(item.rio).trim();
+    const userRio = String(user?.rio || '').trim();
+    const matches = itemRio === userRio;
+
+    console.log(`🔍 Comparing: Call ${item.requestId} - Item RIO="${itemRio}" vs User RIO="${userRio}" => ${matches ? '✅ MATCH' : '❌ NO MATCH'}`);
+
+    return matches;
+  });
+
+  console.log('🔍 Call Desk - Filtered calls for user RIO:', filteredCalls.length);
+
+  return filteredCalls.map(item => ({
+    id: item.workflowTransitionId,
+    callNumber: item.requestId,
+    vendor: { name: item.vendorName || '-' },
+    submissionDateTime: item.createdDate,
+    poNumber: item.poNo, // Fixed: API returns 'poNo', not 'poNumber'
+    product: item.productType, // Added: for filtering
+    productStage: item.productType,
+    desiredInspectionDate: item.desiredInspectionDate,
+    placeOfInspection: '-',
+    status: item.status,
+    rio: item.rio,
+  }));
 };
 
   // Fetch data from backend API
