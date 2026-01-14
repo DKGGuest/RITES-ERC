@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import DataTable from './DataTable';
 import StatusBadge from './StatusBadge';
 import Notification from './Notification';
@@ -36,32 +36,44 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
     }, 5000);
   };
 
-  // Fetch completed calls from API on component mount
+  // Fetch completed calls from API on component mount only if parent didn't provide them.
+  const hasFetchedRef = useRef(false);
   useEffect(() => {
+    // If parent already passed `calls` prop (from IELandingPage), use that and skip fetching.
+    if (Array.isArray(calls) && calls.length > 0) {
+      setCompletedCalls(calls);
+      hasFetchedRef.current = true;
+      return;
+    }
+
     const loadCompletedCalls = async () => {
+      if (hasFetchedRef.current) return; // already fetched
       try {
         setIsLoadingCalls(true);
         const userId = getCurrentUserId();
 
         if (!userId) {
           console.warn('⚠️ User ID not found, cannot fetch completed calls');
+          setCompletedCalls([]);
           return;
         }
 
-        const calls = await fetchCompletedCallsForIC(userId);
-        setCompletedCalls(calls);
-        console.log('✅ Loaded completed calls:', calls);
+        const fetched = await fetchCompletedCallsForIC(userId);
+        setCompletedCalls(fetched);
+        console.log('✅ Loaded completed calls:', fetched);
       } catch (error) {
         console.error('❌ Failed to load completed calls:', error);
         showNotification('Failed to load completed calls. Please refresh the page.', 'error');
+        setCompletedCalls([]);
       } finally {
         setIsLoadingCalls(false);
+        hasFetchedRef.current = true;
       }
     };
 
     loadCompletedCalls();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [calls]);
 
   // Use completed calls from API instead of filtering from props
   const icCalls = completedCalls;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { MOCK_INSPECTION_CALLS } from '../data/mockData';
 import Tabs from '../components/Tabs';
 import PendingCallsTab from '../components/PendingCallsTab';
@@ -100,11 +100,29 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     }
   }, []);
 
+  // Only fetch pending data on mount. Fetch completed calls only when the
+  // 'Issuance of IC' tab becomes active, and only once per session.
+  const hasFetchedCompletedRef = useRef(false);
+
+  // Fetch pending data only when the Pending tab is active.
+  // This prevents triggering the pending-workflow API when the page loads
+  // with the Issuance tab active (e.g. on browser refresh).
   useEffect(() => {
-    fetchPendingData();
-    fetchCompletedCalls();
+    if (activeTab === 'pending') {
+      fetchPendingData();
+    }
+    // We depend on activeTab and fetchPendingData
+  }, [activeTab, fetchPendingData]);
+
+  useEffect(() => {
+    if (activeTab === 'certificates' && !hasFetchedCompletedRef.current) {
+      // Fetch completed calls only when user opens Issuance tab
+      fetchCompletedCalls();
+      hasFetchedCompletedRef.current = true;
+    }
+    // We intentionally depend on activeTab only
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+  }, [activeTab]);
 
   // Use pending calls directly from API (includes Raw Material, Process, and Final)
   // No need to combine with mock data anymore
