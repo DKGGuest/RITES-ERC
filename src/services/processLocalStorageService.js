@@ -55,27 +55,136 @@ export const clearFromLocalStorage = (submodule, inspectionCallNo, poNo, lineNo)
 };
 
 /**
+ * Transform frontend array-based data to backend numbered field format
+ * Frontend uses: lengthCutBar: ['1', '2', '3']
+ * Backend expects: lengthCutBar1: 1, lengthCutBar2: 2, lengthCutBar3: 3
+ */
+const transformToBackendFormat = (data, submodule) => {
+  if (!data || !Array.isArray(data)) return data;
+
+  // Define field mappings for each submodule
+  const fieldMappings = {
+    shearing: {
+      lengthCutBar: ['lengthCutBar1', 'lengthCutBar2', 'lengthCutBar3'],
+      sharpEdges: ['sharpEdges1', 'sharpEdges2', 'sharpEdges3'],
+      rejectedQty: ['rejectedQty1', 'rejectedQty2']
+    },
+    turning: {
+      straightLength: ['straightLength1', 'straightLength2', 'straightLength3'],
+      taperLength: ['taperLength1', 'taperLength2', 'taperLength3'],
+      dia: ['dia1', 'dia2', 'dia3'],
+      rejectedQty: ['rejectedQty1', 'rejectedQty2']
+    },
+    mpi: {
+      testResults: ['testResult1', 'testResult2', 'testResult3'],
+      rejectedQty: ['rejectedQty1', 'rejectedQty2']
+    },
+    forging: {
+      forgingTemperature: ['forgingTemp1', 'forgingTemp2', 'forgingTemp3']
+    },
+    quenching: {
+      quenchingHardness: ['quenchingHardness1', 'quenchingHardness2']
+    },
+    tempering: {
+      // temperingTemperature and temperingDuration are already single values
+    },
+    finalCheck: {
+      visualCheck: ['visualCheck1', 'visualCheck2'],
+      dimensionCheck: ['dimensionCheck1', 'dimensionCheck2'],
+      hardnessCheck: ['hardnessCheck1', 'hardnessCheck2'],
+      rejectedNo: ['rejectedNo1', 'rejectedNo2', 'rejectedNo3']
+    }
+  };
+
+  const mapping = fieldMappings[submodule] || {};
+
+  return data.map((row) => {
+    const transformedRow = { ...row };
+
+    // Transform array fields to numbered fields
+    Object.entries(mapping).forEach(([arrayField, numberedFields]) => {
+      if (row[arrayField] && Array.isArray(row[arrayField])) {
+        numberedFields.forEach((numberedField, index) => {
+          const value = row[arrayField][index];
+          // Convert value appropriately
+          if (value !== '' && value !== null && value !== undefined) {
+            // Check if it's a boolean (for sharpEdges)
+            if (typeof value === 'boolean') {
+              transformedRow[numberedField] = value;
+            } else if (!isNaN(value) && value !== '') {
+              transformedRow[numberedField] = parseFloat(value);
+            } else {
+              transformedRow[numberedField] = value;
+            }
+          } else {
+            transformedRow[numberedField] = null;
+          }
+        });
+        // Remove the original array field
+        delete transformedRow[arrayField];
+      }
+    });
+
+    // Remove the 'hour' field as backend doesn't expect it
+    delete transformedRow.hour;
+
+    return transformedRow;
+  });
+};
+
+/**
  * Get all process inspection data from localStorage for a given call/PO
+ * Maps storage keys to backend DTO field names
+ * Transforms frontend array-based data to backend numbered field format
  */
 export const getAllProcessData = (inspectionCallNo, poNo, lineNo) => {
-  const submodules = [
-    'calibration',
-    'staticCheck',
-    'oilTank',
-    'shearing',
-    'turning',
-    'mpi',
-    'forging',
-    'quenching',
-    'tempering',
-    'finalCheck'
-  ];
+  const submoduleMapping = {
+    'calibration': 'calibrationDocuments',
+    'staticCheck': 'staticPeriodicChecks',
+    'oilTank': 'oilTankCounter',
+    'shearing': 'shearingData',
+    'turning': 'turningData',
+    'mpi': 'mpiData',
+    'forging': 'forgingData',
+    'quenching': 'quenchingData',
+    'tempering': 'temperingData',
+    'finalCheck': 'finalCheckData',
+    'lineFinalResult': 'lineFinalResult'
+  };
+
+  // Submodules that need array-to-numbered-field transformation
+  const gridSubmodules = ['shearing', 'turning', 'mpi', 'forging', 'quenching', 'tempering', 'finalCheck'];
 
   const allData = {};
-  submodules.forEach(submodule => {
-    const data = loadFromLocalStorage(submodule, inspectionCallNo, poNo, lineNo);
+  Object.entries(submoduleMapping).forEach(([storageKey, dtoKey]) => {
+    const data = loadFromLocalStorage(storageKey, inspectionCallNo, poNo, lineNo);
     if (data) {
-      allData[submodule] = data;
+      // `staticCheck` is saved as a single object per line in the UI; backend expects a list
+      if (storageKey === 'staticCheck') {
+        // Ensure staticPeriodicChecks is always an array
+        allData[dtoKey] = Array.isArray(data) ? data : [data];
+
+        // Also extract oil tank counter info from staticCheck when present
+        // Backend expects a separate `oilTankCounter` object on the line DTO
+        const staticObj = Array.isArray(data) ? data[0] : data;
+        if (staticObj && (staticObj.oilTankCounter !== undefined || staticObj.cleaningDone !== undefined)) {
+          allData['oilTankCounter'] = {
+            inspectionCallNo,
+            poNo,
+            lineNo,
+            oilTankCounter: staticObj.oilTankCounter ?? null,
+            cleaningDone: staticObj.cleaningDone ?? null
+          };
+        }
+        return;
+      }
+
+      // Transform grid data to backend format
+      if (gridSubmodules.includes(storageKey)) {
+        allData[dtoKey] = transformToBackendFormat(data, storageKey);
+      } else {
+        allData[dtoKey] = data;
+      }
     }
   });
 
@@ -96,7 +205,8 @@ export const clearAllProcessData = (inspectionCallNo, poNo, lineNo) => {
     'forging',
     'quenching',
     'tempering',
-    'finalCheck'
+    'finalCheck',
+    'lineFinalResult'
   ];
 
   submodules.forEach(submodule => {

@@ -106,6 +106,18 @@ const ProcessStaticPeriodicCheckPage = ({ call, onBack, selectedLines = [], onNa
     return () => saveToLocal();
   }, [saveToLocal]);
 
+  // Listen for global saveDraft event (triggered by Finish Inspection)
+  useEffect(() => {
+    const handler = () => {
+      // Force save current per-line state to localStorage (bypass modified flag)
+      const data = perLineState[activeLine];
+      if (!inspectionCallNo || !poNo || !data) return;
+      saveToLocalStorage('staticCheck', inspectionCallNo, poNo, activeLine, data);
+    };
+    window.addEventListener('process:saveDraft', handler);
+    return () => window.removeEventListener('process:saveDraft', handler);
+  }, [inspectionCallNo, poNo, activeLine, perLineState]);
+
   /**
    * Fetch static periodic check data - first from localStorage, then backend
    */

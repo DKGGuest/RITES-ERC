@@ -35,6 +35,11 @@ const ErcRmIC = ({ data = {} }) => {
     inspectingEngineer = "",
   } = data;
 
+  const displayCertificateNo = (certificateNo || '')
+    .replace(/[\uFEFF\u200B]/g, '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+
   return (
     <div className="a4-page">
       <div className="certificate-container border border-black">
@@ -43,7 +48,7 @@ const ErcRmIC = ({ data = {} }) => {
         <div className="border-r border-black py-1" />
         <div className="border-r border-black flex flex-col justify-center py-1 text-center">
           <div>प्रमाणपत्र सं. / Certificate No.</div>
-          <div className="font-normal text-sm">{certificateNo}</div>
+          <div className="font-normal text-sm break-words">{displayCertificateNo}</div>
         </div>
         <div className="border-r border-black flex flex-col justify-center py-1 text-center">
           <div>दिनांक / Date</div>

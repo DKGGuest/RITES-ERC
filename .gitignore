@@ -4,11 +4,13 @@ dist/
 
 # Local env files
 .env
-.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Allow .env.production to be committed for Vercel deployment
+!.env.production
 
 # Logs
 npm-debug.log*

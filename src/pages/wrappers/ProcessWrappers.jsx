@@ -194,6 +194,7 @@ export const ProcessParametersWrapper = () => {
   // Get all production lines and their call options
   const productionLines = lineData?.productionLines || [];
   const allCallOptions = lineData?.allCallOptions || [];
+  const callInitiationDataCache = lineData?.callInitiationDataCache || {};
   const selectedLine = lineData?.selectedLine || (processSelectedLines && processSelectedLines[0]) || 'Line-1';
 
   // Build all lines array from production lines
@@ -221,6 +222,7 @@ export const ProcessParametersWrapper = () => {
       lineData={lineData}
       productionLines={productionLines}
       allCallOptions={allCallOptions}
+      callInitiationDataCache={callInitiationDataCache}
     />
   );
 };

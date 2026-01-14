@@ -5,7 +5,7 @@ import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import CallsFilterSection from './common/CallsFilterSection';
 import { createStageValidationHandler } from '../utils/stageValidation';
-import { generateRawMaterialCertificate } from '../services/certificateService';
+import { generateRawMaterialCertificate, generateProcessMaterialCertificate } from '../services/certificateService';
 import { fetchCompletedCallsForIC, getCurrentUserId } from '../services/workflowApiService';
 
 const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
@@ -122,7 +122,8 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
 
   const columns = [
     { key: 'call_no', label: 'Call No.' },
-    { key: 'icNo', label: 'IC Number' },
+    // Commented out: IC Number column removed as requested
+    // { key: 'icNo', label: 'IC Number' },
     { key: 'po_no', label: 'PO No.' },
     { key: 'vendor_name', label: 'Vendor Name' },
     { key: 'product_type', label: 'Product Type', render: (val) => getProductTypeDisplayName(val) },
@@ -198,9 +199,19 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
 
       console.log('🔍 Raw IC Number:', rawIcNumber);
       console.log('🔍 Core IC Number for API:', coreIcNumber);
+      console.log('🔍 Stage:', row.stage);
+      console.log('🔍 Checking if EP prefix:', coreIcNumber?.toUpperCase().startsWith('EP-'));
+      console.log('🔍 Checking if process stage:', row.stage?.toLowerCase().includes('process'));
 
-      // Call the certificate generation API with core IC number
-      const certificateData = await generateRawMaterialCertificate(coreIcNumber);
+      // Call the appropriate certificate generation API based on IC number prefix or stage
+      let certificateData;
+      if (coreIcNumber?.toUpperCase().startsWith('EP-') || row.stage?.toLowerCase().includes('process')) {
+        console.log('📋 Generating Process Material certificate for EP/process call...');
+        certificateData = await generateProcessMaterialCertificate(coreIcNumber);
+      } else {
+        console.log('📋 Generating Raw Material certificate for non-EP call...');
+        certificateData = await generateRawMaterialCertificate(coreIcNumber);
+      }
 
       console.log('✅ Certificate data received:', certificateData);
       console.log('📋 Certificate Number from backend:', certificateData.certificateNo);
@@ -218,7 +229,7 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
 
       // Set the selected call with enriched data and navigate to the appropriate IC page
       if (setSelectedCall) setSelectedCall(enrichedCallData);
-      if (setCurrentPage) setCurrentPage(getICPageForStage(row.stage));
+      if (setCurrentPage) setCurrentPage(getICPageForStage(row.stage, rawIcNumber));
 
       showNotification('Certificate loaded successfully!', 'success');
     } catch (error) {
@@ -241,12 +252,18 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
     await handleIssueIC(row);
   };
 
-  const getICPageForStage = (stage) => {
-    if (stage === 'Raw Material Inspection' || stage === 'Raw Material') {
-      return 'ic-rawmaterial';
-    } else if (stage === 'Process Inspection' || stage === 'ERC Process' || stage.includes('Process')) {
+  const getICPageForStage = (stage, icNumber) => {
+    // First check IC number prefix for EP- (process material)
+    if (icNumber?.toUpperCase().includes('EP-')) {
       return 'ic-processmaterial';
-    } else if (stage === 'Final Product Inspection' || stage === 'Final Product' || stage.includes('Final')) {
+    }
+
+    // Then check stage
+    if (stage?.toLowerCase().includes('raw')) {
+      return 'ic-rawmaterial';
+    } else if (stage?.toLowerCase().includes('process')) {
+      return 'ic-processmaterial';
+    } else if (stage?.toLowerCase().includes('final')) {
       return 'ic-finalproduct';
     }
     return 'ic-rawmaterial'; // default fallback

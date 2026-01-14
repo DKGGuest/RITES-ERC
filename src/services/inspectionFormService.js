@@ -3,11 +3,9 @@
  * All endpoints require JWT authentication
  */
 
-const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend/api/inspection-form';
+import { API_BASE_URL as API_ROOT } from './apiConfig';
 
-
-// const API_ROOT = 'http://localhost:8080/sarthi-backend';
-// const API_BASE_URL = `${API_ROOT}/api/inspection-form`;
+const API_BASE_URL = `${API_ROOT}/api/inspection-form`;
 /**
  * Get auth headers with JWT token
  */

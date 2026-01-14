@@ -1,11 +1,12 @@
 /**
  * Service for Process Material Inspection APIs
- * Handles all 11 submodules: Calibration, Static Check, Oil Tank, 
+ * Handles all 11 submodules: Calibration, Static Check, Oil Tank,
  * Shearing, Turning, MPI, Forging, Quenching, Tempering, Final Check, Summary
  */
 
-const API_ROOT = process.env.REACT_APP_API_URL || 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-const API_BASE_URL = `${API_ROOT}/api/process-material`;
+import { API_ENDPOINTS } from './apiConfig';
+
+const API_BASE_URL = API_ENDPOINTS.PROCESS_MATERIAL;
 
 /**
  * Get auth headers with JWT token

@@ -3,9 +3,10 @@
  * Handles all Process stage inspection data fetching and submission
  */
 
-const API_ROOT = process.env.REACT_APP_API_URL || 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-const API_BASE_URL = `${API_ROOT}/api/process-inspection`;
-const VENDOR_API_URL = `${API_ROOT}/api/inspection-requests`;
+import { API_ENDPOINTS } from './apiConfig';
+
+const API_BASE_URL = API_ENDPOINTS.PROCESS_MATERIAL; // Process Material Inspection endpoints
+const VENDOR_API_URL = API_ENDPOINTS.INSPECTION_REQUESTS;
 
 /**
  * Fetch all Process type inspection requests from vendor API
@@ -164,10 +165,29 @@ const handleResponse = async (response) => {
 /**
  * Save Process inspection data when inspector finishes
  * @param {Object} data - Complete inspection data payload
+ * @param {String} userId - User ID of logged in user
  * @returns {Promise<Object>} API response
  */
-export const finishProcessInspection = async (data) => {
-    const response = await fetch(`${API_BASE_URL}/finish`, {
+export const finishProcessInspection = async (data, userId) => {
+    const url = userId ? `${API_BASE_URL}/finish?userId=${userId}` : `${API_BASE_URL}/finish`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data)
+    });
+    const result = await handleResponse(response);
+    return result.responseData;
+};
+
+/**
+ * Pause Process inspection - saves data without changing status
+ * @param {Object} data - Complete inspection data payload
+ * @param {String} userId - User ID of logged in user
+ * @returns {Promise<Object>} API response
+ */
+export const pauseProcessInspection = async (data, userId) => {
+    const url = userId ? `${API_BASE_URL}/pause?userId=${userId}` : `${API_BASE_URL}/pause`;
+    const response = await fetch(url, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data)

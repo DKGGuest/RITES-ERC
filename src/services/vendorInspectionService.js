@@ -5,8 +5,9 @@
  * Note: For Process inspection, use processInspectionService.js
  */
 
-const API_ROOT = process.env.REACT_APP_API_URL || 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-const API_BASE_URL = `${API_ROOT}/api/inspection-requests`;
+import { API_ENDPOINTS, API_BASE_URL as API_ROOT } from './apiConfig';
+
+const API_BASE_URL = API_ENDPOINTS.INSPECTION_REQUESTS;
 
 /**
  * Fetch all pending inspection requests

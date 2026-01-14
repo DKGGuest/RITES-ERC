@@ -279,7 +279,7 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
           throw new Error(workflowError.message || 'Failed to cancel call via workflow');
         }
       } else {
-        // WITHHELD - use existing logic
+        // WITHHELD - use workflow API for Process/Final Product, or existing logic for Raw Material
         const actionData = {
           inspectionRequestId: call.api_id || null,
           callNo: call.call_no,
@@ -291,10 +291,30 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
           actionDate: new Date().toISOString()
         };
 
-        // Skip API call for Process/Final Product (mock mode)
+        // Call workflow API for Process/Final Product
         if (isProcessOrFinalProduct(call.product_type)) {
-          console.log('🏭 Process/Final Product: Withheld saved to localStorage only (no API call)');
-          alert(`✅ Call withheld successfully (Mock Mode)`);
+          console.log('🏭 Process/Final Product: Calling workflow API for withheld...');
+
+          const workflowActionData = {
+            workflowTransitionId: call.workflowTransitionId || call.id,
+            requestId: call.call_no,
+            action: 'VERIFY_MATERIAL_AVAILABILITY',
+            remarks: finalRemarks,
+            actionBy: userId,
+            pincode: call.pincode || '560001',
+            materialAvailable: 'NO'
+          };
+
+          console.log('Workflow Action Data:', workflowActionData);
+
+          try {
+            await performTransitionAction(workflowActionData);
+            console.log('✅ Workflow transition successful for Process/Final Product');
+            alert(`✅ Call withheld successfully`);
+          } catch (workflowError) {
+            console.error('❌ Workflow API error:', workflowError);
+            throw new Error(workflowError.message || 'Failed to withheld call via workflow');
+          }
         } else {
           // Raw Material: Call real API
           await saveInspectionInitiation(actionData);
@@ -393,10 +413,31 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
         actionBy: userId
       };
 
-      // Skip API call for Process/Final Product (mock mode)
+      // Call workflow API for Process/Final Product, or saveInspectionInitiation for Raw Material
       if (isProcessOrFinalProduct(call.product_type)) {
-        console.log('🏭 Process/Final Product: Initiation saved to localStorage only (no API call)');
+        console.log('🏭 Process/Final Product: Calling workflow API for initiation...');
         console.log('Initiation Data:', initiationData);
+
+        // Trigger workflow API for Process/Final Product
+        const workflowActionData = {
+          workflowTransitionId: workflowTransitionId,
+          requestId: call.call_no,
+          action: 'VERIFY_MATERIAL_AVAILABILITY',
+          remarks: `Inspection initiated - Shift: ${shiftOfInspection}, Date: ${dateOfInspection}`,
+          actionBy: userId,
+          pincode: call.pincode || '560001',
+          materialAvailable: 'YES'
+        };
+
+        console.log('Workflow Action Data:', workflowActionData);
+
+        try {
+          await performTransitionAction(workflowActionData);
+          console.log('✅ Workflow transition successful for Process/Final Product');
+        } catch (workflowError) {
+          console.error('❌ Workflow API error:', workflowError);
+          throw new Error(workflowError.message || 'Failed to initiate inspection via workflow');
+        }
       } else {
         // Raw Material: Call real API
         await saveInspectionInitiation(initiationData);

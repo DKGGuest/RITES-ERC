@@ -12,13 +12,9 @@
  */
 
 import { getAuthToken } from '../authService';
+import { API_ENDPOINTS } from '../apiConfig';
 
-// LOCAL BACKEND URL - For Raw Material Inspection & Dashboard only
-// const API_ROOT = 'http://localhost:8080/sarthi-backend';
-// AZURE BACKEND URL (Swagger) - Commented for temporary local development
-const API_ROOT = process.env.REACT_APP_API_URL || 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-
-const API_BASE_URL = `${API_ROOT}/api/raw-material`;
+const API_BASE_URL = API_ENDPOINTS.RAW_MATERIAL;
 
 /* ==================== Helper Functions ==================== */
 

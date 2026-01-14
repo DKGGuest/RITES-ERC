@@ -2,11 +2,10 @@
  * Certificate Service
  * Handles certificate generation API calls
  */
-// const API_ROOT = 'http://localhost:8080/sarthi-backend';
 
-const API_ROOT = process.env.REACT_APP_API_URL ||
-  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-const API_BASE_URL = `${API_ROOT}/api/certificate`;
+import { API_ENDPOINTS } from './apiConfig';
+
+const API_BASE_URL = API_ENDPOINTS.CERTIFICATES;
 
 /**
  * Get auth headers with JWT token
@@ -76,6 +75,39 @@ export const generateRawMaterialCertificateById = async (callId) => {
     return data;
   } catch (error) {
     console.error('❌ Error generating certificate:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate Process Material certificate data
+ * @param {string} icNumber - Inspection Call Number (e.g., "EP-01090004")
+ * @returns {Promise<Object>} Certificate data
+ */
+export const generateProcessMaterialCertificate = async (icNumber) => {
+  try {
+    console.log('🔍 Generating Process Material certificate for IC Number:', icNumber);
+
+    // Use query parameter instead of path variable to handle slashes
+    // URL-encode the IC number to handle special characters
+    const encodedIcNumber = encodeURIComponent(icNumber);
+    console.log('📝 Encoded IC Number:', encodedIcNumber);
+
+    const response = await fetch(`${API_BASE_URL}/process-material?icNumber=${encodedIcNumber}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Failed to generate Process Material certificate: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Process Material certificate generated successfully:', data);
+    return data.responseData || data;
+  } catch (error) {
+    console.error('❌ Error generating Process Material certificate:', error);
     throw error;
   }
 };

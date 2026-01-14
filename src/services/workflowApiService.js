@@ -3,11 +3,7 @@
  * Handles API calls related to workflow transitions and completed calls
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 
-  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-
-// const API_ROOT = 'http://localhost:8080/sarthi-backend';
-// const API_BASE_URL = `${API_ROOT}/api/workflow`;
+import { API_BASE_URL } from './apiConfig';
 /**
  * Get auth headers with JWT token
  * The authService stores the token as 'authToken' in localStorage

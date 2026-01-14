@@ -11,9 +11,7 @@
 import { getAuthToken, getStoredUser } from './authService';
 import { cleanVendorName } from './poDataService';
 import { processVendorName } from '../utils/vendorMapper';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL ||
-  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+import { API_BASE_URL } from './apiConfig';
 
 /**
  * Get auth headers with JWT token

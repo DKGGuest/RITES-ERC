@@ -15,6 +15,7 @@ import {
 import { performTransitionAction } from '../services/workflowService';
 import { getStoredUser } from '../services/authService';
 import { fetchPoDataForSections } from '../services/poDataService';
+import { fetchProcessInitiationData } from '../services/processInitiationDataService';
 import '../styles/inspectionInitiationPage.css';
 
 
@@ -76,17 +77,96 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     const loadData = async () => {
       setIsLoading(true);
 
-      // Check if this is Process or Final Product - use mock data only (no API calls)
-      // Handle multiple product type formats: "PROCESS_MATERIAL", "ERC Process", "Process", "FINAL_PRODUCT", "Final Product"
+      // Check if this is Process material - fetch from database
       const productType = call.product_type || '';
-      const isProcessOrFinal =
+      const isProcess =
         productType === 'PROCESS_MATERIAL' ||
+        productType.includes('Process');
+
+      const isFinalProduct =
         productType === 'FINAL_PRODUCT' ||
-        productType.includes('Process') ||
         productType.includes('Final');
 
-      if (isProcessOrFinal) {
-        console.log('🏭 Process/Final Product: Using MOCK data only (no API call)', productType);
+      // PROCESS MATERIAL: Fetch from database using call number
+      if (isProcess && call.call_no) {
+        try {
+          console.log('🏭 Process Material: Fetching from database for call:', call.call_no);
+          const processData = await fetchProcessInitiationData(call.call_no);
+
+          if (processData) {
+            console.log('✅ Process data fetched from database:', processData);
+            setIsFromDatabase(true);
+
+            // Transform database response to match expected format
+            const transformedPoData = {
+              po_no: processData.poNo,
+              po_date: processData.poDate,
+              po_amend_no: processData.amendmentNo || 'N/A',
+              po_amend_dates: processData.amendmentDate || 'N/A',
+              product_name: processData.poDescription || call.product_name,
+              vendor_name: processData.vendorName,
+              vendor_code: processData.vendorCode,
+              consignee: processData.consignee,
+              po_qty: processData.poQty,
+              unit: processData.poUnit || 'Nos',
+              orig_dp: processData.deliveryDate,
+              purchasing_authority: processData.purchasingAuthority,
+              bpo: processData.billPayingOfficer,
+
+              // Section B: Inspection Call Details
+              call_no: processData.callNo,
+              call_date: processData.callDate,
+              desired_inspection_date: processData.desiredInspectionDate,
+              type_of_call: processData.typeOfCall,
+              type_of_erc: processData.typeOfErc, // Type of ERC from inspection_calls.erc_type
+              place_of_inspection: processData.placeOfInspection,
+              company_name: processData.companyName,
+              unit_name: processData.unitName,
+              unit_address: processData.unitAddress,
+              rm_ic_number: processData.rmIcNumber, // RM IC number from process_inspection_details
+              heat_number: processData.heatNumber, // Heat number from process_inspection_details
+
+              // Section C: RM IC Heat Information
+              rm_ic_heat_info: processData.rmIcHeatInfoList || []
+            };
+
+            setFetchedPoData(transformedPoData);
+
+            // Transform inventory data to subPoList for Section C
+            if (processData.rmIcHeatInfoList && processData.rmIcHeatInfoList.length > 0) {
+              const transformedSubPoList = processData.rmIcHeatInfoList.map(heat => ({
+                raw_material_name: heat.rawMaterialName || 'N/A',
+                grade_spec: heat.gradeSpec || 'N/A',
+                heat_no: heat.heatNumber || 'N/A',
+                manufacturer: heat.manufacturer || 'N/A',
+                manufacturer_steel_bars: heat.manufacturer || 'N/A',
+                tc_no: heat.tcNumber || 'N/A',
+                tc_date: heat.tcDate || 'N/A',
+                sub_po_no: heat.subPoNumber || 'N/A',
+                sub_po_date: heat.subPoDate || 'N/A',
+                invoice_no: heat.invoiceNumber || 'N/A',
+                invoice_date: heat.invoiceDate || 'N/A',
+                sub_po_qty: heat.subPoQty || heat.tcQuantity || 'N/A',
+                qty: heat.qtyAccepted || 0,
+                unit: heat.unit || 'MT',
+                place_of_inspection: processData.placeOfInspection || call.place_of_inspection
+              }));
+              setSubPoList(transformedSubPoList);
+              console.log(`✅ Loaded ${transformedSubPoList.length} heat details from inventory for Section C`);
+            }
+
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Error fetching Process data from database:', error);
+          // Fall through to mock data
+        }
+      }
+
+      // FINAL PRODUCT: Use mock data only (no API calls)
+      if (isFinalProduct) {
+        console.log('🏭 Final Product: Using MOCK data only (no API call)', productType);
         const mockPo = MOCK_PO_DATA[call.po_no] || {};
 
         if (Object.keys(mockPo).length > 0) {
@@ -263,19 +343,25 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
   };
 
   /* Build Section A payload for API */
-  const buildSectionAPayload = () => ({
-    inspectionCallNo: call.call_no,
-    poNo: poData.rly_po_no || poData.po_no || call.po_no,
-    poDate: convertDateToISO(poData.po_date || call.po_date),
-    poQty: poData.po_qty || call.po_qty,
-    placeOfInspection: poData.place_of_inspection || call.place_of_inspection,
-    vendorName: poData.vendor_name || call.vendor_name,
-    maNo: poData.po_amend_no || null,
-    maDate: poData.po_amend_dates || null,
-    purchasingAuthority: poData.purchasing_authority || 'Manager, Procurement',
-    billPayingOfficer: poData.bpo || 'BPO-001',
-    status: 'approved'
-  });
+  const buildSectionAPayload = () => {
+    const currentUser = getStoredUser();
+    const userId = currentUser?.userId || currentUser?.username || 'system';
+
+    return {
+      inspectionCallNo: call.call_no,
+      poNo: poData.rly_po_no || poData.po_no || call.po_no,
+      poDate: convertDateToISO(poData.po_date || call.po_date),
+      poQty: poData.po_qty || call.po_qty,
+      placeOfInspection: poData.place_of_inspection || call.place_of_inspection,
+      vendorName: poData.vendor_name || call.vendor_name,
+      maNo: poData.po_amend_no || null,
+      maDate: poData.po_amend_dates || null,
+      purchasingAuthority: poData.purchasing_authority || 'Manager, Procurement',
+      billPayingOfficer: poData.bpo || 'BPO-001',
+      status: 'approved',
+      createdBy: userId
+    };
+  };
 
   /* Build Section B payload for API */
   const buildSectionBPayload = () => {
@@ -285,6 +371,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       // Handle datetime format "2025-12-25 09:11:48" -> "2025-12-25"
       return dateStr.split(' ')[0].split('T')[0];
     };
+
+    const currentUser = getStoredUser();
+    const userId = currentUser?.userId || currentUser?.username || 'system';
 
     return {
       inspectionCallNo: call.call_no,
@@ -307,7 +396,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       rmIcNumber: call.rm_ic_number || poData.rm_ic_number || '',
       processIcNumber: call.process_ic_number || poData.process_ic_number || '',
       remarks: call.remarks || poData.remarks || '',
-      status: 'approved'
+      status: 'approved',
+      createdBy: userId
     };
   };
 
@@ -317,6 +407,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     console.log('🔍 [buildSectionCPayload] Using data source:', subPoList.length > 0 ? 'subPoList' : 'subPoData');
     console.log('🔍 [buildSectionCPayload] Data count:', dataList.length);
     console.log('🔍 [buildSectionCPayload] Raw data:', dataList);
+
+    const currentUser = getStoredUser();
+    const userId = currentUser?.userId || currentUser?.username || 'system';
 
     const payload = dataList.map(item => ({
       inspectionCallNo: call.call_no,
@@ -333,7 +426,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       subPoQty: item.sub_po_qty || item.qty || null,
       unit: item.unit || 'MT',
       placeOfInspection: item.place_of_inspection || call.place_of_inspection,
-      status: 'approved'
+      status: 'approved',
+      createdBy: userId
     }));
 
     console.log('🔍 [buildSectionCPayload] Final payload:', payload);
@@ -357,51 +451,42 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       console.log('📋 [Section A] Product Type:', productType);
       console.log('📋 [Section A] Is Process/Final?', isProcessOrFinal);
 
-      if (isProcessOrFinal) {
-        console.log('🏭 Process/Final Product: Section A approved (no API call)');
-        // Just update local state - no API calls
-        onFormDataChange({ sectionAVerified: true, sectionAStatus: 'approved' });
-        if (showSectionB) {
-          setSectionBExpanded(true);
-        }
-      } else {
-        console.log('🔧 Raw Material: Calling Section A APIs...');
-        // Raw Material: Call real APIs
-        const currentUser = getStoredUser();
-        const userId = currentUser?.userId || 0;
+      // Call workflow API for both Raw Material and Process/Final Product
+      console.log('🔧 Calling Section A workflow API...');
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
 
-        // Call Azure API for PO verification - OK action
-        const actionData = {
-          workflowTransitionId: call.workflowTransitionId || call.id,
-          requestId: call.call_no,
-          action: 'VERIFY_PO_DETAILS',
-          remarks: 'PO details verified - Section A OK',
-          actionBy: userId,
-          pincode: '560001'
-        };
+      // Call Azure API for PO verification - OK action
+      const actionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: call.call_no,
+        action: 'VERIFY_PO_DETAILS',
+        remarks: 'PO details verified - Section A OK',
+        actionBy: userId,
+        pincode: '560001'
+      };
 
-        console.log('📤 [Section A] Calling performTransitionAction...');
-        await performTransitionAction(actionData);
-        console.log('✅ [Section A] performTransitionAction completed');
+      console.log('📤 [Section A] Calling performTransitionAction...');
+      await performTransitionAction(actionData);
+      console.log('✅ [Section A] performTransitionAction completed');
 
-        // Persist Section A to backend and mark approved
-        try {
-          const payload = buildSectionAPayload();
-          console.log('📤 [Section A] Calling saveSectionA with payload:', payload);
-          await saveSectionA(payload);
-          console.log('✅ [Section A] saveSectionA completed');
+      // Persist Section A to backend and mark approved
+      try {
+        const payload = buildSectionAPayload();
+        console.log('📤 [Section A] Calling saveSectionA with payload:', payload);
+        await saveSectionA(payload);
+        console.log('✅ [Section A] saveSectionA completed');
 
-          console.log('📤 [Section A] Calling approveSectionA...');
-          await approveSectionA(call.call_no);
-          console.log('✅ [Section A] approveSectionA completed');
-        } catch (e) {
-          console.error('❌ [Section A] save/approve failed:', e);
-        }
+        console.log('📤 [Section A] Calling approveSectionA...');
+        await approveSectionA(call.call_no);
+        console.log('✅ [Section A] approveSectionA completed');
+      } catch (e) {
+        console.error('❌ [Section A] save/approve failed:', e);
+      }
 
-        onFormDataChange({ sectionAVerified: true, sectionAStatus: 'approved' });
-        if (showSectionB) {
-          setSectionBExpanded(true);
-        }
+      onFormDataChange({ sectionAVerified: true, sectionAStatus: 'approved' });
+      if (showSectionB) {
+        setSectionBExpanded(true);
       }
     } catch (error) {
       console.error('❌ [Section A] Error saving Section A:', error);
@@ -416,48 +501,34 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     setIsSaving(true);
     setSaveError(null);
     try {
-      // Check if this is Process or Final Product - skip API calls
-      const productType = call.product_type || '';
-      const isProcessOrFinal =
-        productType === 'PROCESS_MATERIAL' ||
-        productType === 'FINAL_PRODUCT' ||
-        productType.includes('Process') ||
-        productType.includes('Final');
+      // Call workflow API for both Raw Material and Process/Final Product
+      console.log('🔧 Calling Section A workflow API for rejection...');
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
 
-      if (isProcessOrFinal) {
-        console.log('🏭 Process/Final Product: Section A rejected (no API call)');
-        // Just update local state - no API calls
-        onFormDataChange({ sectionAVerified: false, sectionAStatus: 'rejected' });
-        setSectionBExpanded(false);
-      } else {
-        // Raw Material: Call real APIs
-        const currentUser = getStoredUser();
-        const userId = currentUser?.userId || 0;
+      // Call Azure API for correction request - Not OK action
+      const actionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: call.call_no,
+        action: 'REQUEST_CORRECTION_TO_CM',
+        remarks: 'PO details need correction - Section A Not OK',
+        actionBy: userId,
+        pincode: '560001'
+      };
 
-        // Call Azure API for correction request - Not OK action
-        const actionData = {
-          workflowTransitionId: call.workflowTransitionId || call.id,
-          requestId: call.call_no,
-          action: 'REQUEST_CORRECTION_TO_CM',
-          remarks: 'PO details need correction - Section A Not OK',
-          actionBy: userId,
-          pincode: '560001'
-        };
+      await performTransitionAction(actionData);
 
-        await performTransitionAction(actionData);
-
-        // Persist Section A rejection to backend
-        try {
-          const payload = { ...buildSectionAPayload(), status: 'rejected' };
-          await saveSectionA(payload);
-          await rejectSectionA(call.call_no, 'Rejected by IE');
-        } catch (e) {
-          console.warn('Section A reject save failed:', e);
-        }
-
-        onFormDataChange({ sectionAVerified: false, sectionAStatus: 'rejected' });
-        setSectionBExpanded(false);
+      // Persist Section A rejection to backend
+      try {
+        const payload = { ...buildSectionAPayload(), status: 'rejected' };
+        await saveSectionA(payload);
+        await rejectSectionA(call.call_no, 'Rejected by IE');
+      } catch (e) {
+        console.warn('Section A reject save failed:', e);
       }
+
+      onFormDataChange({ sectionAVerified: false, sectionAStatus: 'rejected' });
+      setSectionBExpanded(false);
     } catch (error) {
       console.error('Error rejecting Section A:', error);
       setSaveError(error.message || 'Failed to reject Section A. Please try again.');
@@ -472,66 +543,44 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     setIsSaving(true);
     setSaveError(null);
     try {
-      // Check if this is Process or Final Product - skip API calls
-      const productType = call.product_type || '';
-      const isProcessOrFinal =
-        productType === 'PROCESS_MATERIAL' ||
-        productType === 'FINAL_PRODUCT' ||
-        productType.includes('Process') ||
-        productType.includes('Final');
+      // Call workflow API for both Raw Material and Process/Final Product
+      console.log('� Calling Section B workflow API...');
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
 
-      console.log('📋 [Section B] Product Type:', productType);
-      console.log('📋 [Section B] Is Process/Final?', isProcessOrFinal);
+      // Call Azure API for call details verification - OK action
+      const actionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: call.call_no,
+        action: 'VERIFY_PO_DETAILS',
+        remarks: 'Inspection call details verified - Section B OK',
+        actionBy: userId,
+        pincode: '560001'
+      };
 
-      if (isProcessOrFinal) {
-        console.log('🏭 Process/Final Product: Section B approved (no API call)');
-        // Just update local state - no API calls
-        onFormDataChange({ sectionBVerified: true, sectionBStatus: 'approved' });
-        const productType = call?.product_type || '';
-        const isSectionCRequired = productType === 'Raw Material' || productType.includes('Process');
-        if (isSectionCRequired) {
-          setSectionCExpanded(true);
-        }
-      } else {
-        console.log('🔧 Raw Material: Calling Section B APIs...');
-        // Raw Material: Call real APIs
-        const currentUser = getStoredUser();
-        const userId = currentUser?.userId || 0;
+      console.log('📤 [Section B] Calling performTransitionAction...');
+      await performTransitionAction(actionData);
+      console.log('✅ [Section B] performTransitionAction completed');
 
-        // Call Azure API for call details verification - OK action
-        const actionData = {
-          workflowTransitionId: call.workflowTransitionId || call.id,
-          requestId: call.call_no,
-          action: 'VERIFY_PO_DETAILS',
-          remarks: 'Inspection call details verified - Section B OK',
-          actionBy: userId,
-          pincode: '560001'
-        };
+      // Persist Section B to backend and mark approved
+      try {
+        const payload = buildSectionBPayload();
+        console.log('📤 [Section B] Calling saveSectionB with payload:', payload);
+        await saveSectionB(payload);
+        console.log('✅ [Section B] saveSectionB completed');
 
-        console.log('📤 [Section B] Calling performTransitionAction...');
-        await performTransitionAction(actionData);
-        console.log('✅ [Section B] performTransitionAction completed');
+        console.log('📤 [Section B] Calling approveSectionB...');
+        await approveSectionB(call.call_no);
+        console.log('✅ [Section B] approveSectionB completed');
+      } catch (e) {
+        console.error('❌ [Section B] save/approve failed:', e);
+      }
 
-        // Persist Section B to backend and mark approved
-        try {
-          const payload = buildSectionBPayload();
-          console.log('📤 [Section B] Calling saveSectionB with payload:', payload);
-          await saveSectionB(payload);
-          console.log('✅ [Section B] saveSectionB completed');
-
-          console.log('📤 [Section B] Calling approveSectionB...');
-          await approveSectionB(call.call_no);
-          console.log('✅ [Section B] approveSectionB completed');
-        } catch (e) {
-          console.error('❌ [Section B] save/approve failed:', e);
-        }
-
-        onFormDataChange({ sectionBVerified: true, sectionBStatus: 'approved' });
-        const productType = call?.product_type || '';
-        const isSectionCRequired = productType === 'Raw Material' || productType.includes('Process');
-        if (isSectionCRequired) {
-          setSectionCExpanded(true);
-        }
+      onFormDataChange({ sectionBVerified: true, sectionBStatus: 'approved' });
+      const productType = call?.product_type || '';
+      const isSectionCRequired = productType === 'Raw Material' || productType.includes('Process');
+      if (isSectionCRequired) {
+        setSectionCExpanded(true);
       }
     } catch (error) {
       console.error('Error saving Section B:', error);
@@ -545,48 +594,34 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     setIsSaving(true);
     setSaveError(null);
     try {
-      // Check if this is Process or Final Product - skip API calls
-      const productType = call.product_type || '';
-      const isProcessOrFinal =
-        productType === 'PROCESS_MATERIAL' ||
-        productType === 'FINAL_PRODUCT' ||
-        productType.includes('Process') ||
-        productType.includes('Final');
+      // Call workflow API for both Raw Material and Process/Final Product
+      console.log('🔧 Calling Section B workflow API for rejection...');
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
 
-      if (isProcessOrFinal) {
-        console.log('🏭 Process/Final Product: Section B rejected (no API call)');
-        // Just update local state - no API calls
-        onFormDataChange({ sectionBVerified: false, sectionBStatus: 'rejected' });
-        setSectionCExpanded(false);
-      } else {
-        // Raw Material: Call real APIs
-        const currentUser = getStoredUser();
-        const userId = currentUser?.userId || 0;
+      // Call Azure API for correction request - Not OK action
+      const actionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: call.call_no,
+        action: 'REQUEST_CORRECTION_TO_CM',
+        remarks: 'Inspection call details need correction - Section B Not OK',
+        actionBy: userId,
+        pincode: '560001'
+      };
 
-        // Call Azure API for correction request - Not OK action
-        const actionData = {
-          workflowTransitionId: call.workflowTransitionId || call.id,
-          requestId: call.call_no,
-          action: 'REQUEST_CORRECTION_TO_CM',
-          remarks: 'Inspection call details need correction - Section B Not OK',
-          actionBy: userId,
-          pincode: '560001'
-        };
+      await performTransitionAction(actionData);
 
-        await performTransitionAction(actionData);
-
-        // Persist Section B rejection to backend
-        try {
-          const payload = { ...buildSectionBPayload(), status: 'rejected' };
-          await saveSectionB(payload);
-          await rejectSectionB(call.call_no, 'Rejected by IE');
-        } catch (e) {
-          console.warn('Section B reject save failed:', e);
-        }
-
-        onFormDataChange({ sectionBVerified: false, sectionBStatus: 'rejected' });
-        setSectionCExpanded(false);
+      // Persist Section B rejection to backend
+      try {
+        const payload = { ...buildSectionBPayload(), status: 'rejected' };
+        await saveSectionB(payload);
+        await rejectSectionB(call.call_no, 'Rejected by IE');
+      } catch (e) {
+        console.warn('Section B reject save failed:', e);
       }
+
+      onFormDataChange({ sectionBVerified: false, sectionBStatus: 'rejected' });
+      setSectionCExpanded(false);
     } catch (error) {
       console.error('Error rejecting Section B:', error);
       setSaveError(error.message || 'Failed to reject Section B. Please try again.');
@@ -601,55 +636,40 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     setIsSaving(true);
     setSaveError(null);
     try {
-      // Check if this is Process Material - skip API calls (Final Product doesn't have Section C)
-      const productType = call.product_type || '';
-      const isProcessMaterial =
-        productType === 'PROCESS_MATERIAL' ||
-        productType.includes('Process');
+      // Call workflow API for both Raw Material and Process Material
+      console.log('🔧 Calling Section C workflow API...');
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
 
-      console.log('📋 [Section C] Product Type:', productType);
-      console.log('📋 [Section C] Is Process Material?', isProcessMaterial);
+      // Call Azure API for Sub PO verification - OK action
+      const actionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: call.call_no,
+        action: 'VERIFY_PO_DETAILS',
+        remarks: 'Sub PO details verified - Section C OK',
+        actionBy: userId,
+        pincode: '560001'
+      };
 
-      if (isProcessMaterial) {
-        console.log('🏭 Process Material: Section C approved (no API call)');
-        // Just update local state - no API calls
-        onFormDataChange({ sectionCVerified: true, sectionCStatus: 'approved' });
-      } else {
-        console.log('🔧 Raw Material: Calling Section C APIs...');
-        // Raw Material: Call real APIs
-        const currentUser = getStoredUser();
-        const userId = currentUser?.userId || 0;
+      console.log('📤 [Section C] Calling performTransitionAction...');
+      await performTransitionAction(actionData);
+      console.log('✅ [Section C] performTransitionAction completed');
 
-        // Call Azure API for Sub PO verification - OK action
-        const actionData = {
-          workflowTransitionId: call.workflowTransitionId || call.id,
-          requestId: call.call_no,
-          action: 'VERIFY_PO_DETAILS',
-          remarks: 'Sub PO details verified - Section C OK',
-          actionBy: userId,
-          pincode: '560001'
-        };
+      // Persist Section C batch and mark approved
+      try {
+        const payload = buildSectionCPayload();
+        console.log('📤 [Section C] Calling saveSectionCBatch with payload:', payload);
+        await saveSectionCBatch(payload);
+        console.log('✅ [Section C] saveSectionCBatch completed');
 
-        console.log('📤 [Section C] Calling performTransitionAction...');
-        await performTransitionAction(actionData);
-        console.log('✅ [Section C] performTransitionAction completed');
-
-        // Persist Section C batch and mark approved
-        try {
-          const payload = buildSectionCPayload();
-          console.log('📤 [Section C] Calling saveSectionCBatch with payload:', payload);
-          await saveSectionCBatch(payload);
-          console.log('✅ [Section C] saveSectionCBatch completed');
-
-          console.log('📤 [Section C] Calling approveAllSectionC...');
-          await approveAllSectionC(call.call_no);
-          console.log('✅ [Section C] approveAllSectionC completed');
-        } catch (e) {
-          console.error('❌ [Section C] save/approve failed:', e);
-        }
-
-        onFormDataChange({ sectionCVerified: true, sectionCStatus: 'approved' });
+        console.log('📤 [Section C] Calling approveAllSectionC...');
+        await approveAllSectionC(call.call_no);
+        console.log('✅ [Section C] approveAllSectionC completed');
+      } catch (e) {
+        console.error('❌ [Section C] save/approve failed:', e);
       }
+
+      onFormDataChange({ sectionCVerified: true, sectionCStatus: 'approved' });
     } catch (error) {
       console.error('Error saving Section C:', error);
       setSaveError(error.message || 'Failed to save Section C. Please try again.');
@@ -662,44 +682,33 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     setIsSaving(true);
     setSaveError(null);
     try {
-      // Check if this is Process Material - skip API calls (Final Product doesn't have Section C)
-      const productType = call.product_type || '';
-      const isProcessMaterial =
-        productType === 'PROCESS_MATERIAL' ||
-        productType.includes('Process');
+      // Call workflow API for both Raw Material and Process Material
+      console.log('🔧 Calling Section C workflow API for rejection...');
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
 
-      if (isProcessMaterial) {
-        console.log('🏭 Process Material: Section C rejected (no API call)');
-        // Just update local state - no API calls
-        onFormDataChange({ sectionCVerified: false, sectionCStatus: 'rejected' });
-      } else {
-        // Raw Material: Call real APIs
-        const currentUser = getStoredUser();
-        const userId = currentUser?.userId || 0;
+      // Call Azure API for correction request - Not OK action
+      const actionData = {
+        workflowTransitionId: call.workflowTransitionId || call.id,
+        requestId: call.call_no,
+        action: 'REQUEST_CORRECTION_TO_CM',
+        remarks: 'Sub PO details need correction - Section C Not OK',
+        actionBy: userId,
+        pincode: '560001'
+      };
 
-        // Call Azure API for correction request - Not OK action
-        const actionData = {
-          workflowTransitionId: call.workflowTransitionId || call.id,
-          requestId: call.call_no,
-          action: 'REQUEST_CORRECTION_TO_CM',
-          remarks: 'Sub PO details need correction - Section C Not OK',
-          actionBy: userId,
-          pincode: '560001'
-        };
+      await performTransitionAction(actionData);
 
-        await performTransitionAction(actionData);
-
-        // Persist Section C rejection batch to backend
-        try {
-          const payload = buildSectionCPayload().map(item => ({ ...item, status: 'rejected' }));
-          await saveSectionCBatch(payload);
-          await rejectAllSectionC(call.call_no, 'Rejected by IE');
-        } catch (e) {
-          console.warn('Section C reject save failed:', e);
-        }
-
-        onFormDataChange({ sectionCVerified: false, sectionCStatus: 'rejected' });
+      // Persist Section C rejection batch to backend
+      try {
+        const payload = buildSectionCPayload().map(item => ({ ...item, status: 'rejected' }));
+        await saveSectionCBatch(payload);
+        await rejectAllSectionC(call.call_no, 'Rejected by IE');
+      } catch (e) {
+        console.warn('Section C reject save failed:', e);
       }
+
+      onFormDataChange({ sectionCVerified: false, sectionCStatus: 'rejected' });
     } catch (error) {
       console.error('Error rejecting Section C:', error);
       setSaveError(error.message || 'Failed to reject Section C. Please try again.');
@@ -865,7 +874,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           {/* Type of ERC - fetched from inspection_calls.erc_type via API */}
           <div className="form-group">
             <label className="form-label">TYPE OF ERC</label>
-            <input type="text" className="form-input" value={poData.erc_type || 'N/A'} disabled />
+            <input type="text" className="form-input" value={poData.type_of_erc || poData.erc_type || call.erc_type || 'N/A'} disabled />
           </div>
           <div className="form-group">
             <label className="form-label">PO_QTY + UNIT</label>
@@ -905,10 +914,19 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           </div>
           {/* RM IC NUMBER - Only for Process & Final Inspection */}
           {(call.product_type?.includes('Process') || call.product_type === 'Final Product') && (
-            <div className="form-group">
-              <label className="form-label">RM IC NUMBER</label>
-              <input type="text" className="form-input" value={call.rm_ic_number || poData.rm_ic_number || 'N/A'} disabled />
-            </div>
+            <>
+              <div className="form-group">
+                <label className="form-label">RM IC NUMBER</label>
+                <input type="text" className="form-input" value={call.rm_ic_number || poData.rm_ic_number || 'N/A'} disabled />
+              </div>
+              {/* HEAT NUMBER - Only for Process Inspection */}
+              {call.product_type?.includes('Process') && (
+                <div className="form-group">
+                  <label className="form-label">HEAT NUMBER</label>
+                  <input type="text" className="form-input" value={call.heat_number || poData.heat_number || 'N/A'} disabled />
+                </div>
+              )}
+            </>
           )}
           {/* PROCESS IC NUMBER - Only for Final Inspection */}
           {call.product_type === 'Final Product' && (

@@ -15,6 +15,7 @@ const ErcProcessIC = ({ data = {} }) => {
     consigneeManufacturer = "",
     purchasingAuthority = "",
     description = "",
+    chpClause = "",
     drgNo = "",
     specNo = "",
     qapNo = "",
@@ -27,6 +28,12 @@ const ErcProcessIC = ({ data = {} }) => {
     sealingPattern = "",
     inspectingEngineer = "",
   } = data;
+
+  // Sanitize certificate number for display (remove BOM / zero-width chars)
+  const displayCertificateNo = (certificateNo || '')
+    .replace(/[\uFEFF\u200B]/g, '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
 
   const totalProcessed = lots.reduce((s, l) => s + (l.totalProcessed || 0), 0);
   const totalAccepted = lots.reduce((s, l) => s + (l.acceptedQty || 0), 0);
@@ -41,7 +48,7 @@ const ErcProcessIC = ({ data = {} }) => {
           <span></span>
         </div>
         <div className="border-r border-b border-black flex items-center justify-center py-1">
-          <span>प्रमाणपत्र सं. / Certificate No. {certificateNo}</span>
+          <span className="break-words">प्रमाणपत्र सं. / Certificate No. {displayCertificateNo}</span>
         </div>
         <div className="border-r border-b border-black flex items-center justify-center py-1">
           <span>दिनांक / Date {certificateDate}</span>
@@ -174,7 +181,7 @@ const ErcProcessIC = ({ data = {} }) => {
           className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] text-center border-b border-black last:border-b-0"
         >
           <div className="border-r border-black py-1 px-2 text-sm">
-            {idx === 0 ? "PROCESS INSPECTION OF ELASTIC RAIL CLIP MK-V" : ""}
+            {chpClause || (idx === 0 ? "PROCESS INSPECTION OF ELASTIC RAIL CLIP MK-V" : "")}
           </div>
           <div className="border-r border-black py-1 px-2">{lot.heatNo}</div>
           <div className="border-r border-black py-1 px-2">{lot.totalProcessed}</div>

@@ -102,6 +102,17 @@ const ProcessCalibrationDocumentsPage = ({ call, onBack, selectedLines = [], onN
     }
   }, [activeLine, poNo, inspectionCallNo, calibrationData]);
 
+  // Listen for global saveDraft event (triggered by Finish Inspection)
+  useEffect(() => {
+    const handler = () => {
+      // Force save current data to localStorage (bypass modified flag)
+      if (!inspectionCallNo || !poNo || calibrationData.length === 0) return;
+      saveToLocalStorage('calibration', inspectionCallNo, poNo, activeLine, calibrationData);
+    };
+    window.addEventListener('process:saveDraft', handler);
+    return () => window.removeEventListener('process:saveDraft', handler);
+  }, [inspectionCallNo, poNo, activeLine, calibrationData]);
+
   // Save on unmount
   useEffect(() => {
     return () => saveToLocal();

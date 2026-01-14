@@ -23,7 +23,7 @@ import {
 } from '../services/processLocalStorageService';
 import './ProcessParametersGridPage.css';
 
-const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selectedShift = 'A', selectedLines = [], onNavigateSubmodule, productionLines = [], allCallOptions = [] }) => {
+const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selectedShift = 'A', selectedLines = [], onNavigateSubmodule, productionLines = [], allCallOptions = [], callInitiationDataCache = {} }) => {
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
 
   // Get line index for active line
@@ -60,16 +60,35 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
 
   const poNo = activeLinePoNo;
 
-  // Get lot numbers for active line from rm_heat_tc_mapping of the selected call
-  const availableLotNumbers = useMemo(() => {
-    // Get rm_heat_tc_mapping from the call data (this contains lot/heat mappings)
-    const rmHeatMapping = currentCallData?.rm_heat_tc_mapping || [];
-    if (rmHeatMapping.length > 0) {
-      return rmHeatMapping.map((mapping, idx) => mapping.subPoNumber || `LOT-${idx + 1}`);
+  // Get cached initiation data for the current line's selected call
+  const currentLineInitiationData = useMemo(() => {
+    if (currentProductionLine?.icNumber) {
+      return callInitiationDataCache[currentProductionLine.icNumber] || null;
     }
-    // Fallback to passed lotNumbers or default
-    return lotNumbers.length > 0 ? lotNumbers : [];
-  }, [currentCallData, lotNumbers]);
+    return null;
+  }, [currentProductionLine, callInitiationDataCache]);
+
+  // Get lot numbers for active line - ONLY use cached initiation data (same source as Pre-Inspection)
+  const availableLotNumbers = useMemo(() => {
+    console.log('📋 [Grid Lot Numbers] Current line initiation data:', currentLineInitiationData);
+    console.log('📋 [Grid Lot Numbers] Current production line:', currentProductionLine);
+
+    // ONLY use lot number from cached initiation data (same source as Pre-Inspection)
+    // This ensures the lot numbers in the grid match exactly what's shown in Pre-Inspection
+    if (currentLineInitiationData) {
+      const mainLotNumber = currentLineInitiationData.lotNumber || '';
+      console.log('📋 [Grid Lot Numbers] Lot number from cached initiation data:', mainLotNumber);
+
+      if (mainLotNumber) {
+        console.log('✅ [Grid Lot Numbers] Using lot number:', [mainLotNumber]);
+        return [mainLotNumber];
+      }
+    }
+
+    // If no cached data, return empty array (no mock data)
+    console.log('⚠️ [Grid Lot Numbers] No cached initiation data available, returning empty array');
+    return [];
+  }, [currentLineInitiationData, currentProductionLine]);
 
   const [shearingData, setShearingData] = useState(
     Array(8).fill(null).map((_, i) => ({
@@ -167,9 +186,8 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     }))
   );
 
-  // Loading and saving states
+  // Loading state
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   const inspectionCallNo = currentCallData?.call_no || call?.call_no || '';
 
@@ -504,66 +522,9 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     fetchAllGridData();
   }, [fetchAllGridData]);
 
-  /**
-   * Transform frontend state to backend DTO format
-   */
-  const transformToDto = (data, hourLabels, section) => {
-    return data.map((row, idx) => ({
-      inspectionCallNo,
-      poNo,
-      lineNo: activeLine,
-      shift,
-      hourIndex: idx,
-      hourLabel: hourLabels[idx],
-      noProduction: row.noProduction,
-      lotNo: row.lotNo,
-      remarks: row.remarks,
-      ...row // Include section-specific fields
-    }));
-  };
+  // transformToDto removed — was unused after removing the manual save handler
 
-  /**
-   * Save all grid data to backend
-   */
-  const handleSaveAll = async () => {
-    if (!inspectionCallNo || !poNo) {
-      alert('Missing call or PO information');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      // Compute hour labels for DTO
-      const SHIFT_STARTS = { A: { h: 6, m: 0 }, B: { h: 14, m: 0 }, C: { h: 22, m: 0 }, G: { h: 9, m: 0 } };
-      const pad = (n) => n.toString().padStart(2, '0');
-      const format = (h, m) => `${((h % 12) || 12)}:${pad(m)} ${h < 12 ? 'AM' : 'PM'}`;
-      const addHours = (h, m, dh) => ({ h: (h + dh) % 24, m });
-      const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
-      const labels = [];
-      for (let i = 0; i < 8; i++) {
-        const start = addHours(s.h, s.m, i);
-        const end = addHours(s.h, s.m, i + 1);
-        labels.push(`${format(start.h, start.m)} - ${format(end.h, end.m)}`);
-      }
-
-      await Promise.all([
-        shearingDataService.saveBatch(transformToDto(shearingData, labels, 'shearing')),
-        turningDataService.saveBatch(transformToDto(turningData, labels, 'turning')),
-        mpiDataService.saveBatch(transformToDto(mpiData, labels, 'mpi')),
-        forgingDataService.saveBatch(transformToDto(forgingData, labels, 'forging')),
-        quenchingDataService.saveBatch(transformToDto(quenchingData, labels, 'quenching')),
-        temperingDataService.saveBatch(transformToDto(temperingData, labels, 'tempering')),
-        finalCheckDataService.saveBatch(transformToDto(finalCheckData, labels, 'finalCheck'))
-      ]);
-
-      alert('All process parameters saved successfully!');
-      onBack();
-    } catch (err) {
-      alert('Failed to save: ' + err.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // The manual SaveAll handler was removed (not used in UI).
 
   // Compute 8 one-hour labels based on shift
   const SHIFT_STARTS = { A: { h: 6, m: 0 }, B: { h: 14, m: 0 }, C: { h: 22, m: 0 }, G: { h: 9, m: 0 } };
@@ -764,7 +725,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         </div>
       )}
 
-      <div style={{ marginTop: 'var(--space-24)', display: 'flex', gap: 'var(--space-16)', justifyContent: 'flex-end' }}>
+      {/* <div style={{ marginTop: 'var(--space-24)', display: 'flex', gap: 'var(--space-16)', justifyContent: 'flex-end' }}>
         <button className="btn btn-outline" onClick={onBack}>Cancel</button>
         <button
           className="btn btn-primary"
@@ -773,7 +734,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         >
           {isSaving ? 'Saving...' : 'Save & Continue'}
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };

@@ -3,9 +3,9 @@
  * TODO: Uncomment API calls for production with backend
  */
 
-// Uncomment for production with backend
-const API_ROOT = process.env.REACT_APP_API_URL || 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-const API_BASE_URL = `${API_ROOT}/api/billing`;
+import { API_ENDPOINTS } from './apiConfig';
+
+const API_BASE_URL = API_ENDPOINTS.BILLING;
 
 // Billing status constants
 export const BILLING_STATUS = {

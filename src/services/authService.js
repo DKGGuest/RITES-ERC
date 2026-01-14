@@ -3,8 +3,7 @@
  * Handles login API calls and token management
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL ||
-  'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+import { API_BASE_URL } from './apiConfig';
 
 /**
  * Hardcoded credentials for CM, CallDesk, and Finance users

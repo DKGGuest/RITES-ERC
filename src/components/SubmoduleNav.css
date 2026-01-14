@@ -40,6 +40,7 @@
 .submodule-nav-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px 14px;
   font-size: 13px;
@@ -51,7 +52,8 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .submodule-nav-btn:hover {
@@ -109,8 +111,7 @@
   .submodule-nav-btn {
     flex-direction: column;
     gap: 4px;
-    padding: 10px 12px;
-    min-width: 70px;
+    padding: 10px 8px;
     text-align: center;
     border-radius: 8px;
   }
@@ -118,11 +119,11 @@
   .submodule-nav-btn span:last-child {
     font-size: 9px;
     line-height: 1.2;
-    max-width: 60px;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
   }
 
@@ -148,14 +149,12 @@
   }
 
   .submodule-nav-btn {
-    padding: 10px 8px;
-    min-width: 52px;
+    padding: 10px 6px;
     border-radius: 10px;
   }
 
   .submodule-nav-btn span:last-child {
     font-size: 8px;
-    max-width: 50px;
   }
 
   .submodule-nav-icon {
