@@ -1,7 +1,56 @@
+import { useState, useEffect } from 'react';
+import { useInspection } from '../context/InspectionContext';
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import "./FinalReportsPage.css";
 
 export default function FinalReportsPage({ onBack, onNavigateSubmodule }) {
+  const { getFpCachedData, selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+  // Get cached dashboard data with fallback to sessionStorage
+  const cachedData = getFpCachedData(callNo);
+  let lotsFromVendor = cachedData?.dashboardData?.finalLotDetails || [];
+
+  // Fallback: Check sessionStorage directly if context cache is empty
+  if (lotsFromVendor.length === 0 && callNo) {
+    try {
+      const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+      if (storedCache) {
+        const cacheData = JSON.parse(storedCache);
+        lotsFromVendor = cacheData[callNo]?.finalLotDetails || [];
+      }
+    } catch (e) {
+      console.error('Error reading from sessionStorage:', e);
+    }
+  }
+
+  // State for final decision
+  const [finalDecision, setFinalDecision] = useState(() => {
+    const persistedData = localStorage.getItem(`finalDecisionData_${callNo}`);
+    if (persistedData) {
+      try {
+        return JSON.parse(persistedData);
+      } catch (e) {
+        console.error('Error parsing persisted final decision:', e);
+      }
+    }
+    return {
+      lotStatus: 'Accepted',
+      qtyAccepted: lotsFromVendor.reduce((sum, lot) => sum + (lot.lotSize || lot.offeredQty || 0), 0),
+      qtyRejected: 0,
+      remarks: ''
+    };
+  });
+
+  // Persist final decision whenever it changes
+  useEffect(() => {
+    if (callNo) {
+      localStorage.setItem(`finalDecisionData_${callNo}`, JSON.stringify(finalDecision));
+    }
+  }, [finalDecision, callNo]);
+
   const reportSummary = [
     {
       module: "Calibration & Documents",
@@ -174,7 +223,10 @@ export default function FinalReportsPage({ onBack, onNavigateSubmodule }) {
         <div className="rep-grid">
           <div className="rep-field">
             <label>Lot Status</label>
-            <select>
+            <select
+              value={finalDecision.lotStatus}
+              onChange={(e) => setFinalDecision({...finalDecision, lotStatus: e.target.value})}
+            >
               <option>Accepted</option>
               <option>Rejected</option>
               <option>Conditionally Accepted</option>
@@ -183,18 +235,31 @@ export default function FinalReportsPage({ onBack, onNavigateSubmodule }) {
 
           <div className="rep-field">
             <label>Qty Accepted</label>
-            <input type="number" defaultValue="1000" />
+            <input
+              type="number"
+              value={finalDecision.qtyAccepted}
+              onChange={(e) => setFinalDecision({...finalDecision, qtyAccepted: parseInt(e.target.value) || 0})}
+            />
           </div>
 
           <div className="rep-field">
             <label>Qty Rejected</label>
-            <input type="number" defaultValue="0" />
+            <input
+              type="number"
+              value={finalDecision.qtyRejected}
+              onChange={(e) => setFinalDecision({...finalDecision, qtyRejected: parseInt(e.target.value) || 0})}
+            />
           </div>
         </div>
 
         <div className="rep-field full">
           <label>Final Remarks</label>
-          <textarea rows="3" placeholder="Enter final remarks..."></textarea>
+          <textarea
+            rows="3"
+            placeholder="Enter final remarks..."
+            value={finalDecision.remarks}
+            onChange={(e) => setFinalDecision({...finalDecision, remarks: e.target.value})}
+          ></textarea>
         </div>
 
         <div className="rep-actions">

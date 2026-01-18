@@ -1,16 +1,34 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import Notification from '../components/Notification';
 import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
 import './VisualInspectionPage.css';
 
 const STORAGE_KEY = 'visual_inspection_draft_data';
+
+// Weight calculation factors per metre
+const WEIGHT_FACTORS = {
+  'MK-III': 0.00263,  // tonnes per metre
+  'MK-V': 0.00326     // tonnes per metre
+};
+
+// Defects that contribute to total defective length
+const LENGTH_DEFECTS = ['Distortion', 'Twist', 'Kink', 'Not Straight', 'Fold', 'Lap', 'Crack'];
 
 /**
  * Visual Inspection Page - Raw Material Sub-module
  * Handles visual defects checklist per heat
  * Data persists while switching tabs/submodules until user submits
  */
-const VisualInspectionPage = ({ onBack, heats = [], onNavigateSubmodule, inspectionCallNo = '' }) => {
+const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onNavigateSubmodule, inspectionCallNo = '' }) => {
   const [activeHeatTab, setActiveHeatTab] = useState(0);
+  const [notification, setNotification] = useState({ message: '', type: 'error' });
+
+  const showNotification = (message, type = 'error', autoClose = true, delay = 4000) => {
+    setNotification({ message, type });
+    if (autoClose) {
+      setTimeout(() => setNotification({ message: '', type }), delay);
+    }
+  };
 
   // Visual Defects List
   const defectList = useMemo(() => ([
@@ -98,11 +116,88 @@ const VisualInspectionPage = ({ onBack, heats = [], onNavigateSubmodule, inspect
     });
   }, [activeHeatTab]);
 
+  // Validation: ensure that if any length-defect is selected, its value must be filled
+  const validateHeatData = useCallback((heatIdx) => {
+    const hv = heatVisualData[heatIdx] || {};
+    const selected = hv.selectedDefects || {};
+    const counts = hv.defectCounts || {};
+
+    for (let defect of LENGTH_DEFECTS) {
+      if (selected[defect]) {
+        const v = counts[defect];
+        if (v === undefined || v === null || String(v).trim() === '') {
+          showNotification(`Please enter value for ${defect} before leaving this tab.`, 'warning');
+          return false;
+        }
+      }
+    }
+    return true;
+  }, [heatVisualData]);
+
+  const handleSelectHeat = useCallback((idx) => {
+    // If trying to leave current heat, validate current heat
+    if (activeHeatTab !== idx) {
+      const ok = validateHeatData(activeHeatTab);
+      if (!ok) return; // block change
+    }
+    setActiveHeatTab(idx);
+  }, [activeHeatTab, validateHeatData]);
+
+  // Wrap navigation and back handlers to validate current heat before allowing navigation
+  const handleBackClick = useCallback(() => {
+    const ok = validateHeatData(activeHeatTab);
+    if (!ok) return;
+    onBack();
+  }, [activeHeatTab, validateHeatData, onBack]);
+
+  const handleNavigateSubmodule = useCallback((sub) => {
+    const ok = validateHeatData(activeHeatTab);
+    if (!ok) return;
+    if (onNavigateSubmodule) onNavigateSubmodule(sub);
+  }, [activeHeatTab, validateHeatData, onNavigateSubmodule]);
+
+  /**
+   * Calculate total defective length for current heat
+   * Sum of all length-based defects (Distortion, Twist, Kink, Not Straight, Fold, Lap, Crack)
+   * Input is in metres, output is in metres
+   */
+  const calculateTotalDefectiveLength = useCallback((heatData) => {
+    if (!heatData?.selectedDefects || !heatData?.defectCounts) return 0;
+
+    const selected = heatData.selectedDefects;
+    const counts = heatData.defectCounts;
+
+    let totalMetres = 0;
+    LENGTH_DEFECTS.forEach(defect => {
+      if (selected[defect]) {
+        const lengthMetres = parseFloat(counts[defect]) || 0;
+        totalMetres += lengthMetres;
+      }
+    });
+
+    return totalMetres;
+  }, []);
+
+  /**
+   * Calculate weight rejected based on total defective length
+   * Formula: MK-III: Length(m) * 0.00263, MK-V: Length(m) * 0.00326
+   */
+  const calculateWeightRejected = useCallback((totalLengthMetres) => {
+    const model = productModel?.toUpperCase().includes('V') ? 'MK-V' : 'MK-III';
+    const factor = WEIGHT_FACTORS[model];
+    return totalLengthMetres * factor;
+  }, [productModel]);
+
+  // Calculate values for current heat
+  const currentHeatData = heatVisualData[activeHeatTab] || {};
+  const totalDefectiveLength = calculateTotalDefectiveLength(currentHeatData);
+  const weightRejected = calculateWeightRejected(totalDefectiveLength);
+
   return (
     <div className="visual-page-container">
       <div className="visual-page-header">
         <h1 className="visual-page-title">👁️ Visual Inspection</h1>
-        <button className="visual-back-btn" onClick={onBack}>
+        <button className="visual-back-btn" onClick={handleBackClick}>
           ← Back to Raw Material Dashboard
         </button>
       </div>
@@ -110,7 +205,16 @@ const VisualInspectionPage = ({ onBack, heats = [], onNavigateSubmodule, inspect
       {/* Submodule Navigation */}
       <RawMaterialSubmoduleNav
         currentSubmodule="visual-inspection"
-        onNavigate={onNavigateSubmodule}
+        onNavigate={handleNavigateSubmodule}
+      />
+
+      {/* App notification */}
+      <Notification
+        message={notification.message}
+        type={notification.type}
+        onClose={() => setNotification({ message: '', type: notification.type })}
+        autoClose={true}
+        autoCloseDelay={4000}
       />
 
       <div className="card">
@@ -148,7 +252,7 @@ const VisualInspectionPage = ({ onBack, heats = [], onNavigateSubmodule, inspect
               key={idx}
               type="button"
               className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
-              onClick={() => setActiveHeatTab(idx)}
+                onClick={() => handleSelectHeat(idx)}
             >
               {`Heat ${h.heatNo || `#${idx + 1}`}`}
             </button>
@@ -187,9 +291,9 @@ const VisualInspectionPage = ({ onBack, heats = [], onNavigateSubmodule, inspect
                       className="form-control visual-defect-count"
                       value={counts[d]}
                       onChange={(e) => handleDefectCountChange(d, e.target.value)}
-                      placeholder="Length (mm)"
+                      placeholder="Length (m)"
                       min="0"
-                      step="0.01"
+                      step="0.001"
                     />
                   )}
                 </div>
@@ -198,9 +302,83 @@ const VisualInspectionPage = ({ onBack, heats = [], onNavigateSubmodule, inspect
           })()}
         </div>
 
+        {/* Calculation Summary */}
+        <div style={{
+          marginTop: '24px',
+          padding: '16px',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '8px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '16px'
+        }}>
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: '#64748b',
+              marginBottom: '8px'
+            }}>
+              Total Defective Length (metres)
+            </label>
+            <div style={{
+              padding: '12px',
+              background: '#fff',
+              border: '2px solid #e2e8f0',
+              borderRadius: '6px',
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              color: totalDefectiveLength > 0 ? '#dc2626' : '#64748b'
+            }}>
+              {totalDefectiveLength.toFixed(3)} m
+            </div>
+            <p style={{
+              margin: '8px 0 0',
+              fontSize: '0.75rem',
+              color: '#94a3b8',
+              fontStyle: 'italic'
+            }}>
+              Auto-calculated from: Distortion, Twist, Kink, Not Straight, Fold, Lap, Crack
+            </p>
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: '#64748b',
+              marginBottom: '8px'
+            }}>
+              Weight Rejected (tonnes)
+            </label>
+            <div style={{
+              padding: '12px',
+              background: '#fff',
+              border: '2px solid #e2e8f0',
+              borderRadius: '6px',
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              color: weightRejected > 0 ? '#dc2626' : '#64748b'
+            }}>
+              {weightRejected.toFixed(6)} T
+            </div>
+            <p style={{
+              margin: '8px 0 0',
+              fontSize: '0.75rem',
+              color: '#94a3b8',
+              fontStyle: 'italic'
+            }}>
+              Formula: {productModel?.toUpperCase().includes('V') ? 'MK-V' : 'MK-III'} = Length (m) × {productModel?.toUpperCase().includes('V') ? '0.00326' : '0.00263'}
+            </p>
+          </div>
+        </div>
+
         {/* Note for defective portion */}
         <p className="visual-defect-note">
-          <strong>Note:</strong> In case of defective, enter the total length of defective portion (in mm).
+          <strong>Note:</strong> In case of defective, enter the total length of defective portion (in metres).
         </p>
 
       </div>

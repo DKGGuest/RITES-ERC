@@ -11,7 +11,7 @@ import Notification from '../components/Notification';
 import { scheduleInspection, rescheduleInspection, getScheduleByCallNo, validateScheduleLimit, MAX_CALLS_PER_DAY } from '../services/scheduleService';
 import { raiseBill, updateBillingStatus, approvePayment, BILLING_STATUS } from '../services/billingService';
 import { getStoredUser } from '../services/authService';
-import { fetchUserPendingCalls, performTransitionAction, clearWorkflowCache } from '../services/workflowService';
+import { fetchUserPendingCalls, performTransitionAction, clearWorkflowCache, fetchLatestWorkflowTransition } from '../services/workflowService';
 import { markAsScheduled, isCallInitiated, getCallStatusData } from '../services/callStatusService';
 import { fetchCompletedCallsForIC, getCurrentUserId } from '../services/workflowApiService';
 // import { fetchRawMaterialCallsByStatus } from '../services/rawMaterial/rawMaterialApiService';
@@ -25,6 +25,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedCallLocal, setSelectedCallLocal] = useState(null);
   const [selectedCalls, setSelectedCalls] = useState([]);
+  // Key to signal children to reset selection (increments when schedules/refresh happen)
+  const [selectionResetKey, setSelectionResetKey] = useState(0);
   const [scheduleDate, setScheduleDate] = useState('');
   const [remarks, setRemarks] = useState('');
   const [isBulkSchedule, setIsBulkSchedule] = useState(false);
@@ -45,6 +47,13 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
   // State for completed calls (for IC issuance)
   const [completedCalls, setCompletedCalls] = useState([]);
+
+  // State for Enter Shift Details modal
+  const [showEnterShiftDetailsModal, setShowEnterShiftDetailsModal] = useState(false);
+  const [shiftDetailsCall, setShiftDetailsCall] = useState(null);
+  const [shiftDetailsShift, setShiftDetailsShift] = useState('');
+  const [shiftDetailsDate, setShiftDetailsDate] = useState(new Date().toISOString().split('T')[0]);
+  const [shiftDetailsError, setShiftDetailsError] = useState('');
 
   // Fetch pending workflow transitions for logged-in user from Azure API
   // PERFORMANCE OPTIMIZATION: Returns data immediately, fetches vendor names in background
@@ -202,6 +211,32 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // State for already scheduled calls info (to display in modal)
   const [alreadyScheduledCallsInfo, setAlreadyScheduledCallsInfo] = useState([]);
 
+  // Helper: normalize various date formats to YYYY-MM-DD for comparison
+  function normalizeToYMD(dateStr) {
+    if (!dateStr) return null;
+    if (typeof dateStr === 'string' && dateStr.includes('-')) {
+      try {
+        return new Date(dateStr).toISOString().split('T')[0];
+      } catch (e) {
+        return dateStr.split('T')[0];
+      }
+    }
+    if (typeof dateStr === 'string' && dateStr.includes('/')) {
+      const parts = dateStr.split('/').map(p => p.trim());
+      if (parts.length === 3) {
+        const [d, m, y] = parts;
+        if (y.length === 4) {
+          const dd = d.padStart(2, '0');
+          const mm = m.padStart(2, '0');
+          return `${y}-${mm}-${dd}`;
+        }
+      }
+    }
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
+    return null;
+  }
+
   const handleBulkSchedule = (calls, options = {}) => {
     const { scheduledCallsWithInfo = [], refreshSchedules } = options;
     setSelectedCalls(calls);
@@ -305,6 +340,10 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       // Refresh the pending calls list to update status immediately (force refresh to bypass cache)
       await fetchPendingData(true);
 
+      // Clear selection in landing page and child components (force reset)
+      setSelectedCalls([]);
+      setSelectionResetKey(k => k + 1);
+
       // Reset modal state
       setShowScheduleModal(false);
       setScheduleDate('');
@@ -321,15 +360,56 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   };
 
   // Handle Start/Resume button - calls Azure API when status is IE_SCHEDULED
-  const handleStart = async (call) => {
+  const handleStart = async (call, scheduleInfo) => {
     console.log('🔍 handleStart called for:', call.call_no);
     console.log('🔍 Call status:', call.status);
+
+    // Enforce schedule rule for Raw Material and Final: if scheduled date is after today, block start
+    try {
+      const productTypeLowerEarly = (call.product_type || '').toString().toLowerCase();
+      const requiresScheduleEarly = productTypeLowerEarly.includes('raw') || productTypeLowerEarly.includes('final');
+      if (requiresScheduleEarly) {
+        const existingScheduleEarly = scheduleInfo || (await getScheduleByCallNo(call.call_no));
+        const scheduledDateRawEarly = existingScheduleEarly?.scheduleDate || existingScheduleEarly?.schedule_date || null;
+        const scheduledDateEarly = normalizeToYMD(scheduledDateRawEarly);
+        const todayEarly = new Date().toISOString().split('T')[0];
+        if (scheduledDateEarly && new Date(scheduledDateEarly) > new Date(todayEarly)) {
+          showNotification(`This call is scheduled for ${scheduledDateRawEarly || scheduledDateEarly}. Start is allowed on or after this date.`, 'error');
+          return;
+        }
+      }
+    } catch (schedVerifyErr) {
+      console.error('Error verifying schedule before start', schedVerifyErr);
+      showNotification('Unable to verify schedule. Please try again.', 'error');
+      return;
+    }
 
     // TEMPORARY: Always route to inspection initiation page for VERIFY_PO_DETAILS status
     // This allows IE to review/edit inspection initiation data before going to dashboard
     if (call.status === 'VERIFY_PO_DETAILS') {
       console.log('🔄 VERIFY_PO_DETAILS status - routing to inspection initiation page');
       onStartInspection(call);
+      return;
+    }
+
+    // For ENTER_SHIFT_DETAILS_AND_START_INSPECTION status (Process Material under inspection)
+    // Route directly to dashboard to resume inspection
+    if (call.status === 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION') {
+      console.log('🔄 ENTER_SHIFT_DETAILS_AND_START_INSPECTION status - routing directly to dashboard');
+      const productType = call.product_type;
+      setSelectedCall(call);
+
+      const productTypeLower = productType?.toLowerCase() || '';
+      if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
+        console.log('➡️ Routing to process-dashboard');
+        setCurrentPage('process-dashboard');
+      } else if (productTypeLower.includes('final') || productType === 'ERC-FINAL PRODUCT') {
+        console.log('➡️ Routing to final-dashboard');
+        setCurrentPage('final-dashboard');
+      } else {
+        console.log('➡️ Routing to rm-dashboard');
+        setCurrentPage('rm-dashboard');
+      }
       return;
     }
 
@@ -418,6 +498,28 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     // Only call Azure API if status is IE_SCHEDULED
     if (call.status === 'IE_SCHEDULED') {
       try {
+        // For Raw Material and Final calls, ensure scheduled date equals today's date before starting
+        const productTypeLowerCheck = (call.product_type || '').toString().toLowerCase();
+        const requiresScheduleToday = productTypeLowerCheck.includes('raw') || productTypeLowerCheck.includes('final');
+        if (requiresScheduleToday) {
+          try {
+            const existingSchedule = await getScheduleByCallNo(call.call_no);
+            const scheduledDate = existingSchedule?.scheduleDate || existingSchedule?.schedule_date || null;
+            const today = new Date().toISOString().split('T')[0];
+            if (!scheduledDate) {
+              showNotification('This call is not scheduled. Please schedule it before starting.', 'error');
+              return;
+            }
+            if (scheduledDate !== today) {
+              showNotification(`This call is scheduled for ${scheduledDate}. Start is only allowed on the scheduled date (${today}).`, 'error');
+              return;
+            }
+          } catch (schedErr) {
+            console.error('Error fetching schedule for start validation', schedErr);
+            showNotification('Unable to verify schedule. Please try again.', 'error');
+            return;
+          }
+        }
         const currentUser = getStoredUser();
         const userId = currentUser?.userId || 0;
 
@@ -448,6 +550,136 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     }
   };
 
+  // Handle Enter Shift Details button - for PAUSE_INSPECTION_RESUME_NEXT_DAY status
+  const handleEnterShiftDetails = (call) => {
+    console.log('🔍 handleEnterShiftDetails called for:', call.call_no);
+    console.log('🔍 Call status:', call.status);
+
+    // Show the shift details modal
+    setShiftDetailsCall(call);
+    setShiftDetailsShift('');
+    setShiftDetailsDate(new Date().toISOString().split('T')[0]);
+    setShiftDetailsError('');
+    setShowEnterShiftDetailsModal(true);
+  };
+
+  // Helper to check if call is Process or Final Product
+  const isProcessOrFinalProduct = (productType) => {
+    if (!productType) return false;
+    return (
+      productType === 'PROCESS_MATERIAL' ||
+      productType === 'FINAL_PRODUCT' ||
+      productType.includes('Process') ||
+      productType.includes('Final')
+    );
+  };
+
+  // Handle Enter Shift Details modal confirm
+  const handleEnterShiftDetailsConfirm = async () => {
+    if (!shiftDetailsShift) {
+      setShiftDetailsError('Please select a shift');
+      return;
+    }
+
+    if (!shiftDetailsDate) {
+      setShiftDetailsError('Please select a date');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      console.log('✅ Shift details confirmed:', { shift: shiftDetailsShift, date: shiftDetailsDate });
+
+      // Get current user for actionBy field
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || 0;
+
+      // Fetch the latest workflow transition ID for this call
+      let workflowTransitionId = shiftDetailsCall?.id || shiftDetailsCall?.workflowTransitionId || null;
+
+      try {
+        const latestTransition = await fetchLatestWorkflowTransition(shiftDetailsCall?.call_no);
+        if (latestTransition && latestTransition.workflowTransitionId) {
+          workflowTransitionId = latestTransition.workflowTransitionId;
+          console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${shiftDetailsCall?.call_no}`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
+      }
+
+      // Call workflow API for Process/Final Product, or skip for Raw Material
+      if (isProcessOrFinalProduct(shiftDetailsCall?.product_type)) {
+        console.log('🏭 Process/Final Product: Calling workflow API for enter shift details...');
+
+        const workflowActionData = {
+          workflowTransitionId: workflowTransitionId,
+          requestId: shiftDetailsCall?.call_no,
+          action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
+          remarks: `Shift details entered - Shift: ${shiftDetailsShift}, Date: ${shiftDetailsDate}`,
+          actionBy: userId,
+          pincode: shiftDetailsCall?.pincode || '560001',
+          materialAvailable: 'YES'
+        };
+
+        console.log('Workflow Action Data:', workflowActionData);
+
+        try {
+          await performTransitionAction(workflowActionData);
+          console.log('✅ Workflow transition successful for Process/Final Product');
+        } catch (workflowError) {
+          console.error('❌ Workflow API error:', workflowError);
+          throw new Error(workflowError.message || 'Failed to enter shift details via workflow');
+        }
+      } else {
+        console.log('🔧 Raw Material: Skipping workflow API call');
+      }
+
+      // Store shift and date in sessionStorage for dashboard to use
+      sessionStorage.setItem('inspectionShift', shiftDetailsShift);
+      sessionStorage.setItem('inspectionDate', shiftDetailsDate);
+
+      // Close modal
+      setShowEnterShiftDetailsModal(false);
+
+      // Navigate to dashboard based on product type
+      const productType = shiftDetailsCall?.product_type;
+      console.log('🚀 Navigating to dashboard for product type:', productType);
+
+      setSelectedCall(shiftDetailsCall);
+
+      const productTypeLower = productType?.toLowerCase() || '';
+      if (productTypeLower.includes('raw') || productType === 'ERC-RAW MATERIAL') {
+        console.log('➡️ Routing to rm-dashboard');
+        setCurrentPage('rm-dashboard');
+      } else if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
+        console.log('➡️ Routing to process-dashboard');
+        setCurrentPage('process-dashboard');
+      } else if (productTypeLower.includes('final') || productType === 'ERC-FINAL PRODUCT') {
+        console.log('➡️ Routing to final-dashboard');
+        setCurrentPage('final-dashboard');
+      } else {
+        console.log('➡️ Routing to rm-dashboard (default)');
+        setCurrentPage('rm-dashboard');
+      }
+    } catch (error) {
+      console.error('Error entering shift details:', error);
+      setShiftDetailsError(error.message || 'Failed to enter shift details. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Get date options for Shift C (today and yesterday)
+  const getDateOptions = () => {
+    const today = new Date();
+    const yesterday = new Date(Date.now() - 86400000);
+    return [
+      { value: '', label: 'Select Date' },
+      { value: today.toISOString().split('T')[0], label: `${today.toLocaleDateString('en-GB')} (Today)` },
+      { value: yesterday.toISOString().split('T')[0], label: `${yesterday.toLocaleDateString('en-GB')} (Yesterday)` }
+    ];
+  };
+
   const handleBulkStart = (calls, scheduleInfo) => {
     const { unscheduledCalls, scheduledCalls, refreshSchedules } = scheduleInfo || {};
 
@@ -459,8 +691,60 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       return;
     }
 
-    // All calls are scheduled, proceed with start
-    onStartMultipleInspections(calls);
+    // All calls are scheduled — validate each scheduled call's date for Raw Material & Final
+    const validateAndStart = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const blocked = [];
+      const allowed = [];
+
+      // If no scheduledCalls provided, fall back to calls param
+      const toCheck = Array.isArray(scheduledCalls) && scheduledCalls.length > 0 ? scheduledCalls : calls;
+
+      for (const c of toCheck) {
+        try {
+          const productTypeLower = (c.product_type || '').toString().toLowerCase();
+          const requiresScheduleToday = productTypeLower.includes('raw') || productTypeLower.includes('final');
+          if (!requiresScheduleToday) {
+            // Process and other types may start regardless
+            allowed.push(c);
+            continue;
+          }
+
+          // Prefer schedule info passed from PendingCallsTab (c may include scheduleInfo)
+          const existingSchedule = c.scheduleInfo || (await getScheduleByCallNo(c.call_no));
+          const scheduledDateRaw = existingSchedule?.scheduleDate || existingSchedule?.schedule_date || null;
+          const scheduledDate = normalizeToYMD(scheduledDateRaw);
+          if (!scheduledDate) {
+            blocked.push({ call: c, reason: 'Not scheduled' });
+            continue;
+          }
+
+          // Block if scheduled date is after today (future schedule)
+          if (new Date(scheduledDate) > new Date(today)) {
+            blocked.push({ call: c, reason: `Scheduled for ${scheduledDateRaw || scheduledDate}` });
+            continue;
+          }
+
+          allowed.push(c);
+        } catch (err) {
+          console.error('Error validating schedule for bulk start', c.call_no, err);
+          blocked.push({ call: c, reason: 'Schedule verification failed' });
+        }
+      }
+
+      if (blocked.length > 0) {
+        const msgs = blocked.map(b => `${b.call.call_no} (${b.call.product_type || 'Unknown'}): ${b.reason}`);
+        showNotification(`Some calls cannot be started:\n${msgs.join('\n')}`, 'error');
+      }
+
+      if (allowed.length > 0) {
+        onStartMultipleInspections(allowed);
+      } else {
+        showNotification('No scheduled calls eligible to start. Please check schedules.', 'warning');
+      }
+    };
+
+    validateAndStart();
   };
 
   // Handle scheduling from unscheduled popup
@@ -575,7 +859,9 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
           onStart={handleStart}
           onBulkSchedule={handleBulkSchedule}
           onBulkStart={handleBulkStart}
+          onEnterShiftDetails={handleEnterShiftDetails}
           isLoading={isLoading}
+          selectionResetKey={selectionResetKey}
         />
       )}
 
@@ -944,6 +1230,98 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
               ))}
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Enter Shift Details Modal */}
+      <Modal
+        isOpen={showEnterShiftDetailsModal}
+        onClose={() => !isSubmitting && setShowEnterShiftDetailsModal(false)}
+        title={`Enter Shift Details - ${shiftDetailsCall?.call_no}`}
+        footer={
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowEnterShiftDetailsModal(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleEnterShiftDetailsConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Confirming...' : 'Confirm'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>
+          {shiftDetailsError && (
+            <div style={{
+              padding: 'var(--space-12)',
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+              borderRadius: 'var(--radius-base)',
+              fontSize: '14px'
+            }}>
+              {shiftDetailsError}
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label required">
+              Shift of Inspection
+            </label>
+            <select
+              className="form-control"
+              value={shiftDetailsShift}
+              onChange={(e) => {
+                setShiftDetailsShift(e.target.value);
+                setShiftDetailsError('');
+                if (e.target.value && e.target.value !== 'C') {
+                  setShiftDetailsDate(new Date().toISOString().split('T')[0]);
+                }
+              }}
+            >
+              <option value="">Select Shift</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label required">
+              Date of Inspection
+            </label>
+            {shiftDetailsShift === 'C' ? (
+              <select
+                className="form-control"
+                value={shiftDetailsDate}
+                onChange={(e) => {
+                  setShiftDetailsDate(e.target.value);
+                  setShiftDetailsError('');
+                }}
+              >
+                {getDateOptions().map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                className="form-control"
+                value={shiftDetailsDate ? new Date(shiftDetailsDate).toLocaleDateString('en-GB') : ''}
+                disabled
+              />
+            )}
+            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px', display: 'block' }}>
+              {shiftDetailsShift === 'C' ? 'Shift C: Select today or yesterday' : 'Auto-set to today for shifts A, B, General'}
+            </span>
+          </div>
         </div>
       </Modal>
     </div>

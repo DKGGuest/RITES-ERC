@@ -132,7 +132,8 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
   // Check if all required sections are verified (only those that are shown)
   // Safe check for product_type to avoid "includes" on undefined
   const productType = call?.product_type || '';
-  const isSectionCRequired = (productType === 'Raw Material' || productType.includes('Process'));
+  // Section C is only required for Raw Material, NOT for Process or Final Product
+  const isSectionCRequired = (productType === 'Raw Material');
   // Section D (Production Lines) verification is NOT required as checkboxes were removed
   // eslint-disable-next-line no-unused-vars
   const isSectionDRequired = false;
@@ -422,7 +423,7 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
         const workflowActionData = {
           workflowTransitionId: workflowTransitionId,
           requestId: call.call_no,
-          action: 'VERIFY_MATERIAL_AVAILABILITY',
+          action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
           remarks: `Inspection initiated - Shift: ${shiftOfInspection}, Date: ${dateOfInspection}`,
           actionBy: userId,
           pincode: call.pincode || '560001',

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 /**
  * Inspection Context - Provides shared state across all inspection pages
@@ -72,6 +72,19 @@ export const InspectionProvider = ({ children }) => {
   // Cache timestamp to track when data was last fetched
   const [rmDataCacheTimestamp, setRmDataCacheTimestamp] = useState(() => {
     const saved = sessionStorage.getItem('rmDataCacheTimestamp');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // ==================== FINAL PRODUCT DATA CACHING ====================
+  // Cache fetched Final Product dashboard data to avoid re-fetching on navigation
+  const [fpDashboardDataCache, setFpDashboardDataCache] = useState(() => {
+    const saved = sessionStorage.getItem('fpDashboardDataCache');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Cache timestamp for Final Product data
+  const [fpDataCacheTimestamp, setFpDataCacheTimestamp] = useState(() => {
+    const saved = sessionStorage.getItem('fpDataCacheTimestamp');
     return saved ? JSON.parse(saved) : {};
   });
 
@@ -249,6 +262,71 @@ export const InspectionProvider = ({ children }) => {
     }
   }, []);
 
+  /**
+   * Update Final Product dashboard data cache for a specific call
+   * @param {string} callNo - Inspection call number
+   * @param {object} dashboardData - Dashboard data to cache
+   */
+  const updateFpDashboardDataCache = useCallback((callNo, dashboardData) => {
+    setFpDashboardDataCache(prev => {
+      const updated = { ...prev, [callNo]: dashboardData };
+      sessionStorage.setItem('fpDashboardDataCache', JSON.stringify(updated));
+      return updated;
+    });
+    // Update timestamp
+    setFpDataCacheTimestamp(prev => {
+      const updated = { ...prev, [callNo]: Date.now() };
+      sessionStorage.setItem('fpDataCacheTimestamp', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  /**
+   * Get cached Final Product dashboard data for a specific call
+   * Returns null if cache is expired (older than 5 minutes)
+   */
+  const getFpCachedData = useCallback((callNo) => {
+    const timestamp = fpDataCacheTimestamp[callNo];
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    // Check if cache exists and is not expired
+    if (timestamp && (Date.now() - timestamp) < CACHE_DURATION) {
+      return {
+        dashboardData: fpDashboardDataCache[callNo],
+        isCached: true
+      };
+    }
+
+    return { isCached: false };
+  }, [fpDataCacheTimestamp, fpDashboardDataCache]);
+
+  /**
+   * Clear Final Product cache for a specific call or all caches
+   */
+  const clearFpCache = useCallback((callNo = null) => {
+    if (callNo) {
+      // Clear specific call cache
+      setFpDashboardDataCache(prev => {
+        const updated = { ...prev };
+        delete updated[callNo];
+        sessionStorage.setItem('fpDashboardDataCache', JSON.stringify(updated));
+        return updated;
+      });
+      setFpDataCacheTimestamp(prev => {
+        const updated = { ...prev };
+        delete updated[callNo];
+        sessionStorage.setItem('fpDataCacheTimestamp', JSON.stringify(updated));
+        return updated;
+      });
+    } else {
+      // Clear all caches
+      setFpDashboardDataCache({});
+      setFpDataCacheTimestamp({});
+      sessionStorage.removeItem('fpDashboardDataCache');
+      sessionStorage.removeItem('fpDataCacheTimestamp');
+    }
+  }, []);
+
   const updateProcessShift = useCallback((shift) => {
     setProcessShift(shift);
     sessionStorage.setItem('processShift', shift);
@@ -313,6 +391,13 @@ export const InspectionProvider = ({ children }) => {
     clearRmCache();
   }, [clearRmCache]);
 
+  // Save call_no separately for easier fallback access in submodules
+  useEffect(() => {
+    if (selectedCall?.call_no) {
+      sessionStorage.setItem('selectedCallNo', selectedCall.call_no);
+    }
+  }, [selectedCall?.call_no]);
+
   const value = {
     selectedCall,
     selectedCalls,
@@ -340,12 +425,16 @@ export const InspectionProvider = ({ children }) => {
     setProcessProductionLines: updateProcessProductionLines,
     setLandingActiveTab,
     clearInspectionData,
-    // Cache management functions
+    // Cache management functions - Raw Material
     updateRmPoDataCache,
     updateRmCallDataCache,
     updateRmHeatDataCache,
     getRmCachedData,
     clearRmCache,
+    // Cache management functions - Final Product
+    updateFpDashboardDataCache,
+    getFpCachedData,
+    clearFpCache,
   };
 
   return (

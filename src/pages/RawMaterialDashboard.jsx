@@ -386,15 +386,28 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
   /**
    * Validate calibration product values for a heat
-   * Rules: C: 0.5-0.6, Si: 1.5-2.0, Mn: 0.8-1.0, P: ≤0.030, S: ≤0.030
+   * Rules:
+   * - All fields (C, Si, Mn, P, S) must be filled to enable Accept/Reject
+   * - C: 0.5-0.6, Si: 1.5-2.0, Mn: 0.8-1.0, P: ≤0.030, S: ≤0.030
+   * - Returns 'Pending' if not all fields are filled
+   * - Returns 'OK' if all fields pass validation
+   * - Returns 'NOT OK' if any field fails validation
    */
   const validateCalibrationHeat = useCallback((heatData) => {
     if (!heatData) return 'Pending';
 
     const { percentC, percentSi, percentMn, percentP, percentS } = heatData;
-    const hasData = percentC || percentSi || percentMn || percentP || percentS;
-    if (!hasData) return 'Pending';
 
+    // Check if ALL required fields are filled (excluding remarks)
+    const allFieldsFilled = percentC && percentC !== '' &&
+                           percentSi && percentSi !== '' &&
+                           percentMn && percentMn !== '' &&
+                           percentP && percentP !== '' &&
+                           percentS && percentS !== '';
+
+    if (!allFieldsFilled) return 'Pending';
+
+    // All fields are filled, now validate values
     const c = parseFloat(percentC);
     const si = parseFloat(percentSi);
     const mn = parseFloat(percentMn);
@@ -411,27 +424,82 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   }, []);
 
   /**
+   * Calculate rejected weight from visual defects for a heat
+   * Formula: MK-III: Length(m) * 0.00263, MK-V: Length(m) * 0.00326
+   * Defects considered: Distortion, Twist, Kink, Not Straight, Fold, Lap, Crack
+   * Input: Defect lengths in metres
+   */
+  const calculateVisualRejectedWeight = useCallback((heatVisualData) => {
+    if (!heatVisualData?.selectedDefects || !heatVisualData?.defectCounts) return 0;
+
+    const selected = heatVisualData.selectedDefects;
+    const counts = heatVisualData.defectCounts;
+    const lengthDefects = ['Distortion', 'Twist', 'Kink', 'Not Straight', 'Fold', 'Lap', 'Crack'];
+
+    // Calculate total defective length in metres
+    let totalMetres = 0;
+    lengthDefects.forEach(defect => {
+      if (selected[defect]) {
+        const lengthMetres = parseFloat(counts[defect]) || 0;
+        totalMetres += lengthMetres;
+      }
+    });
+
+    // Calculate weight based on product model
+    const weightFactor = productModel?.toUpperCase().includes('V') ? 0.00326 : 0.00263;
+    return totalMetres * weightFactor;
+  }, [productModel]);
+
+  /**
    * Validate visual inspection for a heat
-   * Rules: OK if "No Defect" is selected. NOT OK if any other defect is selected.
+   * Rules:
+   * - At least one defect option must be selected
+   * - If defects other than "No Defect" are selected, their counts/lengths must be filled
+   * - OK if "No Defect" is selected
+   * - NOT OK if any other defect is selected (with count filled)
+   * - Returns 'Pending' if no selection is made OR if selected defects don't have counts filled
    */
   const validateVisualHeat = useCallback((heatVisualData) => {
     if (!heatVisualData?.selectedDefects) return 'Pending';
 
     const selected = heatVisualData.selectedDefects;
+    const counts = heatVisualData.defectCounts || {};
     const hasAnySelection = Object.values(selected).some(v => v);
+
+    // Must have at least one selection to proceed
     if (!hasAnySelection) return 'Pending';
 
-    // If "No Defect" is selected, it's OK
+    // If "No Defect" is selected, it's OK (no need to check counts)
     if (selected['No Defect']) return 'OK';
 
-    // If any other defect is selected, it's NOT OK
-    const hasDefects = Object.entries(selected).some(([key, val]) => key !== 'No Defect' && val);
-    return hasDefects ? 'NOT OK' : 'OK';
+    // Check if any other defect is selected
+    const selectedDefects = Object.entries(selected)
+      .filter(([key, val]) => key !== 'No Defect' && val)
+      .map(([key]) => key);
+
+    if (selectedDefects.length === 0) return 'Pending';
+
+    // Check if all selected defects have their counts/lengths filled
+    const allCountsFilled = selectedDefects.every(defectName => {
+      const count = counts[defectName];
+      return count && count.toString().trim() !== '';
+    });
+
+    // If not all counts are filled, status is still Pending
+    if (!allCountsFilled) return 'Pending';
+
+    // All counts are filled, so it's NOT OK (defects found)
+    return 'NOT OK';
   }, []);
 
   /**
    * Validate dimensional check for a heat
-   * Rules: All samples must be within tolerance (MK-III: 20.47-20.84, MK-V: 22.81-23.23)
+   * Rules:
+   * - ALL 20 samples must be filled to enable Accept/Reject
+   * - All samples must be within tolerance (MK-III: 20.47-20.84, MK-V: 22.81-23.23)
+   * - Returns 'Pending' if not all 20 samples are filled
+   * - Returns 'OK' if all samples pass validation
+   * - Returns 'NOT OK' if any sample fails validation
    */
   const validateDimensionalHeat = useCallback((dimSamples, model) => {
     if (!dimSamples || !Array.isArray(dimSamples)) return 'Pending';
@@ -441,10 +509,13 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       ? { min: 22.81, max: 23.23 }
       : { min: 20.47, max: 20.84 }; // Default MK-III
 
+    const REQUIRED_SAMPLES = 20; // Total samples required per heat
     const filledSamples = dimSamples.filter(s => s?.diameter && s.diameter !== '');
-    if (filledSamples.length === 0) return 'Pending';
 
-    // Check if any sample is outside tolerance
+    // Must have ALL 20 samples filled to proceed
+    if (filledSamples.length < REQUIRED_SAMPLES) return 'Pending';
+
+    // All samples are filled, now validate each one
     const hasFailure = filledSamples.some(s => {
       const val = parseFloat(s.diameter);
       return !isNaN(val) && (val < specs.min || val > specs.max);
@@ -455,16 +526,38 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
   /**
    * Validate material testing for a heat
-   * Rules: C: 0.5-0.6, Si: 1.5-2.0, Mn: 0.8-1.0, P: ≤0.030, S: ≤0.030, GrainSize: ≥6, Decarb: ≤0.25, Inclusions A/B/C/D: ≤2.0
+   * Rules:
+   * - All required fields (C, Si, Mn, P, S, Grain Size, Decarb, Inclusions A/B/C/D, Hardness) must be filled for all samples
+   * - C: 0.5-0.6, Si: 1.5-2.0, Mn: 0.8-1.0, P: ≤0.030, S: ≤0.030
+   * - GrainSize: ≥6, Decarb: ≤0.25, Inclusions A/B/C/D: ≤2.0
+   * - Returns 'Pending' if not all required fields are filled
+   * - Returns 'OK' if all fields pass validation
+   * - Returns 'NOT OK' if any field fails validation
    */
   const validateMaterialTestHeat = useCallback((heatMaterialData) => {
     if (!heatMaterialData?.samples || !Array.isArray(heatMaterialData.samples)) return 'Pending';
 
     const samples = heatMaterialData.samples;
-    const hasData = samples.some(s => s.c || s.si || s.mn || s.p || s.s);
-    if (!hasData) return 'Pending';
 
-    // Check each sample for failures
+    // Check if ALL required fields are filled for all samples (excluding remarks)
+    const allFieldsFilled = samples.every(sample => {
+      return sample.c && sample.c !== '' &&
+             sample.si && sample.si !== '' &&
+             sample.mn && sample.mn !== '' &&
+             sample.p && sample.p !== '' &&
+             sample.s && sample.s !== '' &&
+             sample.grainSize && sample.grainSize !== '' &&
+             sample.decarb && sample.decarb !== '' &&
+             sample.inclA && sample.inclA !== '' &&
+             sample.inclB && sample.inclB !== '' &&
+             sample.inclC && sample.inclC !== '' &&
+             sample.inclD && sample.inclD !== '' &&
+             sample.hardness && sample.hardness !== '';
+    });
+
+    if (!allFieldsFilled) return 'Pending';
+
+    // All fields are filled, now validate values
     const hasFailure = samples.some(sample => {
       const c = parseFloat(sample.c);
       const si = parseFloat(sample.si);
@@ -498,7 +591,11 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
   /**
    * Validate packing & storage checklist - per heat
-   * Rules: All checklist items must be "Yes" for OK. Any "No" = NOT OK.
+   * Rules:
+   * - All checklist items must be answered (Yes/No) to enable Accept/Reject
+   * - All items must be "Yes" for OK
+   * - Any "No" = NOT OK
+   * - Returns 'Pending' if not all items are answered
    */
   const validatePackingStorage = useCallback((packingData, heatIndex) => {
     if (!packingData?.packingDataByHeat) return 'Pending';
@@ -508,9 +605,14 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
     const checkItems = ['bundlingSecure', 'tagsAttached', 'labelsCorrect', 'protectionAdequate', 'storageCondition', 'moistureProtection', 'stackingProper'];
 
-    const hasData = checkItems.some(item => heatData[item] !== '' && heatData[item] !== undefined);
-    if (!hasData) return 'Pending';
+    // Check if ALL checklist items are answered (excluding remarks)
+    const allItemsAnswered = checkItems.every(item =>
+      heatData[item] === 'Yes' || heatData[item] === 'No'
+    );
 
+    if (!allItemsAnswered) return 'Pending';
+
+    // All items are answered, now check if any is "No"
     const hasNo = checkItems.some(item => heatData[item] === 'No');
     return hasNo ? 'NOT OK' : 'OK';
   }, []);
@@ -602,9 +704,18 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     // Also re-check when component regains focus (user navigates back)
     window.addEventListener('focus', handleStorageChange);
 
+    // Listen for custom event dispatched when submodule data is saved
+    const handleCustomRefresh = () => computeStatuses();
+    window.addEventListener('rm:statusRefresh', handleCustomRefresh);
+
+    // Poll for changes every 2 seconds (to catch same-window localStorage changes)
+    const pollInterval = setInterval(computeStatuses, 2000);
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('focus', handleStorageChange);
+      window.removeEventListener('rm:statusRefresh', handleCustomRefresh);
+      clearInterval(pollInterval);
     };
   }, [call?.call_no, activeHeats, productModel, validateCalibrationHeat, validateVisualHeat, validateDimensionalHeat, validateMaterialTestHeat, validatePackingStorage]);
 
@@ -1339,8 +1450,63 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
         {/* Final Results - Raw Material - One Block Per Heat */}
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          {/* Info Banner */}
+          {/* <div style={{
+            padding: '12px 16px',
+            marginBottom: '16px',
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '6px',
+            fontSize: '13px',
+            color: '#1e40af',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '16px' }}>ℹ️</span>
+            <div>
+              <strong>Status Logic:</strong> Each section shows <strong style={{ color: '#92400e' }}>Pending</strong> until all required fields are filled (remarks excluded).
+              Once complete, status changes to <strong style={{ color: '#166534' }}>OK</strong> (all values pass) or <strong style={{ color: '#991b1b' }}>NOT OK</strong> (any value fails).
+              Hover over pending badges for details.
+            </div>
+          </div> */}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <h4 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Final Inspection Results</h4>
+
+            {/* Refresh Status Button
+            <button
+              onClick={() => {
+                // Manually trigger status recomputation
+                const event = new Event('rm:statusRefresh');
+                window.dispatchEvent(event);
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#0369a1',
+                background: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = '#e0f2fe';
+                e.target.style.borderColor = '#7dd3fc';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = '#f0f9ff';
+                e.target.style.borderColor = '#bae6fd';
+              }}
+            >
+              <span style={{ fontSize: '14px' }}>🔄</span>
+              Refresh Status
+            </button> */}
 
             {/* Overall Status Badge */}
             {(() => {
@@ -1438,19 +1604,21 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                     marginBottom: '16px'
                   }}>
                     {[
-                      { key: 'calibration', label: 'Calibration' },
-                      { key: 'visual', label: 'Visual' },
-                      { key: 'dimensional', label: 'Dimensional' },
-                      { key: 'materialTest', label: 'Material Test' },
-                      { key: 'packing', label: 'Packing' }
-                    ].map(({ key, label }) => {
+                      { key: 'calibration', label: 'Calibration', tooltip: 'Fill all chemical composition fields (C, Si, Mn, P, S)' },
+                      { key: 'visual', label: 'Visual', tooltip: 'Select defect option and fill counts/lengths for selected defects' },
+                      { key: 'dimensional', label: 'Dimensional', tooltip: 'Fill all 20 sample diameters' },
+                      { key: 'materialTest', label: 'Material Test', tooltip: 'Fill all fields for all samples (C, Si, Mn, P, S, Grain Size, Decarb, Inclusions, Hardness)' },
+                      { key: 'packing', label: 'Packing', tooltip: 'Answer all checklist items (Yes/No)' }
+                    ].map(({ key, label, tooltip }) => {
                       const status = heatStatuses[key];
                       const isOk = status === 'OK';
                       const isNotOk = status === 'NOT OK';
+                      const isPending = status === 'Pending';
 
                       return (
                         <span
                           key={key}
+                          title={isPending ? `${tooltip} to enable Accept/Reject` : `${label}: ${status}`}
                           style={{
                             padding: '4px 12px',
                             borderRadius: '4px',
@@ -1458,7 +1626,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                             fontWeight: 500,
                             background: isOk ? '#dcfce7' : isNotOk ? '#fee2e2' : '#fef3c7',
                             color: isOk ? '#166534' : isNotOk ? '#991b1b' : '#92400e',
-                            border: `1px solid ${isOk ? '#86efac' : isNotOk ? '#fca5a5' : '#fcd34d'}`
+                            border: `1px solid ${isOk ? '#86efac' : isNotOk ? '#fca5a5' : '#fcd34d'}`,
+                            cursor: isPending ? 'help' : 'default'
                           }}
                         >
                           {label}: {status}
@@ -1521,7 +1690,29 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                     <div>
                       <span style={{ fontSize: '11px', color: '#dc2626', display: 'block', marginBottom: '4px' }}>Wt. Rejected (Tons)</span>
                       <strong style={{ fontSize: '14px', color: '#dc2626' }}>
-                        {isRejected ? (heat.weight || '—') : '0'}
+                        {(() => {
+                          // Load visual inspection data from localStorage
+                          const callNo = call?.call_no;
+                          if (!callNo) return '0';
+
+                          const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${callNo}`;
+                          const visualRaw = localStorage.getItem(visualKey);
+                          const visualData = visualRaw ? JSON.parse(visualRaw) : [];
+
+                          // Get heat index to find the correct visual data
+                          const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNo);
+                          const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+
+                          // Calculate rejected weight from visual defects
+                          const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
+
+                          // If heat is rejected and has visual defects, show calculated weight
+                          // Otherwise show 0
+                          if (isRejected && rejectedWeight > 0) {
+                            return rejectedWeight.toFixed(6);
+                          }
+                          return '0';
+                        })()}
                       </strong>
                     </div>
 

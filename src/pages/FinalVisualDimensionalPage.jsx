@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
 
 // Table 2 mapping for Dimension & Weight AQL 2.5
@@ -26,22 +27,61 @@ function getSamplingValues(lotSize) {
   return { ac: null, re: null, sample: null, cumulative: null };
 }
 
-const availableLots = [
-  { lotNo: "LOT-001", heatNo: "HT-2025-A1", quantity: 500 },
-  { lotNo: "LOT-002", heatNo: "HT-2025-A2", quantity: 800 },
-  { lotNo: "LOT-003", heatNo: "HT-2025-B1", quantity: 1200 }
-].map(lot => {
-  const { ac, re, sample, cumulative } = getSamplingValues(lot.quantity);
-  return {
-    ...lot,
-    sampleSize: sample,
-    accpNo: ac,
-    rejNo: re,
-    cummRejNo: cumulative
-  };
-});
+// This will be populated from context with live data
+// Fallback to empty array if no lots available
+const getAvailableLots = (lotsFromVendor = []) => {
+  if (!lotsFromVendor || lotsFromVendor.length === 0) {
+    return [];
+  }
+
+  return lotsFromVendor.map(lot => {
+    // Handle both API response format (lotNumber, heatNumber) and mapped format (lotNo, heatNo)
+    const lotNo = lot.lotNo || lot.lotNumber;
+    const heatNo = lot.heatNo || lot.heatNumber;
+    const lotSize = lot.lotSize || lot.offeredQty || 0;
+
+    const { ac, re, sample, cumulative } = getSamplingValues(lotSize);
+    return {
+      lotNo: lotNo,
+      heatNo: heatNo,
+      quantity: lotSize,
+      sampleSize: sample,
+      accpNo: ac,
+      rejNo: re,
+      cummRejNo: cumulative
+    };
+  });
+};
 
 const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
+  // Get live lot data from context
+  const { getFpCachedData, selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+  // Get cached dashboard data with fallback to sessionStorage
+  const lotsFromVendor = useMemo(() => {
+    const cachedData = getFpCachedData(callNo);
+    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+
+    // Fallback: Check sessionStorage directly if context cache is empty
+    if (lots.length === 0 && callNo) {
+      try {
+        const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+        if (storedCache) {
+          const cacheData = JSON.parse(storedCache);
+          lots = cacheData[callNo]?.finalLotDetails || [];
+        }
+      } catch (e) {
+        console.error('Error reading from sessionStorage:', e);
+      }
+    }
+    return lots;
+  }, [callNo, getFpCachedData]);
+
+  const availableLots = useMemo(() => getAvailableLots(lotsFromVendor), [lotsFromVendor]);
+
   /* Section collapse states */
   const [visualExpanded, setVisualExpanded] = useState(true);
   const [dimensionalExpanded, setDimensionalExpanded] = useState(true);
@@ -54,8 +94,8 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
   const [visualPopupLot, setVisualPopupLot] = useState(null);
   const [dimPopupLot, setDimPopupLot] = useState(null);
 
-  const [lotData, setLotData] = useState(
-    availableLots.reduce(
+  const [lotData, setLotData] = useState(() => {
+    return availableLots.reduce(
       (acc, lot) => ({
         ...acc,
         [lot.lotNo]: {
@@ -72,8 +112,59 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
         }
       }),
       {}
-    )
-  );
+    );
+  });
+
+  // Helper function to initialize lot data
+  const initializeLotData = useCallback(() => {
+    setLotData(prev => {
+      const newLotData = { ...prev };
+      availableLots.forEach(lot => {
+        if (!newLotData[lot.lotNo]) {
+          newLotData[lot.lotNo] = {
+            visualR1: "",
+            visualR2: "",
+            visualRemark: "",
+            dimGo1: "",
+            dimNoGo1: "",
+            dimFlat1: "",
+            dimGo2: "",
+            dimNoGo2: "",
+            dimFlat2: "",
+            dimRemark: ""
+          };
+        }
+      });
+      return newLotData;
+    });
+  }, [availableLots]);
+
+  // Reinitialize lotData when call changes (when navigating back from other submodules)
+  useEffect(() => {
+    if (availableLots.length > 0) {
+      // Try to load persisted data first
+      const persistedData = localStorage.getItem(`visualDimensionalData_${callNo}`);
+
+      if (persistedData) {
+        try {
+          const parsedData = JSON.parse(persistedData);
+          setLotData(parsedData);
+        } catch (e) {
+          console.error('Error parsing persisted data:', e);
+          initializeLotData();
+        }
+      } else {
+        initializeLotData();
+      }
+    }
+  }, [callNo, availableLots, initializeLotData]);
+
+  // Persist data whenever lotData changes
+  useEffect(() => {
+    if (Object.keys(lotData).length > 0 && callNo) {
+      localStorage.setItem(`visualDimensionalData_${callNo}`, JSON.stringify(lotData));
+    }
+  }, [lotData, callNo]);
 
   const handleChange = (lotNo, field, value) => {
     setLotData(prev => ({
@@ -132,7 +223,7 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
         }
       }
     });
-  }, [lotData, visualPopupLot, showVisual2ndMap]);
+  }, [lotData, visualPopupLot, showVisual2ndMap, availableLots]);
 
   /* ------------------------------
      DIMENSIONAL 2ND SAMPLING LOGIC
@@ -179,7 +270,7 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
         }
       }
     });
-  }, [lotData, dimPopupLot, showDim2ndMap]);
+  }, [lotData, dimPopupLot, showDim2ndMap, availableLots]);
 
   /* ------------------------------
      VISUAL POPUP HANDLERS
@@ -428,17 +519,31 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
       )}
 
       {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)' }}>
         <div>
-          <h1>Visual & Dimensional Check</h1>
-          <p style={{ fontSize: 12, color: "#64748b" }}>
-            Final Product Inspection – each lot displayed separately
-          </p>
+          <h1 className="page-title">Visual & Dimensional Check</h1>
+          <p className="page-subtitle">Final Product Inspection – each lot displayed separately</p>
         </div>
-        <button className="btn btn-outline" onClick={onBack}>← Back</button>
+        <button className="btn btn-outline" onClick={onBack}>
+          ← Back to Final Product Dashboard
+        </button>
       </div>
 
       <FinalSubmoduleNav currentSubmodule="final-visual-dimensional" onNavigate={onNavigateSubmodule} />
+
+      {/* Show message if no lots available */}
+      {availableLots.length === 0 && (
+        <div style={{
+          padding: '20px',
+          background: '#fef3c7',
+          border: '1px solid #fcd34d',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          color: '#92400e'
+        }}>
+          <p>⚠️ No lots available. Please ensure the dashboard has loaded lot data.</p>
+        </div>
+      )}
 
       {/* ---------------- VISUAL INSPECTION ---------------- */}
       <div className="section-wrapper">
@@ -682,11 +787,6 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
         )}
       </div>
 
-      {/* BUTTONS */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-        <button className="btn btn-outline" onClick={onBack}>Cancel</button>
-        <button className="btn btn-primary">Save & Continue</button>
-      </div>
     </div>
   );
 };

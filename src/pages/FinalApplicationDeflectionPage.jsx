@@ -1,24 +1,52 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import { getDimensionWeightAQL } from '../utils/is2500Calculations';
 import "./FinalApplicationDeflectionPage.css";
 
-/* Mock lots - replace with API */
-const LOTS = [
-  { lotNo: "LOT-001", heatNo: "HT-2025-A1", quantity: 500 },
-  { lotNo: "LOT-002", heatNo: "HT-2025-A2", quantity: 800 },
-  { lotNo: "LOT-003", heatNo: "HT-2025-B1", quantity: 1200 }
-];
-
 const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
+  // Get live lot data from context
+  const { getFpCachedData, selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+  // Get cached dashboard data with fallback to sessionStorage
+  const cachedData = getFpCachedData(callNo);
+
+  // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
+  const lotsFromVendor = useMemo(() => {
+    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+
+    // Fallback: Check sessionStorage directly if context cache is empty
+    if (lots.length === 0 && callNo) {
+      try {
+        const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+        if (storedCache) {
+          const cacheData = JSON.parse(storedCache);
+          lots = cacheData[callNo]?.finalLotDetails || [];
+        }
+      } catch (e) {
+        console.error('Error reading from sessionStorage:', e);
+      }
+    }
+    return lots;
+  }, [cachedData, callNo]);
+
   /* Active tab state */
   const [activeTab, setActiveTab] = useState('dimension');
 
   /* Build lot data with IS 2500 Table 2 - Dimension & Weight (AQL 2.5) */
-  const lotsData = useMemo(() => LOTS.map(lot => {
-    const aql = getDimensionWeightAQL(lot.quantity);
+  const lotsData = useMemo(() => lotsFromVendor.map(lot => {
+    const lotNo = lot.lotNo || lot.lotNumber;
+    const heatNo = lot.heatNo || lot.heatNumber;
+    const quantity = lot.lotSize || lot.offeredQty || 0;
+
+    const aql = getDimensionWeightAQL(quantity);
     return {
-      ...lot,
+      lotNo,
+      heatNo,
+      quantity,
       sampleSize: aql.n1,
       sampleSize2nd: aql.n2,
       accpNo: aql.ac1,
@@ -26,10 +54,22 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
       cummRejNo: aql.cummRej,
       useSingleSampling: aql.useSingleSampling
     };
-  }), []);
+  }), [lotsFromVendor]);
 
   /* State for all lots - both dimension and deflection data */
   const [lotStates, setLotStates] = useState(() => {
+    // Try to load persisted data first
+    const persistedData = localStorage.getItem(`deflectionTestData_${callNo}`);
+
+    if (persistedData) {
+      try {
+        return JSON.parse(persistedData);
+      } catch (e) {
+        console.error('Error parsing persisted deflection test data:', e);
+      }
+    }
+
+    // Initialize new data
     const initial = {};
     lotsData.forEach(lot => {
       initial[lot.lotNo] = {
@@ -49,6 +89,13 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
     });
     return initial;
   });
+
+  // Persist data whenever lotStates changes
+  useEffect(() => {
+    if (Object.keys(lotStates).length > 0 && callNo) {
+      localStorage.setItem(`deflectionTestData_${callNo}`, JSON.stringify(lotStates));
+    }
+  }, [lotStates, callNo]);
 
   /* Helper to safely parse number */
   const safe = (val) => {
@@ -449,10 +496,10 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
       )}
 
       {/* Page Actions */}
-      <div className="ad-actions">
+      {/* <div className="ad-actions">
         <button className="ad-btn ad-btn-outline" onClick={onBack}>Cancel</button>
         <button className="ad-btn ad-btn-primary" onClick={() => alert('Saved!')}>Save & Continue</button>
-      </div>
+      </div> */}
     </div>
   );
 };

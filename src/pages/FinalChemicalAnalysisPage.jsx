@@ -1,24 +1,77 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
 import "./FinalChemicalAnalysisPage.css";
 
-const availableLots = [
-  {
-    lotNo: "LOT-001",
-    heatNo: "HT-2025-A1",
-    ladleAnalysis: { c: 0.55, si: 1.75, mn: 0.9, s: 0.02, p: 0.025 },
-  },
-  {
-    lotNo: "LOT-002",
-    heatNo: "HT-2025-A2",
-    ladleAnalysis: { c: 0.54, si: 1.8, mn: 0.88, s: 0.018, p: 0.022 },
-  },
-];
-
 const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
-  const [chemValues, setChemValues] = useState({});
-  const [remarks, setRemarks] = useState({});
-  const [expandedLot, setExpandedLot] = useState("LOT-001"); // ✅ Default expanded lot
+  // Get live lot data from context
+  const { getFpCachedData, selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+  // Get cached dashboard data with fallback to sessionStorage
+  const cachedData = getFpCachedData(callNo);
+  let lotsFromVendor = cachedData?.dashboardData?.finalLotDetails || [];
+
+  // Fallback: Check sessionStorage directly if context cache is empty
+  if (lotsFromVendor.length === 0 && callNo) {
+    try {
+      const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+      if (storedCache) {
+        const cacheData = JSON.parse(storedCache);
+        lotsFromVendor = cacheData[callNo]?.finalLotDetails || [];
+      }
+    } catch (e) {
+      console.error('Error reading from sessionStorage:', e);
+    }
+  }
+
+  // Map live lot data to component format
+  const availableLots = lotsFromVendor.map(lot => ({
+    lotNo: lot.lotNo || lot.lotNumber,
+    heatNo: lot.heatNo || lot.heatNumber,
+    quantity: lot.lotSize || lot.offeredQty || 0,
+    ladleAnalysis: { c: 0, si: 0, mn: 0, s: 0, p: 0 }, // Default values
+  }));
+
+  const [chemValues, setChemValues] = useState(() => {
+    const persistedData = localStorage.getItem(`chemicalAnalysisData_${callNo}`);
+    if (persistedData) {
+      try {
+        const parsed = JSON.parse(persistedData);
+        return parsed.chemValues || {};
+      } catch (e) {
+        console.error('Error parsing persisted chemical data:', e);
+      }
+    }
+    return {};
+  });
+
+  const [remarks, setRemarks] = useState(() => {
+    const persistedData = localStorage.getItem(`chemicalAnalysisData_${callNo}`);
+    if (persistedData) {
+      try {
+        const parsed = JSON.parse(persistedData);
+        return parsed.remarks || {};
+      } catch (e) {
+        console.error('Error parsing persisted remarks:', e);
+      }
+    }
+    return {};
+  });
+
+  const [expandedLot, setExpandedLot] = useState(availableLots[0]?.lotNo || ""); // Default to first lot
+
+  // Persist data whenever chemValues or remarks change
+  useEffect(() => {
+    if (callNo) {
+      localStorage.setItem(`chemicalAnalysisData_${callNo}`, JSON.stringify({
+        chemValues,
+        remarks
+      }));
+    }
+  }, [chemValues, remarks, callNo]);
 
   const chemicalFields = [
     { id: "c", label: "% C (Carbon)" },
@@ -250,7 +303,7 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
       </div>
 
       {/* FOOTER */}
-      <div className="chem-footer">
+      {/* <div className="chem-footer">
         <button className="btn btn-outline" onClick={onBack}>
           Cancel
         </button>
@@ -260,7 +313,7 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
         >
           Save & Continue
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };

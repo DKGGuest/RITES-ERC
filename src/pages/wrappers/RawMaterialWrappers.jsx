@@ -69,7 +69,7 @@ export const CalibrationDocumentsWrapper = () => {
  */
 export const VisualInspectionWrapper = () => {
   const navigate = useNavigate();
-  const { rmHeats, selectedCall } = useInspection();
+  const { rmHeats, rmProductModel, selectedCall } = useInspection();
 
   const handleBack = () => navigate(ROUTES.RAW_MATERIAL);
   const handleNavigateSubmodule = (subModule) => {
@@ -81,6 +81,7 @@ export const VisualInspectionWrapper = () => {
     <VisualInspectionPage
       onBack={handleBack}
       heats={rmHeats}
+      productModel={rmProductModel}
       inspectionCallNo={selectedCall?.call_no || ''}
       onNavigateSubmodule={handleNavigateSubmodule}
     />

@@ -14,6 +14,8 @@ export const API_STATUS = {
   IE_SCHEDULED: 'IE_SCHEDULED',
   SCHEDULED: 'SCHEDULED',
   VERIFY_PO_DETAILS: 'VERIFY_PO_DETAILS',
+  ENTER_SHIFT_DETAILS_AND_START_INSPECTION: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
+  PAUSE_INSPECTION_RESUME_NEXT_DAY: 'PAUSE_INSPECTION_RESUME_NEXT_DAY',
   // Add more statuses as needed
 };
 
@@ -24,6 +26,7 @@ export const DISPLAY_STATUS = {
   PENDING: 'Pending',
   SCHEDULED: 'Scheduled',
   UNDER_INSPECTION: 'Under Inspection',
+  INSPECTION_PAUSED: 'Inspection Paused',
   // Add more display labels as needed
 };
 
@@ -38,6 +41,8 @@ export const getDisplayStatus = (apiStatus) => {
     [API_STATUS.IE_SCHEDULED]: DISPLAY_STATUS.SCHEDULED,
     [API_STATUS.SCHEDULED]: DISPLAY_STATUS.SCHEDULED,
     [API_STATUS.VERIFY_PO_DETAILS]: DISPLAY_STATUS.UNDER_INSPECTION,
+    [API_STATUS.ENTER_SHIFT_DETAILS_AND_START_INSPECTION]: DISPLAY_STATUS.UNDER_INSPECTION,
+    [API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY]: DISPLAY_STATUS.INSPECTION_PAUSED,
   };
 
   const displayStatus = statusMap[apiStatus] || apiStatus;
@@ -56,6 +61,8 @@ export const getAvailableActions = (apiStatus) => {
     [API_STATUS.IE_SCHEDULED]: ['start', 'reschedule'],
     [API_STATUS.SCHEDULED]: ['start', 'reschedule'],
     [API_STATUS.VERIFY_PO_DETAILS]: ['resume', 'reschedule'],
+    [API_STATUS.ENTER_SHIFT_DETAILS_AND_START_INSPECTION]: ['resume', 'reschedule'],
+    [API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY]: ['enterShiftDetails'],
   };
 
   return actionMap[apiStatus] || [];
@@ -67,11 +74,13 @@ export const getAvailableActions = (apiStatus) => {
  * @returns {boolean} True if schedule date should be shown
  */
 export const shouldShowScheduleDate = (apiStatus) => {
-  // Show schedule date for IE_SCHEDULED, SCHEDULED and VERIFY_PO_DETAILS (Under Inspection)
+  // Show schedule date for IE_SCHEDULED, SCHEDULED, VERIFY_PO_DETAILS (Under Inspection)
+  // and PAUSE_INSPECTION_RESUME_NEXT_DAY (Paused inspection)
   // because the call was scheduled before inspection started
   return apiStatus === API_STATUS.IE_SCHEDULED ||
          apiStatus === API_STATUS.SCHEDULED ||
-         apiStatus === API_STATUS.VERIFY_PO_DETAILS;
+         apiStatus === API_STATUS.VERIFY_PO_DETAILS ||
+         apiStatus === API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY;
 };
 
 /**
@@ -85,6 +94,8 @@ export const getStatusVariant = (apiStatus) => {
     [API_STATUS.IE_SCHEDULED]: 'info',       // Blue for scheduled
     [API_STATUS.SCHEDULED]: 'info',          // Blue for scheduled
     [API_STATUS.VERIFY_PO_DETAILS]: 'success', // Green for under inspection
+    [API_STATUS.ENTER_SHIFT_DETAILS_AND_START_INSPECTION]: 'success', // Green for under inspection
+    [API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY]: 'warning', // Orange for paused
   };
 
   return variantMap[apiStatus] || 'default';

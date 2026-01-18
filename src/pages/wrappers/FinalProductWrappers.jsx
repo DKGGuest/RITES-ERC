@@ -17,7 +17,7 @@ import { ROUTES, FINAL_PRODUCT_SUBMODULE_ROUTES } from '../../routes';
  */
 export const FinalProductDashboardWrapper = () => {
   const navigate = useNavigate();
-  const { setLandingActiveTab } = useInspection();
+  const { setLandingActiveTab, selectedCall } = useInspection();
 
   const handleBack = () => {
     setLandingActiveTab('pending');
@@ -30,6 +30,18 @@ export const FinalProductDashboardWrapper = () => {
       navigate(route);
     }
   };
+
+  // Ensure selectedCall is available
+  if (!selectedCall) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p>⚠️ No inspection call selected. Please select a call from the landing page.</p>
+        <button className="btn btn-secondary" onClick={handleBack}>
+          Back to Landing Page
+        </button>
+      </div>
+    );
+  }
 
   return (
     <FinalProductDashboard

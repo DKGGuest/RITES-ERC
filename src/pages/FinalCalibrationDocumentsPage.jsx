@@ -1,16 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useInspection } from '../context/InspectionContext';
 import CalibrationModule from '../components/CalibrationModule';
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 
 const FinalCalibrationDocumentsPage = ({ onBack, onNavigateSubmodule }) => {
+  const { selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
   // Document verification states
-  const [verifications, setVerifications] = useState({
-    rdsoApproval: { verified: false, remarks: '', validityDate: '' },
-    rawMaterialIC: { verified: false, remarks: '', icNumber: '' },
-    dimensionCheck: { verified: false, remarks: '' },
-    packingList: { verified: false, remarks: '' },
-    rdsoGauges: { verified: false, remarks: '' }
+  const [verifications, setVerifications] = useState(() => {
+    // Try to load persisted data first
+    const persistedData = localStorage.getItem(`calibrationDocumentsData_${callNo}`);
+
+    if (persistedData) {
+      try {
+        return JSON.parse(persistedData);
+      } catch (e) {
+        console.error('Error parsing persisted calibration data:', e);
+      }
+    }
+
+    // Initialize new data
+    return {
+      rdsoApproval: { verified: false, remarks: '', validityDate: '' },
+      rawMaterialIC: { verified: false, remarks: '', icNumber: '' },
+      dimensionCheck: { verified: false, remarks: '' },
+      packingList: { verified: false, remarks: '' },
+      rdsoGauges: { verified: false, remarks: '' }
+    };
   });
+
+  // Persist data whenever verifications change
+  useEffect(() => {
+    if (callNo) {
+      localStorage.setItem(`calibrationDocumentsData_${callNo}`, JSON.stringify(verifications));
+    }
+  }, [verifications, callNo]);
 
   const handleVerificationChange = (field, key, value) => {
     setVerifications(prev => ({
@@ -264,10 +291,10 @@ const FinalCalibrationDocumentsPage = ({ onBack, onNavigateSubmodule }) => {
       </div>
 
       {/* Action Buttons */}
-      <div style={{ marginTop: 'var(--space-24)', display: 'flex', gap: 'var(--space-16)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+      {/* <div style={{ marginTop: 'var(--space-24)', display: 'flex', gap: 'var(--space-16)', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         <button className="btn btn-outline" onClick={onBack}>Cancel</button>
         <button className="btn btn-primary" onClick={() => { alert('Calibration & Documents verified!'); onBack(); }}>Save & Continue</button>
-      </div>
+      </div> */}
     </div>
   );
 };

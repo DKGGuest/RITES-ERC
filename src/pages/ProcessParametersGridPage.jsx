@@ -73,15 +73,26 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     console.log('📋 [Grid Lot Numbers] Current line initiation data:', currentLineInitiationData);
     console.log('📋 [Grid Lot Numbers] Current production line:', currentProductionLine);
 
-    // ONLY use lot number from cached initiation data (same source as Pre-Inspection)
+    // ONLY use lot numbers from cached initiation data (same source as Pre-Inspection)
     // This ensures the lot numbers in the grid match exactly what's shown in Pre-Inspection
     if (currentLineInitiationData) {
-      const mainLotNumber = currentLineInitiationData.lotNumber || '';
-      console.log('📋 [Grid Lot Numbers] Lot number from cached initiation data:', mainLotNumber);
+      // Check if lotDetailsList is available (contains all lots for this inspection)
+      if (currentLineInitiationData.lotDetailsList && currentLineInitiationData.lotDetailsList.length > 0) {
+        console.log('📋 [Grid Lot Numbers] Using lotDetailsList from API:', currentLineInitiationData.lotDetailsList);
 
-      if (mainLotNumber) {
-        console.log('✅ [Grid Lot Numbers] Using lot number:', [mainLotNumber]);
-        return [mainLotNumber];
+        // Extract all lot numbers from lotDetailsList
+        const allLotNumbers = currentLineInitiationData.lotDetailsList.map(lot => lot.lotNumber);
+        console.log('✅ [Grid Lot Numbers] Using all lot numbers from lotDetailsList:', allLotNumbers);
+        return allLotNumbers;
+      } else {
+        // Fallback to main lot number if lotDetailsList is not available
+        const mainLotNumber = currentLineInitiationData.lotNumber || '';
+        console.log('📋 [Grid Lot Numbers] Lot number from cached initiation data:', mainLotNumber);
+
+        if (mainLotNumber) {
+          console.log('✅ [Grid Lot Numbers] Using main lot number:', [mainLotNumber]);
+          return [mainLotNumber];
+        }
       }
     }
 

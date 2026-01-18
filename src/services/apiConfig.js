@@ -36,6 +36,8 @@ export const API_ENDPOINTS = {
     // Raw Material
     RAW_MATERIAL: `${API_BASE_URL}/api/raw-material`,
     RM_INSPECTION: `${API_BASE_URL}/api/rm-inspection`,
+    // Final Material
+    FINAL_MATERIAL: `${API_BASE_URL}/api/final-material`,
     
     // Process Material
     PROCESS_MATERIAL: `${API_BASE_URL}/api/process-material`,

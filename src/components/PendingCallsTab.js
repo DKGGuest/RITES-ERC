@@ -117,7 +117,7 @@ const responsiveStyles = `
   }
 `;
 
-const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSchedule, onBulkStart, isLoading = false }) => {
+const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSchedule, onBulkStart, onEnterShiftDetails, isLoading = false, selectionResetKey = 0 }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filterSearch, setFilterSearch] = useState('');
@@ -285,7 +285,9 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
         const isFromWorkflowAPI = row.status === 'CALL_REGISTERED' ||
                                    row.status === 'IE_SCHEDULED' ||
                                    row.status === 'VERIFY_PO_DETAILS' ||
-                                   row.status === 'INSPECTION_COMPLETE_CONFIRM';
+                                   row.status === 'INSPECTION_COMPLETE_CONFIRM' ||
+                                   row.status === 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION' ||
+                                   row.status === 'PAUSE_INSPECTION_RESUME_NEXT_DAY';
 
         let displayStatus;
         if (isFromWorkflowAPI) {
@@ -312,6 +314,11 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
     setSelectionError
   );
 
+  // Clear selection when parent signals a reset (selectionResetKey changed)
+  React.useEffect(() => {
+    setSelectedRows([]);
+  }, [selectionResetKey]);
+
   // Check if a call is scheduled
   const isScheduled = (callNo) => !!scheduledCalls[callNo];
 
@@ -336,7 +343,9 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
     const isFromWorkflowAPI = row.status === 'CALL_REGISTERED' ||
                                row.status === 'IE_SCHEDULED' ||
                                row.status === 'VERIFY_PO_DETAILS' ||
-                               row.status === 'INSPECTION_COMPLETE_CONFIRM';
+                               row.status === 'INSPECTION_COMPLETE_CONFIRM' ||
+                               row.status === 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION' ||
+                               row.status === 'PAUSE_INSPECTION_RESUME_NEXT_DAY';
 
     let availableActions = [];
 
@@ -376,13 +385,18 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
           </button>
         )}
         {availableActions.includes('start') && (
-          <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>
+          <button className="btn btn-sm btn-primary" onClick={() => onStart(row, scheduledCalls[row.call_no])}>
             START
           </button>
         )}
         {availableActions.includes('resume') && (
-          <button className="btn btn-sm btn-primary" onClick={() => onStart(row)}>
+          <button className="btn btn-sm btn-primary" onClick={() => onStart(row, scheduledCalls[row.call_no])}>
             RESUME
+          </button>
+        )}
+        {availableActions.includes('enterShiftDetails') && (
+          <button className="btn btn-sm btn-primary" onClick={() => onEnterShiftDetails(row)}>
+            ENTER SHIFT DETAILS
           </button>
         )}
       </div>
@@ -408,7 +422,7 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
   const handleBulkStart = () => {
     // Pass scheduling info to parent for proper handling
     onBulkStart(selectedCallsData, {
-      scheduledCalls: scheduledCallsData,
+      scheduledCalls: scheduledCallsWithInfo,
       unscheduledCalls: unscheduledCallsData,
       refreshSchedules
     });

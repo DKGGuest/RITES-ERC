@@ -100,7 +100,9 @@ const RoleBasedRedirect = () => {
 const LandingPageGuard = () => {
   const user = getStoredUser();
 
-  if (user?.roleName !== 'IE') {
+  // Allow IE and Process IE users to access landing page
+  const ieRoles = ['IE', 'Process IE'];
+  if (!ieRoles.includes(user?.roleName)) {
     return (
       <Navigate
         to={ROLE_LANDING_ROUTE[user?.roleName]}

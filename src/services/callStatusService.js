@@ -163,12 +163,9 @@ const hasInspectionData = (callNo) => {
     }
   }
 
-  // Check sessionStorage for shift and date (legacy support)
-  const shift = sessionStorage.getItem('inspectionShift');
-  const date = sessionStorage.getItem('inspectionDate');
-  if (shift && date) {
-    return true;
-  }
+  // NOTE: Do NOT check global sessionStorage 'inspectionShift' and 'inspectionDate'
+  // These are shared across calls and will cause false positives
+  // Only check call-specific keys above
 
   // Check localStorage for dashboard draft data
   const dashboardDraftKey = `process_dashboard_draft_${callNo}`;
@@ -182,12 +179,23 @@ const hasInspectionData = (callNo) => {
     return true;
   }
 
-  // Check for any process inspection data
+  // Check for actual process inspection data with shift and date
+  // Only return true if we have meaningful inspection data, not just empty keys
   const processKeys = Object.keys(localStorage).filter(key =>
     key.startsWith('process_inspection_') && key.includes(callNo)
   );
   if (processKeys.length > 0) {
-    return true;
+    // Check if any of these keys contain actual inspection data with shift and date
+    for (const key of processKeys) {
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        if (data && data.shiftOfInspection && data.dateOfInspection) {
+          return true;
+        }
+      } catch (e) {
+        // Invalid JSON, continue checking
+      }
+    }
   }
 
   return false;

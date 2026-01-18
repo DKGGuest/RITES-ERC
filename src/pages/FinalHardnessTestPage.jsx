@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
 import ExcelImport from "../components/ExcelImport";
 import Pagination from "../components/Pagination";
@@ -8,22 +9,48 @@ import {
   // calculateBagsForSampling,
 } from "../utils/is2500Calculations";
 
-/* Auto-fetched lots */
-const lotsFromPreInspection = [
-  { lotNo: "LOT-001", heatNo: "HT-2025-A1", lotSize: 500 },
-  { lotNo: "LOT-002", heatNo: "HT-2025-A2", lotSize: 800 },
-  { lotNo: "LOT-003", heatNo: "HT-2025-B1", lotSize: 1200 },
-];
-
 const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
+  // Get live lot data from context
+  const { getFpCachedData, selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+  // Get cached dashboard data with fallback to sessionStorage
+  const cachedData = getFpCachedData(callNo);
+
+  // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
+  const lotsFromVendor = useMemo(() => {
+    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+
+    // Fallback: Check sessionStorage directly if context cache is empty
+    if (lots.length === 0 && callNo) {
+      try {
+        const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+        if (storedCache) {
+          const cacheData = JSON.parse(storedCache);
+          lots = cacheData[callNo]?.finalLotDetails || [];
+        }
+      } catch (e) {
+        console.error('Error reading from sessionStorage:', e);
+      }
+    }
+    return lots;
+  }, [cachedData, callNo]);
+
   /* --- LOT AQL Info --- */
   const availableLots = useMemo(() => {
-    return lotsFromPreInspection.map((lot) => {
-      const aql = getHardnessToeLoadAQL(lot.lotSize);
+    return lotsFromVendor.map((lot) => {
+      // Handle both API response format (lotNumber, heatNumber) and mapped format (lotNo, heatNo)
+      const lotNo = lot.lotNo || lot.lotNumber;
+      const heatNo = lot.heatNo || lot.heatNumber;
+      const lotSize = lot.lotSize || lot.offeredQty || 0;
+
+      const aql = getHardnessToeLoadAQL(lotSize);
       return {
-        lotNo: lot.lotNo,
-        heatNo: lot.heatNo,
-        quantity: lot.lotSize,
+        lotNo: lotNo,
+        heatNo: heatNo,
+        quantity: lotSize,
         sampleSize: aql.n1,
         accpNo: aql.ac1,
         rejNo: aql.re1,
@@ -32,11 +59,23 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         singleSampling: aql.useSingleSampling || false,
       };
     });
-  }, []);
+  }, [lotsFromVendor]);
 
   /* --- Initial Hardness Data Storage --- */
-  const [lotData, setLotData] = useState(
-    availableLots.reduce(
+  const [lotData, setLotData] = useState(() => {
+    // Try to load persisted data first
+    const persistedData = localStorage.getItem(`hardnessTestData_${callNo}`);
+
+    if (persistedData) {
+      try {
+        return JSON.parse(persistedData);
+      } catch (e) {
+        console.error('Error parsing persisted hardness data:', e);
+      }
+    }
+
+    // Initialize new data
+    return availableLots.reduce(
       (acc, lot) => ({
         ...acc,
         [lot.lotNo]: {
@@ -46,8 +85,15 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         },
       }),
       {}
-    )
-  );
+    );
+  });
+
+  // Persist data whenever lotData changes
+  useEffect(() => {
+    if (Object.keys(lotData).length > 0 && callNo) {
+      localStorage.setItem(`hardnessTestData_${callNo}`, JSON.stringify(lotData));
+    }
+  }, [lotData, callNo]);
 
   /* ------------------------------
      PAGINATION - ROWS HANDLER
@@ -456,7 +502,7 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
       })}
 
       {/* Bottom Buttons */}
-      <div className="bottom-actions">
+      {/* <div className="bottom-actions">
         <button className="btn btn-outline" onClick={onBack}>
           Cancel
         </button>
@@ -466,7 +512,7 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         >
           Save & Continue
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };

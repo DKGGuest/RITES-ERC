@@ -1,18 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useInspection } from '../context/InspectionContext';
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import ExcelImport from '../components/ExcelImport';
 import Pagination from '../components/Pagination';
 import { getHardnessToeLoadAQL } from '../utils/is2500Calculations';
 import './FinalToeLoadTestPage.css';
-
-/**
- * Base lot data – typically comes from backend (Process IC / Pre-inspection)
- */
-const BASE_LOTS = [
-  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', quantity: 500, springType: 'MK-III' },
-  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', quantity: 800, springType: 'MK-V' },
-  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', quantity: 1200, springType: 'ERC-J' }
-];
 
 /**
  * Tolerance band by spring type (used internally for validation)
@@ -27,15 +19,50 @@ const TOLERANCES = {
 };
 
 const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
+  // Get live lot data from context
+  const { getFpCachedData, selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+  // Get cached dashboard data with fallback to sessionStorage
+  const cachedData = getFpCachedData(callNo);
+
+  // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
+  const lotsFromVendor = useMemo(() => {
+    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+
+    // Fallback: Check sessionStorage directly if context cache is empty
+    if (lots.length === 0 && callNo) {
+      try {
+        const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+        if (storedCache) {
+          const cacheData = JSON.parse(storedCache);
+          lots = cacheData[callNo]?.finalLotDetails || [];
+        }
+      } catch (e) {
+        console.error('Error reading from sessionStorage:', e);
+      }
+    }
+    return lots;
+  }, [cachedData, callNo]);
+
   /**
    * Compute sample size & AQL values for each lot using IS 2500 Table 2
    */
   const lotsWithSampleSize = useMemo(
     () =>
-      BASE_LOTS.map(lot => {
-        const aql = getHardnessToeLoadAQL(lot.quantity);
+      lotsFromVendor.map(lot => {
+        const lotNo = lot.lotNo || lot.lotNumber;
+        const heatNo = lot.heatNo || lot.heatNumber;
+        const quantity = lot.lotSize || lot.offeredQty || 0;
+
+        const aql = getHardnessToeLoadAQL(quantity);
         return {
-          ...lot,
+          lotNo,
+          heatNo,
+          quantity,
+          springType: lot.springType || 'MK-III',
           sampleSize: aql.n1,
           sampleSize2nd: aql.n2,
           accpNo: aql.ac1,
@@ -44,7 +71,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
           singleSampling: aql.useSingleSampling || false
         };
       }),
-    []
+    [lotsFromVendor]
   );
 
   /**
@@ -54,6 +81,18 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
    *  remarks: string
    */
   const [lotData, setLotData] = useState(() => {
+    // Try to load persisted data first
+    const persistedData = localStorage.getItem(`toeLoadTestData_${callNo}`);
+
+    if (persistedData) {
+      try {
+        return JSON.parse(persistedData);
+      } catch (e) {
+        console.error('Error parsing persisted toe load test data:', e);
+      }
+    }
+
+    // Initialize new data
     const initial = {};
     lotsWithSampleSize.forEach(lot => {
       initial[lot.lotNo] = {
@@ -64,6 +103,13 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
     });
     return initial;
   });
+
+  // Persist data whenever lotData changes
+  useEffect(() => {
+    if (Object.keys(lotData).length > 0 && callNo) {
+      localStorage.setItem(`toeLoadTestData_${callNo}`, JSON.stringify(lotData));
+    }
+  }, [lotData, callNo]);
 
   /* 2nd Sampling visibility state and popup */
   const [show2ndSamplingMap, setShow2ndSamplingMap] = useState({});
@@ -236,6 +282,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
   };
 
   /** Validate & save whole page (you can later split per-lot if needed) */
+  // eslint-disable-next-line no-unused-vars
   const handleSave = () => {
     const payload = lotsWithSampleSize.map(lot => {
       const summary = computeLotSummary(lot);
@@ -460,14 +507,14 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
       })}
 
       {/* Global buttons */}
-      <div className="tlp-actions-page">
+      {/* <div className="tlp-actions-page">
         <button className="tlp-btn tlp-btn-outline" onClick={onBack}>
           Cancel
         </button>
         <button className="tlp-btn tlp-btn-primary" onClick={handleSave}>
           Save &amp; Continue
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };

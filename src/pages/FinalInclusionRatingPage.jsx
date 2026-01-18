@@ -1,34 +1,81 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useInspection } from '../context/InspectionContext';
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 
 /*
-  Lots Data - Auto-fetched from Pre-Inspection
+  Lots Data - Auto-fetched from Final Product Dashboard
   barDia (d) comes from Pre-Inspection Data Entry where user enters Bar Diameter for each lot
   hardnessSampleSize comes from Hardness Test sample size (calculated via IS 2500)
 */
-const lotsFromPreInspection = [
-  { lotNo: 'LOT-001', heatNo: 'HT-2025-A1', lotSize: 500, hardnessSampleSize: 32, barDia: 14 },
-  { lotNo: 'LOT-002', heatNo: 'HT-2025-A2', lotSize: 800, hardnessSampleSize: 50, barDia: 16 },
-  { lotNo: 'LOT-003', heatNo: 'HT-2025-B1', lotSize: 1200, hardnessSampleSize: 50, barDia: 18 }
-];
 
 const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
+  // Get live lot data from context
+  const { getFpCachedData, selectedCall } = useInspection();
+
+  // Get the call number - use selectedCall or fallback to sessionStorage
+  const callNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+  // Get cached dashboard data with fallback to sessionStorage
+  const cachedData = getFpCachedData(callNo);
+
+  // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
+  const lotsFromVendor = useMemo(() => {
+    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+
+    // Fallback: Check sessionStorage directly if context cache is empty
+    if (lots.length === 0 && callNo) {
+      try {
+        const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+        if (storedCache) {
+          const cacheData = JSON.parse(storedCache);
+          lots = cacheData[callNo]?.finalLotDetails || [];
+        }
+      } catch (e) {
+        console.error('Error reading from sessionStorage:', e);
+      }
+    }
+    return lots;
+  }, [cachedData, callNo]);
+
   /*
-    Calculate sample size for each lot: 6 or 0.5% of hardness test sample size (whichever is higher)
-    Formula: max(6, ceil(hardnessSampleSize * 0.5 / 100)) = max(6, ceil(hardnessSampleSize * 0.005))
+    Calculate sample size for each lot: 6 or 0.5% of lot size (whichever is higher)
+    Formula: max(6, ceil(lotSize * 0.5 / 100)) = max(6, ceil(lotSize * 0.005))
   */
   const lotsWithSampleSize = useMemo(() => {
-    return lotsFromPreInspection.map((lot) => {
-      const halfPercent = Math.ceil(lot.hardnessSampleSize * 0.005);
+    return lotsFromVendor.map((lot) => {
+      // Handle both API response format (lotNumber, heatNumber) and mapped format (lotNo, heatNo)
+      const lotNo = lot.lotNo || lot.lotNumber;
+      const heatNo = lot.heatNo || lot.heatNumber;
+      const lotSize = lot.lotSize || lot.offeredQty || 0;
+
+      const halfPercent = Math.ceil(lotSize * 0.005);
       const sampleSize = Math.max(6, halfPercent);
-      /* Max decarb limit: ≤ 0.25mm or (d/100)mm whichever is less. d = Bar Diameter from Pre-Inspection */
-      const maxDecarb = Math.min(0.25, lot.barDia / 100);
-      return { ...lot, sampleSize, maxDecarb };
+      /* Max decarb limit: ≤ 0.25mm (default) */
+      const maxDecarb = 0.25;
+      return {
+        lotNo,
+        heatNo,
+        quantity: lotSize,
+        sampleSize,
+        maxDecarb
+      };
     });
-  }, []);
+  }, [lotsFromVendor]);
 
   /* Initialize state for each lot */
   const [lotData, setLotData] = useState(() => {
+    // Try to load persisted data first
+    const persistedData = localStorage.getItem(`inclusionRatingData_${callNo}`);
+
+    if (persistedData) {
+      try {
+        return JSON.parse(persistedData);
+      } catch (e) {
+        console.error('Error parsing persisted inclusion data:', e);
+      }
+    }
+
+    // Initialize new data
     const initial = {};
     lotsWithSampleSize.forEach((lot) => {
       initial[lot.lotNo] = {
@@ -52,6 +99,13 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     });
     return initial;
   });
+
+  // Persist data whenever lotData changes
+  useEffect(() => {
+    if (Object.keys(lotData).length > 0 && callNo) {
+      localStorage.setItem(`inclusionRatingData_${callNo}`, JSON.stringify(lotData));
+    }
+  }, [lotData, callNo]);
 
   /* Handler for Microstructure change */
   const handleMicrostructureChange = (lotNo, idx, value) => {
@@ -946,10 +1000,10 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       </div>
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+      {/* <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
         <button className="btn btn-outline" onClick={onBack}>Cancel</button>
         <button className="btn btn-primary" onClick={() => alert('Inclusion Rating data saved!')}>Save & Continue</button>
-      </div>
+      </div> */}
     </div>
   );
 };

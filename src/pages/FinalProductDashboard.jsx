@@ -1,8 +1,11 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import FormField from "../components/FormField";
-import { MOCK_PO_DATA } from "../data/mockData";
 import { formatDate } from "../utils/helpers";
 import { markAsWithheld } from '../services/callStatusService';
+import { useInspection } from '../context/InspectionContext';
+import {
+  getFinalDashboardData
+} from '../services/finalProductInspectionService';
 import "./FinalProductDashboard.css";
 
 // Reason options for withheld inspection
@@ -18,7 +21,237 @@ const WITHHELD_REASONS = [
 const DASHBOARD_DRAFT_KEY = 'fp_dashboard_draft_';
 
 export default function FinalProductDashboard({ onBack, onNavigateToSubModule }) {
-  const poData = MOCK_PO_DATA["PO-2025-1001"];
+  const { selectedCall, getFpCachedData, updateFpDashboardDataCache } = useInspection();
+
+  // State for live data
+  const [poData, setPoData] = useState(null);
+  const [lotsFromVendorCall, setLotsFromVendorCall] = useState([]);
+  const [testResultsPerLot, setTestResultsPerLot] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+
+  // Fetch live data from backend with caching
+  useEffect(() => {
+    const fetchLiveData = async () => {
+      if (!selectedCall?.call_no) {
+        console.warn('⚠️ No selected call found');
+        setIsLoading(false);
+        setLoadError('No inspection call selected');
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+        console.log('📥 Fetching Final Product dashboard data for call:', selectedCall.call_no);
+
+        // Check cache first
+        const cachedData = getFpCachedData(selectedCall.call_no);
+        if (cachedData.isCached && cachedData.dashboardData) {
+          console.log('✅ Using cached dashboard data for call:', selectedCall.call_no);
+          const dashboardData = cachedData.dashboardData;
+          processDashboardData(dashboardData);
+          setIsLoading(false);
+          return;
+        }
+
+        // Fetch all dashboard data in one optimized call
+        console.log('🔄 Fetching dashboard data from API...');
+        const dashboardData = await getFinalDashboardData(selectedCall.call_no);
+        console.log('✅ Dashboard data fetched from API:', dashboardData);
+
+        // Cache the data for future navigation
+        updateFpDashboardDataCache(selectedCall.call_no, dashboardData);
+        console.log('💾 Dashboard data cached for call:', selectedCall.call_no);
+        console.log('💾 Cached finalLotDetails:', dashboardData?.finalLotDetails);
+
+        // Process the data
+        processDashboardData(dashboardData);
+      } catch (error) {
+        console.error('❌ Error fetching Final Product dashboard data:', error);
+        setLoadError(error.message || 'Failed to load inspection data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Helper function to process dashboard data
+    const processDashboardData = (dashboardData) => {
+      // Extract and set PO data - Map backend response to frontend format
+      if (dashboardData?.poData) {
+        const mappedPoData = {
+          po_no: dashboardData.poData.poNo || dashboardData.poData.rlyPoNo || '',
+          po_date: dashboardData.poData.poDate || '',
+          contractor: dashboardData.poData.vendorName || '',
+          manufacturer: dashboardData.finalLotDetails?.[0]?.manufacturer || dashboardData.poData.vendorName || '',
+          // Additional fields for reference
+          poSerialNo: dashboardData.poData.poSerialNo || '',
+          inspPlace: dashboardData.poData.inspPlace || '',
+          itemDesc: dashboardData.poData.itemDesc || '',
+          unit: dashboardData.poData.unit || 'Nos.',
+          poQty: dashboardData.poData.poQty || 0
+        };
+        setPoData(mappedPoData);
+        console.log('✅ PO Data mapped and set:', mappedPoData);
+      } else {
+        console.warn('⚠️ No PO data in response');
+        setPoData({});
+      }
+
+      // Extract and set lots
+      if (dashboardData?.finalLotDetails && Array.isArray(dashboardData.finalLotDetails)) {
+        const mappedLots = dashboardData.finalLotDetails.map(lot => ({
+          lotNo: lot.lotNumber,
+          heatNo: lot.heatNumber,
+          lotSize: lot.offeredQty || 0,
+          manufacturer: lot.manufacturer,
+          manufacturerHeat: lot.manufacturerHeat
+        }));
+        setLotsFromVendorCall(mappedLots);
+        console.log('✅ Lots set:', mappedLots);
+      } else {
+        console.warn('⚠️ No lots in response');
+        setLotsFromVendorCall([]);
+      }
+
+      // Initialize test results
+      const results = {};
+      if (dashboardData?.finalLotDetails && Array.isArray(dashboardData.finalLotDetails)) {
+        dashboardData.finalLotDetails.forEach(lot => {
+          results[lot.lotNumber] = {
+            visualDim: "PENDING",
+            hardness: "PENDING",
+            inclusion: "PENDING",
+            deflection: "PENDING",
+            toeLoad: "PENDING",
+            weight: "PENDING",
+            chemical: "PENDING"
+          };
+        });
+      }
+      setTestResultsPerLot(results);
+      console.log('✅ Test results initialized:', results);
+
+      console.log('✅ All dashboard data loaded successfully');
+    };
+
+    fetchLiveData();
+  }, [selectedCall?.call_no, selectedCall?.po_no, getFpCachedData, updateFpDashboardDataCache]);
+
+  // Validation function for visual & dimensional data
+  const validateVisualDimensionalData = useCallback((lotData) => {
+    if (!lotData) return 'Pending';
+    // Check if any visual or dimensional data is filled
+    const hasVisualData = lotData.visualR1 || lotData.visualR2 || lotData.visualRemark;
+    const hasDimData = lotData.dimGo1 || lotData.dimNoGo1 || lotData.dimFlat1 || lotData.dimGo2 || lotData.dimNoGo2 || lotData.dimFlat2 || lotData.dimRemark;
+    return (hasVisualData || hasDimData) ? 'OK' : 'Pending';
+  }, []);
+
+  // Validation function for hardness test data
+  const validateHardnessData = useCallback((lotData) => {
+    if (!lotData || !Array.isArray(lotData)) return 'Pending';
+    const hasData = lotData.some(sample => sample && (sample.hardnessValue || sample.result || sample.remarks));
+    return hasData ? 'OK' : 'Pending';
+  }, []);
+
+  // Validation function for inclusion rating data
+  const validateInclusionData = useCallback((lotData) => {
+    if (!lotData || !Array.isArray(lotData)) return 'Pending';
+    const hasData = lotData.some(sample => sample && (sample.inclusionRating || sample.decarb || sample.remarks));
+    return hasData ? 'OK' : 'Pending';
+  }, []);
+
+  // Validation function for deflection test data
+  const validateDeflectionData = useCallback((lotData) => {
+    if (!lotData || !Array.isArray(lotData)) return 'Pending';
+    const hasData = lotData.some(sample => sample && (sample.deflectionValue || sample.result || sample.remarks));
+    return hasData ? 'OK' : 'Pending';
+  }, []);
+
+  // Validation function for toe load test data
+  const validateToeLoadData = useCallback((lotData) => {
+    if (!lotData || !Array.isArray(lotData)) return 'Pending';
+    const hasData = lotData.some(sample => sample && (sample.toeLoadValue || sample.result || sample.remarks));
+    return hasData ? 'OK' : 'Pending';
+  }, []);
+
+  // Validation function for weight test data
+  const validateWeightData = useCallback((lotData) => {
+    if (!lotData || !Array.isArray(lotData)) return 'Pending';
+    const hasData = lotData.some(sample => sample && (sample.weight || sample.result || sample.remarks));
+    return hasData ? 'OK' : 'Pending';
+  }, []);
+
+  // Validation function for chemical analysis data
+  const validateChemicalData = useCallback((lotData) => {
+    if (!lotData || !Array.isArray(lotData)) return 'Pending';
+    const hasData = lotData.some(sample => sample && (sample.carbon || sample.silicon || sample.remarks));
+    return hasData ? 'OK' : 'Pending';
+  }, []);
+
+  // Update test results from submodule data stored in sessionStorage
+  const updateTestResultsFromStorage = useCallback(() => {
+    const callNo = selectedCall?.call_no;
+    if (!callNo || Object.keys(testResultsPerLot).length === 0) return;
+
+    const updatedResults = { ...testResultsPerLot };
+    let hasUpdates = false;
+
+    // Check each submodule's stored data and update test results
+    const submoduleKeys = [
+      { key: 'visualDimensionalData_', testName: 'visualDim', validator: validateVisualDimensionalData },
+      { key: 'hardnessTestData_', testName: 'hardness', validator: validateHardnessData },
+      { key: 'inclusionRatingData_', testName: 'inclusion', validator: validateInclusionData },
+      { key: 'deflectionTestData_', testName: 'deflection', validator: validateDeflectionData },
+      { key: 'toeLoadTestData_', testName: 'toeLoad', validator: validateToeLoadData },
+      { key: 'weightTestData_', testName: 'weight', validator: validateWeightData },
+      { key: 'chemicalAnalysisData_', testName: 'chemical', validator: validateChemicalData }
+    ];
+
+    submoduleKeys.forEach(({ key, testName, validator }) => {
+      const storageKey = `${key}${callNo}`;
+      const storedData = localStorage.getItem(storageKey);
+      if (storedData) {
+        try {
+          const data = JSON.parse(storedData);
+          // Update test results for each lot based on stored data
+          Object.keys(data).forEach(lotNo => {
+            if (updatedResults[lotNo]) {
+              const lotData = data[lotNo];
+              const status = validator(lotData);
+              if (status !== 'Pending') {
+                updatedResults[lotNo][testName] = status;
+                hasUpdates = true;
+              }
+            }
+          });
+        } catch (e) {
+          console.error(`Error reading ${storageKey}:`, e);
+        }
+      }
+    });
+
+    if (hasUpdates) {
+      setTestResultsPerLot(updatedResults);
+    }
+  }, [selectedCall?.call_no, testResultsPerLot, validateVisualDimensionalData, validateHardnessData, validateInclusionData, validateDeflectionData, validateToeLoadData, validateWeightData, validateChemicalData]);
+
+  // Update test results when component mounts or when returning from submodule
+  useEffect(() => {
+    updateTestResultsFromStorage();
+  }, [selectedCall?.call_no, updateTestResultsFromStorage]);
+
+  // Listen for storage changes (when user saves data in submodules)
+  useEffect(() => {
+    const handleStorageChange = () => updateTestResultsFromStorage();
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleStorageChange);
+    };
+  }, [updateTestResultsFromStorage]);
 
   /* -------------------- IS 2500 AQL LOGIC -------------------- */
 
@@ -67,18 +300,16 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     return 1250;
   };
 
-  /* -------------------- LOTS DATA (Auto-fetched from Vendor Call) -------------------- */
-  const lotsFromVendorCall = [
-    { lotNo: "LOT-001", heatNo: "HT-2025-001", lotSize: 500 },
-    { lotNo: "LOT-002", heatNo: "HT-2025-002", lotSize: 800 },
-    { lotNo: "LOT-003", heatNo: "HT-2025-003", lotSize: 1200 }
-  ];
+  /* -------------------- LOTS DATA (Fetched from Backend) -------------------- */
+  // lotsFromVendorCall is now fetched from backend in useEffect above
 
   /* Calculate Sample Size for each lot based on Lot Size (IS 2500 Table 2) */
-  const lotsWithSampling = lotsFromVendorCall.map((lot) => {
-    const sampleSize = calculateSampleSize(lot.lotSize);
-    return { ...lot, sampleSize };
-  });
+  const lotsWithSampling = (lotsFromVendorCall && Array.isArray(lotsFromVendorCall) && lotsFromVendorCall.length > 0)
+    ? lotsFromVendorCall.map((lot) => {
+        const sampleSize = calculateSampleSize(lot.lotSize);
+        return { ...lot, sampleSize };
+      })
+    : [];
 
   /* Calculate totals */
   const totalQtyOffered = lotsWithSampling.reduce((sum, l) => sum + (l.lotSize || 0), 0);
@@ -86,44 +317,57 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   const bagsForSampling = calculateBagsForSampling(totalSampleSize);
 
   /* No. of Bags Offered - Auto-fetched from Vendor Call */
-  const bagsOffered = lotsFromVendorCall.length > 0 ? lotsFromVendorCall.reduce((sum, lot) => sum + Math.ceil(lot.lotSize / 50), 0) : 0;
+  const bagsOffered = (lotsFromVendorCall && Array.isArray(lotsFromVendorCall) && lotsFromVendorCall.length > 0)
+    ? lotsFromVendorCall.reduce((sum, lot) => sum + Math.ceil(lot.lotSize / 50), 0)
+    : 0;
 
   /* -------------------- FINAL INSPECTION RESULTS DATA -------------------- */
-  /*
-    Mock test results per lot - In real app, this will be fetched from all test modules
-    If any test is rejected, the whole lot is rejected
-  */
-  const testResultsPerLot = useMemo(() => ({
-    "LOT-001": {
-      visualDim: "OK", hardness: "OK", inclusion: "OK", deflection: "OK",
-      toeLoad: "OK", weight: "OK", chemical: "OK"
-    },
-    "LOT-002": {
-      visualDim: "OK", hardness: "OK", inclusion: "NOT OK", deflection: "OK",
-      toeLoad: "OK", weight: "OK", chemical: "OK"
-    },
-    "LOT-003": {
-      visualDim: "OK", hardness: "OK", inclusion: "OK", deflection: "OK",
-      toeLoad: "OK", weight: "OK", chemical: "OK"
-    }
-  }), []);
+  /* Test results per lot - Fetched from backend in useEffect above */
+  // testResultsPerLot is now fetched from backend
 
   /* State for each lot's final inspection data */
   const [lotInspectionData, setLotInspectionData] = useState(() => {
+    const callNo = selectedCall?.call_no;
+
+    // Try to load persisted data first
+    if (callNo) {
+      const persistedData = localStorage.getItem(`fpLotInspectionData_${callNo}`);
+      if (persistedData) {
+        try {
+          return JSON.parse(persistedData);
+        } catch (e) {
+          console.error('Error loading persisted lot inspection data:', e);
+        }
+      }
+    }
+
+    // Initialize new data
     const initial = {};
-    lotsFromVendorCall.forEach(lot => {
-      initial[lot.lotNo] = {
-        stdPackingNo: 50,
-        bagsStdPacking: '',
-        nonStdBagsCount: 0,
-        nonStdBagsQty: [],
-        holograms: [{ type: 'range', from: '', to: '' }],
-        remarks: '',
-        ercUsedForTesting: ''
-      };
-    });
+    if (lotsFromVendorCall && Array.isArray(lotsFromVendorCall) && lotsFromVendorCall.length > 0) {
+      lotsFromVendorCall.forEach(lot => {
+        if (lot && lot.lotNo) {
+          initial[lot.lotNo] = {
+            stdPackingNo: 50,
+            bagsStdPacking: '',
+            nonStdBagsCount: 0,
+            nonStdBagsQty: [],
+            holograms: [{ type: 'range', from: '', to: '' }],
+            remarks: '',
+            ercUsedForTesting: ''
+          };
+        }
+      });
+    }
     return initial;
   });
+
+  // Persist lot inspection data to localStorage whenever it changes
+  useEffect(() => {
+    const callNo = selectedCall?.call_no;
+    if (callNo && lotInspectionData && Object.keys(lotInspectionData).length > 0) {
+      localStorage.setItem(`fpLotInspectionData_${callNo}`, JSON.stringify(lotInspectionData));
+    }
+  }, [lotInspectionData, selectedCall?.call_no]);
 
   /* Check if lot is rejected (any test NOT OK) */
   const isLotRejected = (lotNo) => {
@@ -191,8 +435,8 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     setLotInspectionData(prev => ({
       ...prev,
       [lotNo]: {
-        ...prev[lotNo],
-        holograms: [...prev[lotNo].holograms, type === 'range' ? { type: 'range', from: '', to: '' } : { type: 'single', value: '' }]
+        ...(prev[lotNo] || {}),
+        holograms: [...(prev[lotNo]?.holograms || []), type === 'range' ? { type: 'range', from: '', to: '' } : { type: 'single', value: '' }]
       }
     }));
   };
@@ -201,17 +445,17 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     setLotInspectionData(prev => ({
       ...prev,
       [lotNo]: {
-        ...prev[lotNo],
-        holograms: prev[lotNo].holograms.filter((_, i) => i !== idx)
+        ...(prev[lotNo] || {}),
+        holograms: (prev[lotNo]?.holograms || []).filter((_, i) => i !== idx)
       }
     }));
   };
 
   const updateHologram = (lotNo, idx, field, value) => {
     setLotInspectionData(prev => {
-      const arr = [...prev[lotNo].holograms];
+      const arr = [...(prev[lotNo]?.holograms || [])];
       arr[idx] = { ...arr[idx], [field]: value };
-      return { ...prev, [lotNo]: { ...prev[lotNo], holograms: arr } };
+      return { ...prev, [lotNo]: { ...(prev[lotNo] || {}), holograms: arr } };
     });
   };
 
@@ -241,8 +485,11 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     }
 
     try {
-      // Note: FinalProductDashboard doesn't have call object, using mock data
-      const callNo = 'FP-MOCK-001'; // Replace with actual call number when available
+      const callNo = selectedCall?.call_no;
+      if (!callNo) {
+        setWithheldError('Call number not found');
+        return;
+      }
 
       const actionData = {
         callNo: callNo,
@@ -273,7 +520,11 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
 
   /* -------------------- SAVE DRAFT HANDLER -------------------- */
   const handleSaveDraft = useCallback(() => {
-    const callNo = 'FP-MOCK-001'; // Replace with actual call number when available
+    const callNo = selectedCall?.call_no;
+    if (!callNo) {
+      alert('❌ Call number not found. Cannot save draft.');
+      return;
+    }
 
     setIsSavingDraft(true);
 
@@ -297,14 +548,14 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     } finally {
       setIsSavingDraft(false);
     }
-  }, [lotInspectionData, packedInHDPE, cleanedWithCoating]);
+  }, [selectedCall?.call_no, lotInspectionData, packedInHDPE, cleanedWithCoating]);
 
   // Load draft data from localStorage on mount
   useEffect(() => {
-    const callNo = 'FP-MOCK-001'; // Replace with actual call number when available
+    if (!selectedCall?.call_no) return;
 
     try {
-      const storageKey = `${DASHBOARD_DRAFT_KEY}${callNo}`;
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${selectedCall.call_no}`;
       const savedDraft = localStorage.getItem(storageKey);
 
       if (savedDraft) {
@@ -321,7 +572,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     } catch (error) {
       console.error('Error loading draft data:', error);
     }
-  }, []);
+  }, [selectedCall?.call_no]);
 
   /* -------------------- MAIN JSX -------------------- */
   return (
@@ -336,36 +587,62 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
 
       <h1 className="fp-title">ERC Final Product Inspection</h1>
 
-      {/* STATIC INSPECTION DATA */}
-      <div className="fp-card">
-        <h2 className="fp-card-title">Inspection Details</h2>
-        <div className="fp-grid">
-          <FormField label="PO Number">
-            <input
-              className="fp-input"
-              value={poData.sub_po_no || poData.po_no}
-              disabled
-            />
-          </FormField>
-          <FormField label="PO Date">
-            <input
-              className="fp-input"
-              value={formatDate(poData.sub_po_date || poData.po_date)}
-              disabled
-            />
-          </FormField>
-          <FormField label="Contractor">
-            <input className="fp-input" value={poData.contractor} disabled />
-          </FormField>
-          <FormField label="Manufacturer">
-            <input className="fp-input" value={poData.manufacturer} disabled />
-          </FormField>
+      {/* LOADING STATE */}
+      {isLoading && (
+        <div className="fp-card" style={{ textAlign: 'center', padding: '40px' }}>
+          <p style={{ fontSize: '16px', color: '#666' }}>📥 Loading inspection data...</p>
         </div>
-      </div>
+      )}
 
-      {/* PRE-INSPECTION DATA ENTRY */}
-      <div className="fp-card">
-        <h2 className="fp-card-title">Pre-Inspection Data Entry</h2>
+      {/* ERROR STATE */}
+      {loadError && (
+        <div className="fp-card" style={{ backgroundColor: '#fee', borderLeft: '4px solid #f44', padding: '16px' }}>
+          <p style={{ color: '#c33', margin: 0 }}>❌ Error: {loadError}</p>
+        </div>
+      )}
+
+      {/* MAIN CONTENT - Only show when data is loaded */}
+      {!isLoading && !loadError && (
+        <>
+          {/* STATIC INSPECTION DATA */}
+          <div className="fp-card" style={{ background: 'var(--color-gray-100)', marginBottom: 'var(--space-24)' }}>
+            <div className="fp-card-header" style={{ marginBottom: '16px' }}>
+              <h2 className="fp-card-title">Inspection Details</h2>
+              <p className="fp-card-subtitle" style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                Auto-fetched from PO/Sub PO information
+              </p>
+            </div>
+            <div className="fp-grid">
+              <div className="fp-form-group">
+                <label className="fp-form-label">PO Number</label>
+                <input
+                  className="fp-input"
+                  value={poData?.sub_po_no || poData?.po_no || selectedCall?.po_no || ''}
+                  disabled
+                />
+              </div>
+              <div className="fp-form-group">
+                <label className="fp-form-label">PO Date</label>
+                <input
+                  className="fp-input"
+                  value={poData?.sub_po_date || poData?.po_date ? formatDate(poData?.sub_po_date || poData?.po_date) : ''}
+                  disabled
+                />
+              </div>
+              <div className="fp-form-group">
+                <label className="fp-form-label">Contractor</label>
+                <input className="fp-input" value={poData?.contractor || ''} disabled />
+              </div>
+              <div className="fp-form-group">
+                <label className="fp-form-label">Manufacturer</label>
+                <input className="fp-input" value={poData?.manufacturer || ''} disabled />
+              </div>
+            </div>
+          </div>
+
+          {/* PRE-INSPECTION DATA ENTRY */}
+          <div className="fp-card">
+            <h2 className="fp-card-title">Pre-Inspection Data Entry</h2>
         {/* <p className="fp-card-subtitle">
           Lots auto-fetched from Vendor Call (Lot No., Heat No. &amp; Lot Size
           from Process IC). Sample size and AQL limits are auto calculated as
@@ -384,14 +661,14 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
               </tr>
             </thead>
             <tbody>
-              {lotsWithSampling.map((lotRow) => (
+              {(lotsWithSampling && Array.isArray(lotsWithSampling)) ? lotsWithSampling.map((lotRow) => (
                 <tr key={lotRow.lotNo}>
                   <td className="fp-lot-cell">{lotRow.lotNo}</td>
                   <td className="fp-lot-cell">{lotRow.heatNo}</td>
                   <td className="fp-lot-cell">{lotRow.lotSize}</td>
                   <td className="fp-lot-cell">{lotRow.sampleSize}</td>
                 </tr>
-              ))}
+              )) : null}
             </tbody>
           </table>
         </div>
@@ -466,11 +743,19 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       <div className="fp-card">
         <h2 className="fp-card-title">Final Inspection Results</h2>
 
-        {lotsWithSampling.map(lot => {
-          const data = lotInspectionData[lot.lotNo];
+        {(lotsWithSampling && Array.isArray(lotsWithSampling)) ? lotsWithSampling.map(lot => {
+          const data = lotInspectionData[lot.lotNo] || {
+            stdPackingNo: 50,
+            bagsStdPacking: '',
+            nonStdBagsCount: 0,
+            nonStdBagsQty: [],
+            holograms: [{ type: 'range', from: '', to: '' }],
+            remarks: '',
+            ercUsedForTesting: ''
+          };
           const rejected = isLotRejected(lot.lotNo);
           const tests = testResultsPerLot[lot.lotNo];
-          const bagsStdCount = Math.ceil(lot.lotSize / data.stdPackingNo);
+          const bagsStdCount = Math.ceil(lot.lotSize / (data?.stdPackingNo || 50));
 
           return (
             <div
@@ -503,7 +788,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
 
               {/* Test Results Summary */}
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                {Object.entries(tests).map(([test, status]) => (
+                {(tests && typeof tests === 'object') ? Object.entries(tests).map(([test, status]) => (
                   <span key={test} style={{
                     padding: '2px 8px',
                     borderRadius: '3px',
@@ -513,7 +798,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
                   }}>
                     {test}: {status}
                   </span>
-                ))}
+                )) : null}
               </div>
 
               {/* Packing Info Grid */}
@@ -600,7 +885,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {data.holograms.map((holo, idx) => (
+                  {(data.holograms && Array.isArray(data.holograms)) ? data.holograms.map((holo, idx) => (
                     <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <span style={{ fontSize: '10px', color: '#64748b', width: '50px' }}>
                         {holo.type === 'range' ? 'Range:' : 'Single:'}
@@ -642,7 +927,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
                         </button>
                       )}
                     </div>
-                  ))}
+                  )) : null}
                 </div>
               </div>
 
@@ -662,20 +947,21 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
               </div>
             </div>
           );
-        })}
-        
-      {/* CUMULATIVE RESULTS SECTION */}
-      <div className="fp-card">
+        }) : null}
+          </div>
+
+          {/* CUMULATIVE RESULTS SECTION */}
+          <div className="fp-card">
         <h2 className="fp-card-title">Cumulative Results</h2>
         <div className="fp-cumulative-grid">
           <FormField label="1. Quantity on Order (PO Qty)">
-            <input className="fp-input" value={poData.po_qty || 10000} disabled />
+            <input className="fp-input" value={poData?.po_qty || 10000} disabled />
           </FormField>
           <FormField label="2. Cumm. Qty Offered Previously">
-            <input className="fp-input" value={poData.cummQtyOfferedPreviously || 2500} disabled />
+            <input className="fp-input" value={poData?.cummQtyOfferedPreviously || 2500} disabled />
           </FormField>
           <FormField label="3. Cumm. Qty Passed Previously">
-            <input className="fp-input" value={poData.cummQtyPassedPreviously || 2400} disabled />
+            <input className="fp-input" value={poData?.cummQtyPassedPreviously || 2400} disabled />
           </FormField>
           <FormField label="4. Qty Now Offered">
             <input className="fp-input" value={totalQtyOffered} disabled />
@@ -702,8 +988,8 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
             <input
               className="fp-input"
               value={(() => {
-                const poQty = poData.po_qty || 10000;
-                const cummPassed = poData.cummQtyPassedPreviously || 2400;
+                const poQty = poData?.po_qty || 10000;
+                const cummPassed = poData?.cummQtyPassedPreviously || 2400;
                 const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
                 const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
                 const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
@@ -712,23 +998,24 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
               disabled
             />
           </FormField>
-        </div>
-      </div>
+            </div>
+          </div>
 
-        {/* ACTION BUTTONS */}
-        <div className="fp-actions">
-          <button
-            className="btn btn-outline"
-            onClick={handleSaveDraft}
-            disabled={isSavingDraft}
-          >
-            {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
-          </button>
-          <button className="btn btn-outline">Pause Inspection</button>
-          <button className="btn btn-outline" onClick={handleOpenWithheldModal}>Withheld Inspection</button>
-          <button className="btn btn-primary">Finish Inspection</button>
-        </div>
-      </div>
+          {/* ACTION BUTTONS */}
+          <div className="fp-actions">
+            <button
+              className="btn btn-outline"
+              onClick={handleSaveDraft}
+              disabled={isSavingDraft}
+            >
+              {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
+            </button>
+            <button className="btn btn-outline">Pause Inspection</button>
+            <button className="btn btn-outline" onClick={handleOpenWithheldModal}>Withheld Inspection</button>
+            <button className="btn btn-primary">Finish Inspection</button>
+          </div>
+        </>
+      )}
 
       {/* Withheld Modal */}
       {showWithheldModal && (

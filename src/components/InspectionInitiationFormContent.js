@@ -5,6 +5,7 @@ import {
   saveSectionA,
   approveSectionA,
   rejectSectionA,
+  getSectionAByCallNo,
   saveSectionB,
   approveSectionB,
   rejectSectionB,
@@ -16,6 +17,7 @@ import { performTransitionAction } from '../services/workflowService';
 import { getStoredUser } from '../services/authService';
 import { fetchPoDataForSections } from '../services/poDataService';
 import { fetchProcessInitiationData } from '../services/processInitiationDataService';
+import { getFinalInspectionByCallNo } from '../services/finalInspectionService';
 import '../styles/inspectionInitiationPage.css';
 
 
@@ -25,6 +27,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
   const [fetchedPoData, setFetchedPoData] = useState(null);
   const [fetchedSubPoData, setFetchedSubPoData] = useState(null);
   const [subPoList, setSubPoList] = useState([]); // Multiple sub POs from database
+  const [finalDetailsState, setFinalDetailsState] = useState(null);
+  const [finalMappings, setFinalMappings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFromDatabase, setIsFromDatabase] = useState(false);
   const [currentCallId, setCurrentCallId] = useState(call.id); // Track which call we have data for
@@ -77,15 +81,17 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     const loadData = async () => {
       setIsLoading(true);
 
-      // Check if this is Process material - fetch from database
+      // Check if this is Process material or Final Product - fetch from database
+      // Use product_type from API (values: "Raw Material", "Process", "Final")
       const productType = call.product_type || '';
-      const isProcess =
-        productType === 'PROCESS_MATERIAL' ||
-        productType.includes('Process');
+      const isProcess = productType === 'Process' || productType.includes('Process');
+      const isFinalProduct = productType === 'Final' || productType.includes('Final');
 
-      const isFinalProduct =
-        productType === 'FINAL_PRODUCT' ||
-        productType.includes('Final');
+      console.log('🔍 Call object inspection:');
+      console.log('  - call.product_type:', call.product_type);
+      console.log('  - Derived productType:', productType);
+      console.log('  - isProcess:', isProcess);
+      console.log('  - isFinalProduct:', isFinalProduct);
 
       // PROCESS MATERIAL: Fetch from database using call number
       if (isProcess && call.call_no) {
@@ -125,12 +131,25 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               unit_address: processData.unitAddress,
               rm_ic_number: processData.rmIcNumber, // RM IC number from process_inspection_details
               heat_number: processData.heatNumber, // Heat number from process_inspection_details
+              total_offered_qty: processData.offeredQty, // CALL QTY from process_inspection_details.offered_qty
 
               // Section C: RM IC Heat Information
-              rm_ic_heat_info: processData.rmIcHeatInfoList || []
+              rm_ic_heat_info: processData.rmIcHeatInfoList || [],
+
+              // Multiple Lots Support
+              lotDetailsList: processData.lotDetailsList || []
             };
 
             setFetchedPoData(transformedPoData);
+
+            // Debug logging for Process data
+            console.log('🔍 Process Inspection Data Summary:');
+            console.log('  - RM IC Number:', processData.rmIcNumber);
+            console.log('  - Heat Number:', processData.heatNumber);
+            console.log('  - Offered Qty (CALL QTY):', processData.offeredQty);
+            console.log('  - Heat Info Count:', processData.rmIcHeatInfoList?.length || 0);
+            console.log('  - Lot Details Count:', processData.lotDetailsList?.length || 0);
+            console.log('  - Lot Details:', processData.lotDetailsList);
 
             // Transform inventory data to subPoList for Section C
             if (processData.rmIcHeatInfoList && processData.rmIcHeatInfoList.length > 0) {
@@ -164,32 +183,163 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         }
       }
 
-      // FINAL PRODUCT: Use mock data only (no API calls)
-      if (isFinalProduct) {
-        console.log('🏭 Final Product: Using MOCK data only (no API call)', productType);
-        const mockPo = MOCK_PO_DATA[call.po_no] || {};
+      // FINAL PRODUCT: Fetch composite data from final-material endpoint if available
+      if (isFinalProduct && call.call_no) {
+        try {
+          console.log('🏭 Final Product: Fetching final initiation data for call:', call.call_no);
+          const finalData = await getFinalInspectionByCallNo(call.call_no);
 
-        if (Object.keys(mockPo).length > 0) {
-          setFetchedPoData(mockPo);
-          setIsFromDatabase(false);
+          if (finalData) {
+            setIsFromDatabase(true);
 
-          if (mockPo.sub_po_no) {
-            const mockSubPoData = {
-              raw_material_name: mockPo.product_name,
-              sub_po_no: mockPo.sub_po_no,
-              sub_po_date: mockPo.sub_po_date,
-              contractor: mockPo.contractor,
-              manufacturer: mockPo.manufacturer,
-              place_of_inspection: mockPo.place_of_inspection,
-              bpo: mockPo.bpo,
-              consignee: mockPo.consignee || ''
-            };
-            setFetchedSubPoData(mockSubPoData);
+            const ic = finalData.inspectionCall || finalData.inspection_call || {};
+            const fd = finalData.finalInspectionDetails || finalData.final_inspection_details || null;
+            const lots = finalData.finalLotDetails || finalData.final_lot_details || finalData.finalLotDetails || [];
+            const mappings = finalData.finalProcessMappings || finalData.final_process_mappings || [];
+            const poDataFromDb = finalData.poData || null; // NEW: PO data from database
+
+            // If PO data is available from database, use it (similar to Raw Material)
+            let transformedPoData;
+            if (poDataFromDb) {
+              console.log('✅ Using PO data from database for Final Product:', poDataFromDb);
+              transformedPoData = {
+                po_no: poDataFromDb.poNo,
+                rly_po_no: poDataFromDb.rlyPoNo,
+                po_serial_no: poDataFromDb.poSerialNo,
+                rly_po_no_serial: poDataFromDb.rlyPoNoSerial,
+                po_date: poDataFromDb.poDate,
+                po_amend_no: poDataFromDb.maNo || 'N/A',
+                po_amend_dates: poDataFromDb.maDate || 'N/A',
+                product_name: poDataFromDb.itemDesc || call.product_name,
+                pl_no: poDataFromDb.plNo || 'N/A',
+                vendor_name: poDataFromDb.vendorName,
+                vendor_code: poDataFromDb.vendorCode,
+                vendor_address: poDataFromDb.vendorDetails,
+                place_of_inspection: poDataFromDb.inspPlace || ic.placeOfInspection || call.place_of_inspection,
+                manufacturer: poDataFromDb.vendorName,
+                consignee_rly: poDataFromDb.rlyCd,
+                consignee: poDataFromDb.consignee,
+                po_qty: poDataFromDb.poQty,
+                unit: poDataFromDb.unit || 'Nos',
+                orig_dp: poDataFromDb.deliveryDate,
+                ext_dp: poDataFromDb.extendedDeliveryDate || 'N/A',
+                purchasing_authority: poDataFromDb.purchasingAuthority,
+                bpo: poDataFromDb.billPayingOfficer,
+                cond_title: poDataFromDb.condTitle,
+                cond_text: poDataFromDb.condText,
+                po_cond_sr_no: poDataFromDb.poCondSrNo,
+                erc_type: poDataFromDb.ercType || ic.ercType,
+                total_offered_qty_mt: poDataFromDb.totalOfferedQtyMt,
+
+                // Section B fields from inspection call
+                call_no: ic.icNumber || ic.ic_number || call.call_no,
+                call_date: ic.createdAt || ic.callDate || call.call_date,
+                desired_inspection_date: ic.desiredInspectionDate || call.desired_inspection_date,
+                type_of_call: ic.typeOfCall || call.type_of_call,
+                type_of_erc: ic.ercType || call.erc_type,
+                company_name: ic.companyName || call.company_name,
+                unit_name: ic.unitName || call.unit_name,
+                unit_address: ic.unitAddress || call.unit_address,
+                rm_ic_number: fd?.rmIcNumber || null,
+                process_ic_number: fd?.processIcNumber || null,
+                total_lots: fd?.totalLots || null,
+                total_offered_qty: fd?.totalOfferedQty || null
+              };
+            } else {
+              // Fallback to inspection call data if no PO data
+              console.log('⚠️ No PO data from database, using inspection call data');
+              transformedPoData = {
+                po_no: ic.poNo || ic.po_no || call.po_no,
+                po_date: ic.poDate || ic.po_date || call.po_date,
+                po_amend_no: ic.poAmendNo || ic.maNo || 'N/A',
+                product_name: fd?.companyName || call.product_name || ic.companyName,
+                vendor_name: ic.companyName || fd?.companyName || call.vendor_name,
+                vendor_code: ic.vendorId || call.vendor_id,
+                consignee: ic.unitName || fd?.unitName || call.consignee,
+                po_qty: fd?.totalOfferedQty || ic.poQty || call.po_qty,
+                unit: fd?.unitName || 'Nos',
+                place_of_inspection: ic.unitAddress || fd?.unitAddress || call.place_of_inspection,
+
+                // Section B fields
+                call_no: ic.icNumber || ic.ic_number || call.call_no,
+                call_date: ic.createdAt || ic.callDate || call.call_date,
+                desired_inspection_date: ic.desiredInspectionDate || call.desired_inspection_date,
+                type_of_call: ic.typeOfCall || call.type_of_call,
+                type_of_erc: ic.ercType || call.erc_type,
+                company_name: ic.companyName || call.company_name,
+                unit_name: ic.unitName || call.unit_name,
+                unit_address: ic.unitAddress || call.unit_address,
+                rm_ic_number: fd?.rmIcNumber || null,
+                process_ic_number: fd?.processIcNumber || null,
+                total_lots: fd?.totalLots || null,
+                total_offered_qty: fd?.totalOfferedQty || null
+              };
+            }
+
+            setFetchedPoData(transformedPoData);
+
+            // store finalDetails and mappings for later rendering of RM/Process IC numbers
+            setFinalDetailsState(fd);
+            setFinalMappings(Array.isArray(mappings) ? mappings : []);
+
+            // Debug logging
+            console.log('🔍 Final Product Data Summary:');
+            console.log('  - RM IC Number:', fd?.rmIcNumber);
+            console.log('  - Process IC Number:', fd?.processIcNumber);
+            console.log('  - Total Lots:', fd?.totalLots);
+            console.log('  - Total Offered Qty:', fd?.totalOfferedQty);
+
+            // If a saved Section A exists for this call, prefer those values (same behaviour as Raw Material)
+            try {
+              const savedSectionA = await getSectionAByCallNo(call.call_no);
+              if (savedSectionA) {
+                const sa = savedSectionA;
+                const merged = {
+                  ...transformedPoData,
+                  po_no: sa.poNo || transformedPoData.po_no,
+                  po_date: sa.poDate || transformedPoData.po_date,
+                  po_amend_no: sa.maNo || transformedPoData.po_amend_no,
+                  po_amend_dates: sa.maDate || transformedPoData.po_amend_dates,
+                  vendor_name: sa.vendorName || transformedPoData.vendor_name,
+                  place_of_inspection: sa.placeOfInspection || transformedPoData.place_of_inspection,
+                  po_qty: sa.poQty || transformedPoData.po_qty,
+                  purchasing_authority: sa.purchasingAuthority || transformedPoData.purchasing_authority,
+                  bpo: sa.billPayingOfficer || transformedPoData.bpo
+                };
+                setFetchedPoData(merged);
+              }
+            } catch (e) {
+              // No saved Section A found or API error - continue with transformed final data
+              console.debug('No saved Section A for final call or fetch failed:', e?.message || e);
+            }
+
+            if (lots && Array.isArray(lots) && lots.length > 0) {
+              const transformedSubPoList = lots.map(lot => ({
+                raw_material_name: lot.rawMaterialName || lot.manufacturer || 'N/A',
+                grade_spec: lot.grade || 'N/A',
+                heat_no: lot.heatNumber || lot.heat_number || lot.heatNumber,
+                manufacturer: lot.manufacturer || 'N/A',
+                tc_no: lot.tcNumber || lot.tc_no || 'N/A',
+                tc_date: lot.tcDate || lot.tc_date || 'N/A',
+                sub_po_no: lot.subPoNumber || lot.sub_po_no || 'N/A',
+                sub_po_date: lot.subPoDate || lot.sub_po_date || 'N/A',
+                invoice_no: lot.invoiceNo || lot.invoice_no || 'N/A',
+                invoice_date: lot.invoiceDate || lot.invoice_date || 'N/A',
+                qty: lot.offeredQty || lot.offered_qty || 0,
+                unit: 'Nos',
+                place_of_inspection: transformedPoData.place_of_inspection
+              }));
+              setSubPoList(transformedSubPoList);
+              console.log(`✅ Loaded ${transformedSubPoList.length} final lot details for Section B/C`);
+            }
+
+            setIsLoading(false);
+            return;
           }
+        } catch (error) {
+          console.error('❌ Error fetching Final initiation data from API:', error);
+          // Fall through to mock fallback
         }
-
-        setIsLoading(false);
-        return; // Exit early - skip API call
       }
 
       // PRIORITY 1: Try to fetch PO data from database tables (po_header, po_item, po_ma_header, po_ma_detail)
@@ -375,6 +525,11 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
     const currentUser = getStoredUser();
     const userId = currentUser?.userId || currentUser?.username || 'system';
 
+    // Determine stage of inspection from product_type
+    const stageOfInspection = (call.product_type === 'Process' || call.product_type?.includes('Process')) ? 'Process Material' :
+                              (call.product_type === 'Final' || call.product_type?.includes('Final')) ? 'Final' :
+                              'Raw Material';
+
     return {
       inspectionCallNo: call.call_no,
       inspectionCallDate: extractDateOnly(call.call_date || call.requested_date),
@@ -390,8 +545,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       origDp: convertDateToISO(poData.orig_dp || call.delivery_period),
       extDp: convertDateToISO(poData.ext_dp || ''),
       origDpStart: convertDateToISO(poData.orig_dp_start || poData.po_date),
-      stageOfInspection: call.stage,
-      callQty: call.call_qty,
+      stageOfInspection: stageOfInspection,
+      callQty: poData.total_offered_qty || call.call_qty,
       placeOfInspection: call.place_of_inspection,
       rmIcNumber: call.rm_ic_number || poData.rm_ic_number || '',
       processIcNumber: call.process_ic_number || poData.process_ic_number || '',
@@ -577,11 +732,12 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       }
 
       onFormDataChange({ sectionBVerified: true, sectionBStatus: 'approved' });
-      const productType = call?.product_type || '';
-      const isSectionCRequired = productType === 'Raw Material' || productType.includes('Process');
-      if (isSectionCRequired) {
-        setSectionCExpanded(true);
-      }
+      // COMMENTED OUT: Section C not needed for Process Inspection
+      // const productType = call?.product_type || '';
+      // const isSectionCRequired = productType === 'Raw Material' || productType.includes('Process');
+      // if (isSectionCRequired) {
+      //   setSectionCExpanded(true);
+      // }
     } catch (error) {
       console.error('Error saving Section B:', error);
       setSaveError(error.message || 'Failed to save Section B. Please try again.');
@@ -621,7 +777,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       }
 
       onFormDataChange({ sectionBVerified: false, sectionBStatus: 'rejected' });
-      setSectionCExpanded(false);
+      // COMMENTED OUT: Section C not needed for Process Inspection
+      // setSectionCExpanded(false);
     } catch (error) {
       console.error('Error rejecting Section B:', error);
       setSaveError(error.message || 'Failed to reject Section B. Please try again.');
@@ -899,40 +1056,87 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
           <div className="form-group">
             <label className="form-label">STAGE OF INSPECTION</label>
             <input type="text" className="form-input" value={
-              call.product_type?.includes('Process') ? 'Process Material' :
-              call.product_type === 'Final Product' ? 'Final' :
+              (call.product_type === 'Process' || call.product_type?.includes('Process')) ? 'Process Material' :
+              (call.product_type === 'Final' || call.product_type?.includes('Final')) ? 'Final' :
               'Raw Material'
             } disabled />
           </div>
           <div className="form-group">
             <label className="form-label">CALL QTY</label>
-            <input type="text" className="form-input" value={poData.total_offered_qty_mt || call.call_qty || 'N/A'} disabled />
+            <input type="text" className="form-input" value={
+              poData.total_offered_qty ||
+              poData.total_offered_qty_mt ||
+              call.call_qty ||
+              'N/A'
+            } disabled />
           </div>
           <div className="form-group">
             <label className="form-label">PLACE OF INSPECTION</label>
             <input type="text" className="form-input" value={poData.place_of_inspection || call.place_of_inspection || 'N/A'} disabled />
           </div>
-          {/* RM IC NUMBER - Only for Process & Final Inspection */}
-          {(call.product_type?.includes('Process') || call.product_type === 'Final Product') && (
-            <>
-              <div className="form-group">
-                <label className="form-label">RM IC NUMBER</label>
-                <input type="text" className="form-input" value={call.rm_ic_number || poData.rm_ic_number || 'N/A'} disabled />
+
+          {/* RM IC NUMBERS & HEAT NUMBERS TABLE - Only for Process Material Inspection with multiple lots */}
+          {(call.product_type === 'Process' || call.product_type?.includes('Process')) &&
+           poData.lotDetailsList && poData.lotDetailsList.length > 0 && (
+            <div className="form-group" style={{ gridColumn: '1 / -1', marginTop: 'var(--space-16)' }}>
+              <label className="form-label">RM IC NUMBERS & HEAT NUMBERS</label>
+              <div style={{ overflowX: 'auto', border: '1px solid var(--color-gray-300)', borderRadius: '6px' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: 'var(--font-size-sm)'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: 'var(--color-gray-100)', borderBottom: '2px solid var(--color-gray-300)' }}>
+                      <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>RM IC Number</th>
+                      <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>Heat Number</th>
+                      <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>Call Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {poData.lotDetailsList.map((lot, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--color-gray-200)', backgroundColor: idx % 2 === 0 ? '#fff' : 'var(--color-gray-50)' }}>
+                        <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.rmIcNumber || 'N/A'}</td>
+                        <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.heatNumber || 'N/A'}</td>
+                        <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.offeredQty || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              {/* HEAT NUMBER - Only for Process Inspection */}
-              {call.product_type?.includes('Process') && (
-                <div className="form-group">
-                  <label className="form-label">HEAT NUMBER</label>
-                  <input type="text" className="form-input" value={call.heat_number || poData.heat_number || 'N/A'} disabled />
-                </div>
-              )}
-            </>
+            </div>
           )}
           {/* PROCESS IC NUMBER - Only for Final Inspection */}
-          {call.product_type === 'Final Product' && (
+          {(call.product_type === 'Final' || call.product_type?.includes('Final')) && (
             <div className="form-group">
-              <label className="form-label">PROCESS IC NUMBER</label>
-              <input type="text" className="form-input" value={call.process_ic_number || poData.process_ic_number || 'N/A'} disabled />
+              <label className="form-label">PROCESS IC NUMBERS</label>
+              <input
+                type="text"
+                className="form-input"
+                value={(() => {
+                  const set = new Set();
+                  if (call.process_ic_number) set.add(call.process_ic_number);
+                  if (poData.process_ic_number) set.add(poData.process_ic_number);
+                  if (fetchedPoData && fetchedPoData.process_ic_number) set.add(fetchedPoData.process_ic_number);
+                  if (finalDetailsState && finalDetailsState.processIcNumber) set.add(finalDetailsState.processIcNumber);
+                  // include process ic numbers from finalMappings and from subPoList (if present)
+                  if (finalMappings && finalMappings.length) {
+                    finalMappings.forEach(m => {
+                      if (m.processIcNumber) set.add(m.processIcNumber);
+                      if (m.process_ic_number) set.add(m.process_ic_number);
+                    });
+                  }
+                  if (subPoList && subPoList.length) {
+                    subPoList.forEach(s => {
+                      if (s.process_ic_number) set.add(s.process_ic_number);
+                      if (s.processIcNumber) set.add(s.processIcNumber);
+                    });
+                  }
+                  const arr = Array.from(set).filter(Boolean);
+                  return arr.length ? arr.join(', ') : 'N/A';
+                })()}
+                disabled
+              />
             </div>
           )}
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>
@@ -964,8 +1168,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       </div>
       )}
 
-      {/* SECTION C: Sub PO Details (if applicable) - Only shown when Section B is approved */}
-      {((call?.product_type || '') === 'Raw Material' || (call?.product_type || '').includes('Process')) && formData.sectionBStatus === 'approved' && (
+      {/* SECTION C: Sub PO Details - Only shown for Raw Material, hidden for Process and Final Product */}
+      {(call?.product_type || '') === 'Raw Material' && formData.sectionBStatus === 'approved' && (
         <div className={`card ${formData.showValidationErrors && !formData.sectionCVerified ? 'card--incomplete' : ''}`}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="card-title">

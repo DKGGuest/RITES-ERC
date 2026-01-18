@@ -227,6 +227,29 @@ export const completeInspection = async (inspectionCallNo, poNo, lineNo, ieRemar
   return handleResponse(response);
 };
 
+// ==================== Quantity Summary ====================
+
+/**
+ * Get quantity summary for a process inspection call
+ * Returns: acceptedQty, totalOfferedQty, totalManufactureQty
+ * @param {string} inspectionCallNo - Inspection call number (e.g., "EP-01170008")
+ * @returns {Promise<Object>} Quantity summary data
+ */
+export const getQuantitySummary = async (inspectionCallNo) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL.replace('/api/process-material', '')}/api/processIe/qty-summary/${inspectionCallNo}`,
+      { method: 'GET', headers: getAuthHeaders() }
+    );
+    const data = await handleResponse(response);
+    // Return the responseData which contains acceptedQty, totalOfferedQty, totalManufactureQty
+    return data.responseData || data;
+  } catch (error) {
+    console.error('Error fetching quantity summary:', error);
+    throw error;
+  }
+};
+
 // ==================== Finish Inspection (Save All Submodule Data) ====================
 
 /**

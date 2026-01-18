@@ -38,7 +38,7 @@ const FinalSubmoduleNav = ({ currentSubmodule, onNavigate }) => {
 
   const handleNavigate = (submoduleId) => {
     // Use onNavigate prop if provided (for backward compatibility)
-    if (onNavigate) {
+    if (onNavigate && typeof onNavigate === 'function') {
       onNavigate(submoduleId);
     } else {
       // Use React Router navigation
