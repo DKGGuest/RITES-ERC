@@ -59,7 +59,9 @@ export const getFinalInspectionByCallNo = async (callNo) => {
  * This file focuses on Final-specific creation and any future final endpoints.
  */
 
-export default {
+const finalInspectionService = {
   createFinalInspectionCall,
   getFinalInspectionByCallNo,
 };
+
+export default finalInspectionService;
