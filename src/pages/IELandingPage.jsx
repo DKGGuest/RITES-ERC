@@ -611,10 +611,16 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       if (isProcessOrFinalProduct(shiftDetailsCall?.product_type)) {
         console.log('🏭 Process/Final Product: Calling workflow API for enter shift details...');
 
+        // Determine the action based on call status
+        // If status is INSPECTION_PAUSED, use INSPECTION_PAUSED action, otherwise use ENTER_SHIFT_DETAILS_AND_START_INSPECTION
+        const action = shiftDetailsCall?.status === 'INSPECTION_PAUSED'
+          ? 'INSPECTION_PAUSED'
+          : 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION';
+
         const workflowActionData = {
           workflowTransitionId: workflowTransitionId,
           requestId: shiftDetailsCall?.call_no,
-          action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
+          action: action,
           remarks: `Shift details entered - Shift: ${shiftDetailsShift}, Date: ${shiftDetailsDate}`,
           actionBy: userId,
           pincode: shiftDetailsCall?.pincode || '560001',

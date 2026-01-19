@@ -200,11 +200,11 @@ export const InspectionProvider = ({ children }) => {
 
   /**
    * Get cached data for a specific call
-   * Returns null if cache is expired (older than 5 minutes)
+   * Returns null if cache is expired (older than 15 minutes)
    */
   const getRmCachedData = useCallback((callNo) => {
     const timestamp = rmDataCacheTimestamp[callNo];
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
     // Check if cache exists and is not expired
     if (timestamp && (Date.now() - timestamp) < CACHE_DURATION) {
@@ -283,11 +283,11 @@ export const InspectionProvider = ({ children }) => {
 
   /**
    * Get cached Final Product dashboard data for a specific call
-   * Returns null if cache is expired (older than 5 minutes)
+   * Returns null if cache is expired (older than 15 minutes)
    */
   const getFpCachedData = useCallback((callNo) => {
     const timestamp = fpDataCacheTimestamp[callNo];
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
     // Check if cache exists and is not expired
     if (timestamp && (Date.now() - timestamp) < CACHE_DURATION) {

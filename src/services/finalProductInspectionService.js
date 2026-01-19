@@ -230,3 +230,144 @@ export const getFinalInspectionSummary = async (callNo) => {
   }
 };
 
+/**
+ * Save cumulative results to backend
+ * POST /api/final-inspection/dashboard-results/cumulative-results
+ */
+export const saveCumulativeResults = async (cumulativeData) => {
+  try {
+    console.log('📤 Saving cumulative results:', cumulativeData);
+    const url = `${API_BASE_URL}/api/final-inspection/dashboard-results/cumulative-results`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(cumulativeData)
+    });
+
+    const result = await handleResponse(response);
+    console.log('✅ Cumulative results saved:', result.responseData);
+    return result.responseData;
+  } catch (error) {
+    console.error('❌ Error saving cumulative results:', error);
+    throw error;
+  }
+};
+
+/**
+ * Save inspection summary to backend
+ * POST /api/final-inspection/dashboard-results/inspection-summary
+ */
+export const saveInspectionSummary = async (summaryData) => {
+  try {
+    console.log('📤 Saving inspection summary:', summaryData);
+    const url = `${API_BASE_URL}/api/final-inspection/dashboard-results/inspection-summary`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(summaryData)
+    });
+
+    const result = await handleResponse(response);
+    console.log('✅ Inspection summary saved:', result.responseData);
+    return result.responseData;
+  } catch (error) {
+    console.error('❌ Error saving inspection summary:', error);
+    throw error;
+  }
+};
+
+/**
+ * Save lot results to backend
+ * POST /api/final-inspection/dashboard-results/lot-results
+ */
+export const saveLotResults = async (lotResultsData) => {
+  try {
+    console.log('📤 Saving lot results:', lotResultsData);
+    const url = `${API_BASE_URL}/api/final-inspection/dashboard-results/lot-results`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(lotResultsData)
+    });
+
+    const result = await handleResponse(response);
+    console.log('✅ Lot results saved:', result.responseData);
+    return result.responseData;
+  } catch (error) {
+    console.error('❌ Error saving lot results:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get cumulative results from backend
+ * GET /api/final-inspection/dashboard-results/cumulative-results/{callNo}
+ */
+export const getCumulativeResults = async (callNo) => {
+  try {
+    console.log('📥 Fetching cumulative results for call:', callNo);
+    const url = `${API_BASE_URL}/api/final-inspection/dashboard-results/cumulative-results/${callNo}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    const result = await handleResponse(response);
+    console.log('✅ Cumulative results fetched:', result.responseData);
+    return result.responseData;
+  } catch (error) {
+    console.error('❌ Error fetching cumulative results:', error);
+    return null;
+  }
+};
+
+/**
+ * Get inspection summary from backend
+ * GET /api/final-inspection/dashboard-results/inspection-summary/{callNo}
+ */
+export const getInspectionSummary = async (callNo) => {
+  try {
+    console.log('📥 Fetching inspection summary for call:', callNo);
+    const url = `${API_BASE_URL}/api/final-inspection/dashboard-results/inspection-summary/${callNo}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    const result = await handleResponse(response);
+    console.log('✅ Inspection summary fetched:', result.responseData);
+    return result.responseData;
+  } catch (error) {
+    console.error('❌ Error fetching inspection summary:', error);
+    return null;
+  }
+};
+
+/**
+ * Get lot results from backend
+ * GET /api/final-inspection/dashboard-results/lot-results/{callNo}
+ */
+export const getLotResults = async (callNo) => {
+  try {
+    console.log('📥 Fetching lot results for call:', callNo);
+    const url = `${API_BASE_URL}/api/final-inspection/dashboard-results/lot-results/${callNo}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    const result = await handleResponse(response);
+    console.log('✅ Lot results fetched:', result.responseData);
+    return result.responseData;
+  } catch (error) {
+    console.error('❌ Error fetching lot results:', error);
+    return [];
+  }
+};
+

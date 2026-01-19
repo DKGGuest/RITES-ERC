@@ -16,6 +16,7 @@ export const API_STATUS = {
   VERIFY_PO_DETAILS: 'VERIFY_PO_DETAILS',
   ENTER_SHIFT_DETAILS_AND_START_INSPECTION: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
   PAUSE_INSPECTION_RESUME_NEXT_DAY: 'PAUSE_INSPECTION_RESUME_NEXT_DAY',
+  INSPECTION_PAUSED: 'INSPECTION_PAUSED',
   // Add more statuses as needed
 };
 
@@ -43,6 +44,7 @@ export const getDisplayStatus = (apiStatus) => {
     [API_STATUS.VERIFY_PO_DETAILS]: DISPLAY_STATUS.UNDER_INSPECTION,
     [API_STATUS.ENTER_SHIFT_DETAILS_AND_START_INSPECTION]: DISPLAY_STATUS.UNDER_INSPECTION,
     [API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY]: DISPLAY_STATUS.INSPECTION_PAUSED,
+    [API_STATUS.INSPECTION_PAUSED]: DISPLAY_STATUS.INSPECTION_PAUSED,
   };
 
   const displayStatus = statusMap[apiStatus] || apiStatus;
@@ -63,6 +65,7 @@ export const getAvailableActions = (apiStatus) => {
     [API_STATUS.VERIFY_PO_DETAILS]: ['resume', 'reschedule'],
     [API_STATUS.ENTER_SHIFT_DETAILS_AND_START_INSPECTION]: ['resume', 'reschedule'],
     [API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY]: ['enterShiftDetails'],
+    [API_STATUS.INSPECTION_PAUSED]: ['enterShiftDetails'],
   };
 
   return actionMap[apiStatus] || [];
@@ -75,12 +78,13 @@ export const getAvailableActions = (apiStatus) => {
  */
 export const shouldShowScheduleDate = (apiStatus) => {
   // Show schedule date for IE_SCHEDULED, SCHEDULED, VERIFY_PO_DETAILS (Under Inspection)
-  // and PAUSE_INSPECTION_RESUME_NEXT_DAY (Paused inspection)
+  // PAUSE_INSPECTION_RESUME_NEXT_DAY (Paused inspection), and INSPECTION_PAUSED
   // because the call was scheduled before inspection started
   return apiStatus === API_STATUS.IE_SCHEDULED ||
          apiStatus === API_STATUS.SCHEDULED ||
          apiStatus === API_STATUS.VERIFY_PO_DETAILS ||
-         apiStatus === API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY;
+         apiStatus === API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY ||
+         apiStatus === API_STATUS.INSPECTION_PAUSED;
 };
 
 /**
@@ -96,6 +100,7 @@ export const getStatusVariant = (apiStatus) => {
     [API_STATUS.VERIFY_PO_DETAILS]: 'success', // Green for under inspection
     [API_STATUS.ENTER_SHIFT_DETAILS_AND_START_INSPECTION]: 'success', // Green for under inspection
     [API_STATUS.PAUSE_INSPECTION_RESUME_NEXT_DAY]: 'warning', // Orange for paused
+    [API_STATUS.INSPECTION_PAUSED]: 'warning', // Orange for paused
   };
 
   return variantMap[apiStatus] || 'default';

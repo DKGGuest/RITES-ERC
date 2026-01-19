@@ -113,6 +113,39 @@ export const generateProcessMaterialCertificate = async (icNumber) => {
 };
 
 /**
+ * Generate Final Product certificate data
+ * @param {string} icNumber - Inspection Call Number (e.g., "FP-01120001")
+ * @returns {Promise<Object>} Certificate data
+ */
+export const generateFinalProductCertificate = async (icNumber) => {
+  try {
+    console.log('🔍 Generating Final Product certificate for IC Number:', icNumber);
+
+    // Use query parameter instead of path variable to handle slashes
+    // URL-encode the IC number to handle special characters
+    const encodedIcNumber = encodeURIComponent(icNumber);
+    console.log('📝 Encoded IC Number:', encodedIcNumber);
+
+    const response = await fetch(`${API_BASE_URL}/final-product?icNumber=${encodedIcNumber}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Failed to generate Final Product certificate: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Final Product certificate generated successfully:', data);
+    return data.responseData || data;
+  } catch (error) {
+    console.error('❌ Error generating Final Product certificate:', error);
+    throw error;
+  }
+};
+
+/**
  * Download certificate as PDF (future implementation)
  * @param {string} icNumber - Inspection Call Number (will be URL-encoded automatically by generateRawMaterialCertificate)
  * @returns {Promise<Blob>} PDF blob

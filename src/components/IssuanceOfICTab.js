@@ -5,7 +5,7 @@ import Notification from './Notification';
 import { getProductTypeDisplayName, formatDate } from '../utils/helpers';
 import CallsFilterSection from './common/CallsFilterSection';
 import { createStageValidationHandler } from '../utils/stageValidation';
-import { generateRawMaterialCertificate, generateProcessMaterialCertificate } from '../services/certificateService';
+import { generateRawMaterialCertificate, generateProcessMaterialCertificate, generateFinalProductCertificate } from '../services/certificateService';
 import { fetchCompletedCallsForIC, getCurrentUserId } from '../services/workflowApiService';
 
 const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
@@ -217,7 +217,10 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
 
       // Call the appropriate certificate generation API based on IC number prefix or stage
       let certificateData;
-      if (coreIcNumber?.toUpperCase().startsWith('EP-') || row.stage?.toLowerCase().includes('process')) {
+      if (coreIcNumber?.toUpperCase().startsWith('FP-') || row.stage?.toLowerCase().includes('final')) {
+        console.log('📋 Generating Final Product certificate for FP/final call...');
+        certificateData = await generateFinalProductCertificate(coreIcNumber);
+      } else if (coreIcNumber?.toUpperCase().startsWith('EP-') || row.stage?.toLowerCase().includes('process')) {
         console.log('📋 Generating Process Material certificate for EP/process call...');
         certificateData = await generateProcessMaterialCertificate(coreIcNumber);
       } else {

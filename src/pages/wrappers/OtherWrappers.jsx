@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import MultiTabInspectionInitiationPage from '../MultiTabInspectionInitiationPage';
 import RawMaterialCertificate from '../../IC/erc/rawmaterial';
 import ProcessMaterialCertificate from '../../IC/erc/ProcessMaterial';
+import FinalProductCertificate from '../../IC/erc/FinalProduct';
 import { useInspection } from '../../context/InspectionContext';
 import { ROUTES } from '../../routes';
 
@@ -113,6 +114,32 @@ export const ProcessMaterialCertificateWrapper = () => {
 
   return (
     <ProcessMaterialCertificate
+      call={selectedCall}
+      onBack={handleBack}
+    />
+  );
+};
+
+/**
+ * Wrapper for FinalProductCertificate (IC)
+ */
+export const FinalProductCertificateWrapper = () => {
+  const navigate = useNavigate();
+  const { selectedCall, setLandingActiveTab } = useInspection();
+
+  const handleBack = () => {
+    setLandingActiveTab('certificates');
+    navigate(ROUTES.LANDING);
+  };
+
+  // If no call selected, redirect to landing
+  if (!selectedCall) {
+    navigate(ROUTES.LANDING);
+    return null;
+  }
+
+  return (
+    <FinalProductCertificate
       call={selectedCall}
       onBack={handleBack}
     />

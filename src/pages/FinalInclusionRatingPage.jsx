@@ -87,9 +87,9 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
         /* Inclusion - array of samples, each sample has A, B, C, D ratings + Thick/Thin */
         inclusion1st: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
         inclusion2nd: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
-        /* Freedom from Defects - array equal to sample size */
-        defects1st: Array(lot.sampleSize).fill('OK'),
-        defects2nd: Array(lot.sampleSize).fill('OK'),
+        /* Freedom from Defects - array equal to sample size (default: empty string for "Select") */
+        defects1st: Array(lot.sampleSize).fill(''),
+        defects2nd: Array(lot.sampleSize).fill(''),
         /* Separate remarks for each section */
         microstructureRemarks: '',
         decarbRemarks: '',
@@ -883,6 +883,7 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                         value={val}
                         onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value)}
                       >
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -900,6 +901,7 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                             value={val}
                             onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value, true)}
                           >
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
+import { getLadleValuesByCall } from "../services/finalInspectionSubmoduleService";
 import "./FinalChemicalAnalysisPage.css";
 
 const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
@@ -27,14 +28,7 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
     }
   }
 
-  // Map live lot data to component format
-  const availableLots = lotsFromVendor.map(lot => ({
-    lotNo: lot.lotNo || lot.lotNumber,
-    heatNo: lot.heatNo || lot.heatNumber,
-    quantity: lot.lotSize || lot.offeredQty || 0,
-    ladleAnalysis: { c: 0, si: 0, mn: 0, s: 0, p: 0 }, // Default values
-  }));
-
+  // Declare state BEFORE using it in mappings
   const [chemValues, setChemValues] = useState(() => {
     const persistedData = localStorage.getItem(`chemicalAnalysisData_${callNo}`);
     if (persistedData) {
@@ -61,7 +55,51 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
     return {};
   });
 
+  const [ladleValues, setLadleValues] = useState({});
+  const [loadingLadleValues, setLoadingLadleValues] = useState(false);
+
+  // Map live lot data to component format (after state declarations)
+  const availableLots = lotsFromVendor.map(lot => ({
+    lotNo: lot.lotNo || lot.lotNumber,
+    heatNo: lot.heatNo || lot.heatNumber,
+    quantity: lot.lotSize || lot.offeredQty || 0,
+    // Use fetched ladle values if available, otherwise use defaults
+    ladleAnalysis: ladleValues[lot.lotNo || lot.lotNumber] || { c: 0, si: 0, mn: 0, s: 0, p: 0 },
+  }));
+
   const [expandedLot, setExpandedLot] = useState(availableLots[0]?.lotNo || ""); // Default to first lot
+
+  // Fetch ladle values from backend
+  useEffect(() => {
+    if (callNo) {
+      setLoadingLadleValues(true);
+      getLadleValuesByCall(callNo)
+        .then((response) => {
+          if (response?.data) {
+            // Convert array of ladle values to object keyed by lotNo
+            const ladleMap = {};
+            response.data.forEach((ladle) => {
+              ladleMap[ladle.lotNo] = {
+                c: ladle.percentC,
+                si: ladle.percentSi,
+                mn: ladle.percentMn,
+                s: ladle.percentS,
+                p: ladle.percentP,
+              };
+            });
+            setLadleValues(ladleMap);
+            console.log('✅ Ladle values loaded:', ladleMap);
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Error loading ladle values:', error);
+          // Continue without ladle values - they're optional
+        })
+        .finally(() => {
+          setLoadingLadleValues(false);
+        });
+    }
+  }, [callNo]);
 
   // Persist data whenever chemValues or remarks change
   useEffect(() => {

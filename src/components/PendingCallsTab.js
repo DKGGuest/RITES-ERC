@@ -345,7 +345,8 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
                                row.status === 'VERIFY_PO_DETAILS' ||
                                row.status === 'INSPECTION_COMPLETE_CONFIRM' ||
                                row.status === 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION' ||
-                               row.status === 'PAUSE_INSPECTION_RESUME_NEXT_DAY';
+                               row.status === 'PAUSE_INSPECTION_RESUME_NEXT_DAY' ||
+                               row.status === 'INSPECTION_PAUSED';
 
     let availableActions = [];
 

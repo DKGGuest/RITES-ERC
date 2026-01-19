@@ -44,6 +44,7 @@ import {
   MultiInitiationWrapper,
   RawMaterialCertificateWrapper,
   ProcessMaterialCertificateWrapper,
+  FinalProductCertificateWrapper,
 } from './pages/wrappers/OtherWrappers';
 import { CMDashboardWrapper } from './pages/wrappers/CMWrappers';
 import { CallDeskDashboardWrapper } from './pages/wrappers/CallDeskWrapper';
@@ -173,6 +174,7 @@ const App = () => {
             {/* IC (Inspection Certificate) Routes */}
             <Route path={ROUTES.IC_RAW_MATERIAL} element={<RawMaterialCertificateWrapper />} />
             <Route path={ROUTES.IC_PROCESS} element={<ProcessMaterialCertificateWrapper />} />
+            <Route path={ROUTES.IC_FINAL_PRODUCT} element={<FinalProductCertificateWrapper />} />
 
             {/* CM (Controlling Manager) Routes */}
             <Route path={ROUTES.CM_DASHBOARD} element={<CMDashboardWrapper />} />

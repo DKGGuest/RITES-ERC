@@ -47,6 +47,7 @@ export const ROUTES = {
   // IC (Inspection Certificate) Routes
   IC_RAW_MATERIAL: '/ic/raw-material',
   IC_PROCESS: '/ic/process-material',
+  IC_FINAL_PRODUCT: '/ic/final-product',
 
   // CM (Controlling Manager) Routes
   CM_DASHBOARD: '/cm',
@@ -94,6 +95,7 @@ export const PAGE_TO_ROUTE_MAP = {
   'final-reports': ROUTES.FINAL_REPORTS,
   'ic-rawmaterial': ROUTES.IC_RAW_MATERIAL,
   'ic-processmaterial': ROUTES.IC_PROCESS,
+  'ic-finalproduct': ROUTES.IC_FINAL_PRODUCT,
 };
 
 /**

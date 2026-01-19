@@ -4,8 +4,14 @@ import { formatDate } from "../utils/helpers";
 import { markAsWithheld } from '../services/callStatusService';
 import { useInspection } from '../context/InspectionContext';
 import {
-  getFinalDashboardData
+  getFinalDashboardData,
+  saveCumulativeResults,
+  saveInspectionSummary,
+  saveLotResults
 } from '../services/finalProductInspectionService';
+import { finishInspection } from '../services/finalInspectionSubmoduleService';
+import { performTransitionAction } from '../services/workflowService';
+import { getStoredUser } from '../services/authService';
 import "./FinalProductDashboard.css";
 
 // Reason options for withheld inspection
@@ -45,18 +51,19 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
         setLoadError(null);
         console.log('📥 Fetching Final Product dashboard data for call:', selectedCall.call_no);
 
-        // Check cache first
+        // Check cache first - IMPORTANT: Use cached data to avoid unnecessary API calls
         const cachedData = getFpCachedData(selectedCall.call_no);
         if (cachedData.isCached && cachedData.dashboardData) {
           console.log('✅ Using cached dashboard data for call:', selectedCall.call_no);
+          console.log('💾 Cache is fresh - skipping API call');
           const dashboardData = cachedData.dashboardData;
           processDashboardData(dashboardData);
           setIsLoading(false);
           return;
         }
 
-        // Fetch all dashboard data in one optimized call
-        console.log('🔄 Fetching dashboard data from API...');
+        // Only fetch from API if cache is not available or expired
+        console.log('🔄 Cache expired or not available - fetching dashboard data from API...');
         const dashboardData = await getFinalDashboardData(selectedCall.call_no);
         console.log('✅ Dashboard data fetched from API:', dashboardData);
 
@@ -119,13 +126,14 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       if (dashboardData?.finalLotDetails && Array.isArray(dashboardData.finalLotDetails)) {
         dashboardData.finalLotDetails.forEach(lot => {
           results[lot.lotNumber] = {
-            visualDim: "PENDING",
-            hardness: "PENDING",
-            inclusion: "PENDING",
-            deflection: "PENDING",
-            toeLoad: "PENDING",
-            weight: "PENDING",
-            chemical: "PENDING"
+            calibration: "Pending",
+            visualDim: "Pending",
+            hardness: "Pending",
+            inclusion: "Pending",
+            deflection: "Pending",
+            toeLoad: "Pending",
+            weight: "Pending",
+            chemical: "Pending"
           };
         });
       }
@@ -137,6 +145,14 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
 
     fetchLiveData();
   }, [selectedCall?.call_no, selectedCall?.po_no, getFpCachedData, updateFpDashboardDataCache]);
+
+  // Validation function for calibration data
+  const validateCalibrationData = useCallback((lotData) => {
+    if (!lotData) return 'Pending';
+    // Check if calibration data is filled
+    const hasCalibrationData = lotData.calibrationCertNo || lotData.calibrationDate || lotData.calibrationRemark;
+    return hasCalibrationData ? 'OK' : 'Pending';
+  }, []);
 
   // Validation function for visual & dimensional data
   const validateVisualDimensionalData = useCallback((lotData) => {
@@ -192,49 +208,57 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   // Update test results from submodule data stored in sessionStorage
   const updateTestResultsFromStorage = useCallback(() => {
     const callNo = selectedCall?.call_no;
-    if (!callNo || Object.keys(testResultsPerLot).length === 0) return;
+    if (!callNo) return;
 
-    const updatedResults = { ...testResultsPerLot };
-    let hasUpdates = false;
+    setTestResultsPerLot(prevResults => {
+      if (Object.keys(prevResults).length === 0) return prevResults;
 
-    // Check each submodule's stored data and update test results
-    const submoduleKeys = [
-      { key: 'visualDimensionalData_', testName: 'visualDim', validator: validateVisualDimensionalData },
-      { key: 'hardnessTestData_', testName: 'hardness', validator: validateHardnessData },
-      { key: 'inclusionRatingData_', testName: 'inclusion', validator: validateInclusionData },
-      { key: 'deflectionTestData_', testName: 'deflection', validator: validateDeflectionData },
-      { key: 'toeLoadTestData_', testName: 'toeLoad', validator: validateToeLoadData },
-      { key: 'weightTestData_', testName: 'weight', validator: validateWeightData },
-      { key: 'chemicalAnalysisData_', testName: 'chemical', validator: validateChemicalData }
-    ];
+      const updatedResults = { ...prevResults };
+      let hasUpdates = false;
 
-    submoduleKeys.forEach(({ key, testName, validator }) => {
-      const storageKey = `${key}${callNo}`;
-      const storedData = localStorage.getItem(storageKey);
-      if (storedData) {
-        try {
-          const data = JSON.parse(storedData);
-          // Update test results for each lot based on stored data
-          Object.keys(data).forEach(lotNo => {
-            if (updatedResults[lotNo]) {
-              const lotData = data[lotNo];
-              const status = validator(lotData);
-              if (status !== 'Pending') {
-                updatedResults[lotNo][testName] = status;
-                hasUpdates = true;
+      // Check each submodule's stored data and update test results
+      const submoduleKeys = [
+        { key: 'calibrationDocumentsData_', testName: 'calibration', validator: validateCalibrationData },
+        { key: 'visualDimensionalData_', testName: 'visualDim', validator: validateVisualDimensionalData },
+        { key: 'hardnessTestData_', testName: 'hardness', validator: validateHardnessData },
+        { key: 'inclusionRatingData_', testName: 'inclusion', validator: validateInclusionData },
+        { key: 'deflectionTestData_', testName: 'deflection', validator: validateDeflectionData },
+        { key: 'toeLoadTestData_', testName: 'toeLoad', validator: validateToeLoadData },
+        { key: 'weightTestData_', testName: 'weight', validator: validateWeightData },
+        { key: 'chemicalAnalysisData_', testName: 'chemical', validator: validateChemicalData }
+      ];
+
+      submoduleKeys.forEach(({ key, testName, validator }) => {
+        const storageKey = `${key}${callNo}`;
+        const storedData = localStorage.getItem(storageKey);
+        if (storedData) {
+          try {
+            const data = JSON.parse(storedData);
+            // Update test results for each lot based on stored data
+            Object.keys(data).forEach(lotNo => {
+              if (updatedResults[lotNo]) {
+                const lotData = data[lotNo];
+                const status = validator(lotData);
+                // Always update the status, regardless of whether it's Pending or not
+                if (updatedResults[lotNo][testName] !== status) {
+                  console.log(`📊 Status update for lot ${lotNo}, test ${testName}: ${updatedResults[lotNo][testName]} → ${status}`);
+                  updatedResults[lotNo][testName] = status;
+                  hasUpdates = true;
+                }
               }
-            }
-          });
-        } catch (e) {
-          console.error(`Error reading ${storageKey}:`, e);
+            });
+          } catch (e) {
+            console.error(`Error reading ${storageKey}:`, e);
+          }
         }
-      }
-    });
+      });
 
-    if (hasUpdates) {
-      setTestResultsPerLot(updatedResults);
-    }
-  }, [selectedCall?.call_no, testResultsPerLot, validateVisualDimensionalData, validateHardnessData, validateInclusionData, validateDeflectionData, validateToeLoadData, validateWeightData, validateChemicalData]);
+      if (hasUpdates) {
+        console.log('✅ Test results updated:', updatedResults);
+      }
+      return hasUpdates ? updatedResults : prevResults;
+    });
+  }, [selectedCall?.call_no, validateCalibrationData, validateVisualDimensionalData, validateHardnessData, validateInclusionData, validateDeflectionData, validateToeLoadData, validateWeightData, validateChemicalData]);
 
   // Update test results when component mounts or when returning from submodule
   useEffect(() => {
@@ -334,6 +358,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       const persistedData = localStorage.getItem(`fpLotInspectionData_${callNo}`);
       if (persistedData) {
         try {
+          console.log('✅ Restoring lot inspection data from localStorage for call:', callNo);
           return JSON.parse(persistedData);
         } catch (e) {
           console.error('Error loading persisted lot inspection data:', e);
@@ -361,6 +386,35 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     return initial;
   });
 
+  // Restore form state from localStorage on component mount
+  useEffect(() => {
+    const callNo = selectedCall?.call_no;
+    if (callNo) {
+      try {
+        const persistedData = localStorage.getItem(`fpLotInspectionData_${callNo}`);
+        if (persistedData) {
+          const data = JSON.parse(persistedData);
+          setLotInspectionData(data);
+          console.log('✅ Lot inspection data restored from localStorage');
+        }
+
+        const persistedPackedInHDPE = localStorage.getItem(`fpPackedInHDPE_${callNo}`);
+        if (persistedPackedInHDPE !== null) {
+          setPackedInHDPE(persistedPackedInHDPE === 'true');
+          console.log('✅ Packed in HDPE state restored from localStorage');
+        }
+
+        const persistedCleanedWithCoating = localStorage.getItem(`fpCleanedWithCoating_${callNo}`);
+        if (persistedCleanedWithCoating !== null) {
+          setCleanedWithCoating(persistedCleanedWithCoating === 'true');
+          console.log('✅ Cleaned with coating state restored from localStorage');
+        }
+      } catch (error) {
+        console.error('Error restoring form state from localStorage:', error);
+      }
+    }
+  }, [selectedCall?.call_no]);
+
   // Persist lot inspection data to localStorage whenever it changes
   useEffect(() => {
     const callNo = selectedCall?.call_no;
@@ -376,9 +430,38 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     return Object.values(tests).some(v => v === 'NOT OK');
   };
 
-  /* Packing verification checkboxes */
-  const [packedInHDPE, setPackedInHDPE] = useState(false);
-  const [cleanedWithCoating, setCleanedWithCoating] = useState(false);
+  /* Packing verification checkboxes - with localStorage persistence */
+  const [packedInHDPE, setPackedInHDPE] = useState(() => {
+    const callNo = selectedCall?.call_no;
+    if (callNo) {
+      const persisted = localStorage.getItem(`fpPackedInHDPE_${callNo}`);
+      if (persisted !== null) {
+        return persisted === 'true';
+      }
+    }
+    return false;
+  });
+
+  const [cleanedWithCoating, setCleanedWithCoating] = useState(() => {
+    const callNo = selectedCall?.call_no;
+    if (callNo) {
+      const persisted = localStorage.getItem(`fpCleanedWithCoating_${callNo}`);
+      if (persisted !== null) {
+        return persisted === 'true';
+      }
+    }
+    return false;
+  });
+
+  // Persist packing verification states to localStorage
+  useEffect(() => {
+    const callNo = selectedCall?.call_no;
+    if (callNo) {
+      localStorage.setItem(`fpPackedInHDPE_${callNo}`, String(packedInHDPE));
+      localStorage.setItem(`fpCleanedWithCoating_${callNo}`, String(cleanedWithCoating));
+      console.log('✅ Packing verification states persisted to localStorage');
+    }
+  }, [packedInHDPE, cleanedWithCoating, selectedCall?.call_no]);
 
   /* Save Draft state */
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -388,6 +471,12 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   const [withheldReason, setWithheldReason] = useState('');
   const [withheldRemarks, setWithheldRemarks] = useState('');
   const [withheldError, setWithheldError] = useState('');
+
+  /* Finish inspection state */
+  const [isFinishingInspection, setIsFinishingInspection] = useState(false);
+
+  /* Pause inspection state */
+  const [isPausingInspection, setIsPausingInspection] = useState(false);
 
   /* -------------------- SUBMODULE LIST -------------------- */
   const SUBMODULES = [
@@ -519,6 +608,15 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   };
 
   /* -------------------- SAVE DRAFT HANDLER -------------------- */
+  /**
+   * Cache Invalidation Strategy:
+   * - Dashboard data is cached for 5 minutes (see InspectionContext)
+   * - When user saves draft, form data is persisted to localStorage
+   * - When user navigates back from submodules, cached data is used (no API call)
+   * - Form data is restored from localStorage on component mount
+   * - Cache automatically expires after 5 minutes, triggering fresh API call
+   * - This ensures data consistency while avoiding unnecessary API calls
+   */
   const handleSaveDraft = useCallback(() => {
     const callNo = selectedCall?.call_no;
     if (!callNo) {
@@ -541,6 +639,12 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       const storageKey = `${DASHBOARD_DRAFT_KEY}${callNo}`;
       localStorage.setItem(storageKey, JSON.stringify(draftData));
 
+      // Also persist individual form states for recovery on navigation
+      localStorage.setItem(`fpLotInspectionData_${callNo}`, JSON.stringify(lotInspectionData));
+      localStorage.setItem(`fpPackedInHDPE_${callNo}`, String(packedInHDPE));
+      localStorage.setItem(`fpCleanedWithCoating_${callNo}`, String(cleanedWithCoating));
+
+      console.log('✅ Draft and form states saved to localStorage');
       alert(`✅ Draft saved successfully at ${new Date().toLocaleTimeString()}`);
     } catch (error) {
       console.error('Error saving draft:', error);
@@ -573,6 +677,360 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       console.error('Error loading draft data:', error);
     }
   }, [selectedCall?.call_no]);
+
+  /* -------------------- FINISH INSPECTION HANDLER -------------------- */
+  const handleFinishInspection = async () => {
+    const callNo = selectedCall?.call_no;
+    if (!callNo) {
+      alert('❌ Call number not found. Cannot finish inspection.');
+      return;
+    }
+
+    // Confirm before finishing
+    const confirmed = window.confirm(
+      '⚠️ Are you sure you want to finish the inspection? This will save all submodule data to the database.'
+    );
+    if (!confirmed) return;
+
+    setIsFinishingInspection(true);
+
+    try {
+      console.log('🚀 Starting finish inspection process for call:', callNo);
+
+      // Prepare all data first
+      const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+      const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
+      const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
+      const poQty = poData?.poQty || 10000;
+      const cummPassed = poData?.cummQtyPassedPreviously || 0;
+      const qtyStillDue = poQty - cummPassed - qtyNowPassed;
+
+      // Get current user for audit fields
+      const currentUser = getStoredUser()?.username || 'SYSTEM';
+      const now = new Date().toISOString();
+
+      // 1. Prepare cumulative results data
+      const cumulativeData = {
+        inspectionCallNo: callNo,
+        poNo: poData?.po_no || selectedCall?.po_no,
+        poQty: poQty,
+        cummQtyOfferedPreviously: poData?.cummQtyOfferedPreviously || 0,
+        cummQtyPassedPreviously: cummPassed,
+        qtyNowOffered: totalQtyOffered,
+        qtyNowPassed: qtyNowPassed,
+        qtyNowRejected: qtyRejected,
+        qtyStillDue: qtyStillDue,
+        totalSampleSize: totalSampleSize,
+        bagsForSampling: bagsForSampling,
+        bagsOffered: bagsOffered,
+        // Audit fields - backend will use createdBy/createdAt for new records, updatedBy/updatedAt for updates
+        createdBy: currentUser,
+        createdAt: now,
+        updatedBy: currentUser,
+        updatedAt: now
+      };
+
+      // 2. Prepare inspection summary data
+      const summaryData = {
+        inspectionCallNo: callNo,
+        packedInHdpe: packedInHDPE,
+        cleanedWithCoating: cleanedWithCoating,
+        inspectionStatus: 'COMPLETED',
+        // Audit fields - backend will use createdBy/createdAt for new records, updatedBy/updatedAt for updates
+        createdBy: currentUser,
+        createdAt: now,
+        updatedBy: currentUser,
+        updatedAt: now
+      };
+
+      // 3. Prepare lot results data for all lots
+      const lotResultsDataArray = lotsWithSampling.map(lot => {
+        const lotData = lotInspectionData[lot.lotNo] || {};
+        const tests = testResultsPerLot[lot.lotNo] || {};
+
+        return {
+          inspectionCallNo: callNo,
+          lotNo: lot.lotNo,
+          heatNo: lot.heatNo,
+          calibrationStatus: tests.calibration || 'PENDING',
+          visualDimStatus: tests.visualDim || 'PENDING',
+          hardnessStatus: tests.hardness || 'PENDING',
+          inclusionStatus: tests.inclusion || 'PENDING',
+          deflectionStatus: tests.deflection || 'PENDING',
+          toeLoadStatus: tests.toeLoad || 'PENDING',
+          weightStatus: tests.weight || 'PENDING',
+          chemicalStatus: tests.chemical || 'PENDING',
+          ercUsedForTesting: parseInt(lotData.ercUsedForTesting) || 0,
+          stdPackingNo: parseInt(lotData.stdPackingNo) || 50,
+          bagsWithStdPacking: parseInt(lotData.bagsStdPacking) || 0,
+          nonStdBagsCount: parseInt(lotData.nonStdBagsCount) || 0,
+          nonStdBagsQty: JSON.stringify(lotData.nonStdBagsQty || []),
+          hologramDetails: JSON.stringify(lotData.holograms || []),
+          remarks: lotData.remarks || '',
+          lotStatus: isLotRejected(lot.lotNo) ? 'REJECTED' : 'ACCEPTED',
+          // Audit fields - backend will use createdBy/createdAt for new records, updatedBy/updatedAt for updates
+          createdBy: currentUser,
+          createdAt: now,
+          updatedBy: currentUser,
+          updatedAt: now
+        };
+      });
+
+      // Determine overall inspection status
+      const acceptedLots = lotsWithSampling.filter(lot => !isLotRejected(lot.lotNo)).length;
+      const rejectedLots = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).length;
+      let overallInspectionStatus = 'PENDING';
+      if (acceptedLots === lotsWithSampling.length) {
+        overallInspectionStatus = 'ACCEPTED';
+      } else if (rejectedLots === lotsWithSampling.length) {
+        overallInspectionStatus = 'REJECTED';
+      } else if (acceptedLots > 0 && rejectedLots > 0) {
+        overallInspectionStatus = 'PARTIALLY_ACCEPTED';
+      }
+
+      console.log(`📊 Overall Inspection Status: ${overallInspectionStatus} (${acceptedLots} accepted, ${rejectedLots} rejected out of ${lotsWithSampling.length} lots)`);
+
+      // Step 1: Save dashboard results in parallel
+      console.log('💾 Saving dashboard results (cumulative, summary, and lot results)...');
+      const dashboardSavePromises = [
+        saveCumulativeResults(cumulativeData),
+        saveInspectionSummary(summaryData),
+        ...lotResultsDataArray.map(lotData => saveLotResults(lotData))
+      ];
+
+      await Promise.all(dashboardSavePromises);
+      console.log('✅ Dashboard results saved successfully');
+
+      // Step 2: Call the finish inspection API for submodules
+      console.log('💾 Saving submodule data...');
+      const results = await finishInspection(callNo);
+      console.log('✅ Finish inspection completed:', results);
+
+      // Step 3: Trigger workflow API for Finish Inspection
+      console.log('🔄 Triggering workflow API for Finish Inspection...');
+      const currentUserObj = getStoredUser();
+      const userId = currentUserObj?.userId || 0;
+
+      const workflowActionData = {
+        workflowTransitionId: selectedCall?.workflowTransitionId || selectedCall?.id,
+        requestId: callNo,
+        action: 'INSPECTION_COMPLETE_CONFIRM',
+        remarks: `Final Product Inspection completed with status: ${overallInspectionStatus}`,
+        actionBy: userId,
+        pincode: selectedCall?.pincode || '560001'
+      };
+
+      console.log('Workflow Action Data:', workflowActionData);
+
+      try {
+        await performTransitionAction(workflowActionData);
+        console.log('✅ Workflow transition successful');
+      } catch (workflowError) {
+        console.error('❌ Workflow API error:', workflowError);
+        // Don't fail the entire operation if workflow fails
+        console.warn('Inspection saved but workflow transition failed');
+      }
+
+      // Show summary
+      const summary = `
+✅ Inspection Finished Successfully!
+
+Dashboard Results Saved:
+  ✓ Cumulative Results
+  ✓ Inspection Summary
+  ✓ Lot Results (${lotsWithSampling.length} lots)
+
+Saved Modules: ${results.success.length}
+${results.success.map(m => `  ✓ ${m}`).join('\n')}
+
+${results.skipped.length > 0 ? `Skipped (No Data): ${results.skipped.length}\n${results.skipped.map(m => `  - ${m}`).join('\n')}\n` : ''}
+
+${results.failed.length > 0 ? `Failed: ${results.failed.length}\n${results.failed.map(f => `  ✗ ${f.module}: ${f.error}`).join('\n')}` : ''}
+
+Workflow Status: ✅ Transitioned to COMPLETED
+      `;
+
+      alert(summary);
+
+      // Clear draft data
+      localStorage.removeItem(`${DASHBOARD_DRAFT_KEY}${callNo}`);
+
+      // Navigate back
+      onBack();
+    } catch (error) {
+      console.error('❌ Error finishing inspection:', error);
+      const errorMsg = error.message || 'Failed to finish inspection. Please try again.';
+      alert(`❌ Error: ${errorMsg}`);
+    } finally {
+      setIsFinishingInspection(false);
+    }
+  };
+
+  /* -------------------- PAUSE INSPECTION HANDLER -------------------- */
+  const handlePauseInspection = async () => {
+    const callNo = selectedCall?.call_no;
+    if (!callNo) {
+      alert('❌ Call number not found. Cannot pause inspection.');
+      return;
+    }
+
+    // Confirm before pausing
+    const confirmed = window.confirm(
+      '⚠️ Are you sure you want to pause the inspection? This will save all submodule data to the database and pause the inspection.'
+    );
+    if (!confirmed) return;
+
+    setIsPausingInspection(true);
+
+    try {
+      console.log('🚀 Starting pause inspection process for call:', callNo);
+
+      // Prepare all data first (same as finish inspection)
+      const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+      const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
+      const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
+      const poQty = poData?.poQty || 10000;
+      const cummPassed = poData?.cummQtyPassedPreviously || 0;
+      const qtyStillDue = poQty - cummPassed - qtyNowPassed;
+
+      // Get current user for audit fields
+      const currentUser = getStoredUser()?.username || 'SYSTEM';
+      const now = new Date().toISOString();
+
+      // 1. Prepare cumulative results data
+      const cumulativeData = {
+        inspectionCallNo: callNo,
+        poNo: poData?.po_no || selectedCall?.po_no,
+        poQty: poQty,
+        cummQtyOfferedPreviously: poData?.cummQtyOfferedPreviously || 0,
+        cummQtyPassedPreviously: cummPassed,
+        qtyNowOffered: totalQtyOffered,
+        qtyNowPassed: qtyNowPassed,
+        qtyNowRejected: qtyRejected,
+        qtyStillDue: qtyStillDue,
+        totalSampleSize: totalSampleSize,
+        bagsForSampling: bagsForSampling,
+        bagsOffered: bagsOffered,
+        createdBy: currentUser,
+        createdAt: now,
+        updatedBy: currentUser,
+        updatedAt: now
+      };
+
+      // 2. Prepare inspection summary data
+      const summaryData = {
+        inspectionCallNo: callNo,
+        packedInHdpe: packedInHDPE,
+        cleanedWithCoating: cleanedWithCoating,
+        inspectionStatus: 'PAUSED',
+        createdBy: currentUser,
+        createdAt: now,
+        updatedBy: currentUser,
+        updatedAt: now
+      };
+
+      // 3. Prepare lot results data for all lots
+      const lotResultsDataArray = lotsWithSampling.map(lot => {
+        const lotData = lotInspectionData[lot.lotNo] || {};
+        const tests = testResultsPerLot[lot.lotNo] || {};
+
+        return {
+          inspectionCallNo: callNo,
+          lotNo: lot.lotNo,
+          heatNo: lot.heatNo,
+          calibrationStatus: tests.calibration || 'PENDING',
+          visualDimStatus: tests.visualDim || 'PENDING',
+          hardnessStatus: tests.hardness || 'PENDING',
+          inclusionStatus: tests.inclusion || 'PENDING',
+          deflectionStatus: tests.deflection || 'PENDING',
+          toeLoadStatus: tests.toeLoad || 'PENDING',
+          weightStatus: tests.weight || 'PENDING',
+          chemicalStatus: tests.chemical || 'PENDING',
+          ercUsedForTesting: parseInt(lotData.ercUsedForTesting) || 0,
+          stdPackingNo: parseInt(lotData.stdPackingNo) || 50,
+          bagsWithStdPacking: parseInt(lotData.bagsStdPacking) || 0,
+          nonStdBagsCount: parseInt(lotData.nonStdBagsCount) || 0,
+          nonStdBagsQty: JSON.stringify(lotData.nonStdBagsQty || []),
+          hologramDetails: JSON.stringify(lotData.holograms || []),
+          remarks: lotData.remarks || '',
+          lotStatus: isLotRejected(lot.lotNo) ? 'REJECTED' : 'ACCEPTED',
+          createdBy: currentUser,
+          createdAt: now,
+          updatedBy: currentUser,
+          updatedAt: now
+        };
+      });
+
+      console.log('💾 Saving dashboard results (cumulative, summary, and lot results)...');
+      const dashboardSavePromises = [
+        saveCumulativeResults(cumulativeData),
+        saveInspectionSummary(summaryData),
+        ...lotResultsDataArray.map(lotData => saveLotResults(lotData))
+      ];
+
+      await Promise.all(dashboardSavePromises);
+      console.log('✅ Dashboard results saved successfully');
+
+      // Step 2: Call the finish inspection API for submodules
+      console.log('💾 Saving submodule data...');
+      const results = await finishInspection(callNo);
+      console.log('✅ Submodule data saved:', results);
+
+      // Step 3: Trigger workflow API for Pause Inspection
+      console.log('🔄 Triggering workflow API for Pause Inspection...');
+      const currentUserObj = getStoredUser();
+      const userId = currentUserObj?.userId || 0;
+
+      const workflowActionData = {
+        workflowTransitionId: selectedCall?.workflowTransitionId || selectedCall?.id,
+        requestId: callNo,
+        action: 'INSPECTION_PAUSED',
+        remarks: 'Final Product Inspection paused - will resume next day',
+        actionBy: userId,
+        pincode: selectedCall?.pincode || '560001'
+      };
+
+      console.log('Workflow Action Data:', workflowActionData);
+
+      try {
+        await performTransitionAction(workflowActionData);
+        console.log('✅ Workflow transition successful');
+      } catch (workflowError) {
+        console.error('❌ Workflow API error:', workflowError);
+        console.warn('Inspection saved but workflow transition failed');
+      }
+
+      // Show summary
+      const summary = `
+✅ Inspection Paused Successfully!
+
+Dashboard Results Saved:
+  ✓ Cumulative Results
+  ✓ Inspection Summary
+  ✓ Lot Results (${lotsWithSampling.length} lots)
+
+Saved Modules: ${results.success.length}
+${results.success.map(m => `  ✓ ${m}`).join('\n')}
+
+${results.skipped.length > 0 ? `Skipped (No Data): ${results.skipped.length}\n${results.skipped.map(m => `  - ${m}`).join('\n')}\n` : ''}
+
+${results.failed.length > 0 ? `Failed: ${results.failed.length}\n${results.failed.map(f => `  ✗ ${f.module}: ${f.error}`).join('\n')}` : ''}
+
+Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
+      `;
+
+      alert(summary);
+
+      // Navigate back
+      onBack();
+    } catch (error) {
+      console.error('❌ Error pausing inspection:', error);
+      const errorMsg = error.message || 'Failed to pause inspection. Please try again.';
+      alert(`❌ Error: ${errorMsg}`);
+    } finally {
+      setIsPausingInspection(false);
+    }
+  };
 
   /* -------------------- MAIN JSX -------------------- */
   return (
@@ -786,19 +1244,44 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
                 </span>
               </div>
 
-              {/* Test Results Summary */}
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                {(tests && typeof tests === 'object') ? Object.entries(tests).map(([test, status]) => (
-                  <span key={test} style={{
-                    padding: '2px 8px',
-                    borderRadius: '3px',
-                    fontSize: '10px',
-                    background: status === 'OK' ? '#dcfce7' : '#fee2e2',
-                    color: status === 'OK' ? '#166534' : '#991b1b'
-                  }}>
-                    {test}: {status}
-                  </span>
-                )) : null}
+              {/* Test Results Summary - All 8 Submodules */}
+              <div style={{ marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
+                  📊 Submodule Status:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '6px' }}>
+                  {(tests && typeof tests === 'object') ? Object.entries(tests).map(([test, status]) => {
+                    // Map test names to display labels
+                    const testLabels = {
+                      'calibration': '📄 Calibration',
+                      'visualDim': '📏 Visual & Dim',
+                      'hardness': '💎 Hardness',
+                      'inclusion': '🔬 Inclusion',
+                      'deflection': '📐 Deflection',
+                      'toeLoad': '⚖️ Toe Load',
+                      'weight': '⚖️ Weight',
+                      'chemical': '🧪 Chemical'
+                    };
+                    return (
+                      <span key={test} style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '500',
+                        background: status === 'OK' ? '#dcfce7' : '#fee2e2',
+                        color: status === 'OK' ? '#166534' : '#991b1b',
+                        border: status === 'OK' ? '1px solid #86efac' : '1px solid #fca5a5',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {testLabels[test] || test}: {status === 'OK' ? '✓' : '✗'}
+                      </span>
+                    );
+                  }).sort((a) => {
+                    // Sort by status: PENDING first, then OK
+                    const aStatus = tests[a.key.split(':')[0].trim()];
+                    return aStatus === 'OK' ? 1 : -1;
+                  }) : null}
+                </div>
               </div>
 
               {/* Packing Info Grid */}
@@ -1010,9 +1493,21 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
             >
               {isSavingDraft ? '💾 Saving...' : '💾 Save Draft'}
             </button>
-            <button className="btn btn-outline">Pause Inspection</button>
+            <button
+              className="btn btn-outline"
+              onClick={handlePauseInspection}
+              disabled={isPausingInspection}
+            >
+              {isPausingInspection ? '⏸️ Pausing...' : '⏸️ Pause Inspection'}
+            </button>
             <button className="btn btn-outline" onClick={handleOpenWithheldModal}>Withheld Inspection</button>
-            <button className="btn btn-primary">Finish Inspection</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleFinishInspection}
+              disabled={isFinishingInspection}
+            >
+              {isFinishingInspection ? '⏳ Finishing...' : '✅ Finish Inspection'}
+            </button>
           </div>
         </>
       )}
