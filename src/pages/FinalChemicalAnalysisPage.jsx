@@ -56,7 +56,6 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
   });
 
   const [ladleValues, setLadleValues] = useState({});
-  const [loadingLadleValues, setLoadingLadleValues] = useState(false);
 
   // Map live lot data to component format (after state declarations)
   const availableLots = lotsFromVendor.map(lot => ({
@@ -72,7 +71,6 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
   // Fetch ladle values from backend
   useEffect(() => {
     if (callNo) {
-      setLoadingLadleValues(true);
       getLadleValuesByCall(callNo)
         .then((response) => {
           if (response?.data) {
@@ -94,9 +92,6 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
         .catch((error) => {
           console.error('❌ Error loading ladle values:', error);
           // Continue without ladle values - they're optional
-        })
-        .finally(() => {
-          setLoadingLadleValues(false);
         });
     }
   }, [callNo]);
