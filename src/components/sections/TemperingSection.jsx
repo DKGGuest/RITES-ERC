@@ -27,9 +27,19 @@ const TemperingSection = ({
     return rejected.reduce((sum, val) => sum + (parseInt(val) || 0), 0);
   };
 
-  // Check if tempering temp/duration was entered in first hour (for Once/Shift rule)
-  const isTempTakenInFirstHour = data[0]?.temperingTemperature && data[0].temperingTemperature.toString().trim() !== '';
-  const isDurationTakenInFirstHour = data[0]?.temperingDuration && data[0].temperingDuration.toString().trim() !== '';
+  // Find the first hour where tempering duration was entered (Once/Shift rule)
+  // This handles cases where user enters data in the middle of the hour range
+  const findFirstHourWithDuration = () => {
+    for (let i = 0; i < data.length; i++) {
+      if (data[i]?.temperingDuration && data[i].temperingDuration.toString().trim() !== '') {
+        return i;
+      }
+    }
+    return -1; // No duration entered yet
+  };
+
+  const firstHourWithDuration = findFirstHourWithDuration();
+  const isDurationTakenInFirstHour = firstHourWithDuration >= 0;
 
   return (
     <div className="tempering-section">
@@ -57,14 +67,17 @@ const TemperingSection = ({
                 <th className="tempering-th tempering-th--checkbox">No Production</th>
                 <th className="tempering-th tempering-th--lot">Lot No.</th>
                 <th className="tempering-th tempering-th--temp">Tempering<br/>Temp.</th>
-                <th className="tempering-th tempering-th--duration">Tempering<br/>Duration</th>
+                <th className="tempering-th tempering-th--duration">
+                  Tempering<br/>Duration
+                  <br /><small className="tempering-th__hint">Once/Shift</small>
+                </th>
                 <th className="tempering-th tempering-th--remarks">Remarks</th>
               </tr>
             </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => {
-                const showTempHint = idx > 0 && isTempTakenInFirstHour;
-                const showDurationHint = idx > 0 && isDurationTakenInFirstHour;
+                // Once/Shift rule: Duration is disabled for hours AFTER the first hour with duration
+                const showDurationHint = isDurationTakenInFirstHour && idx !== firstHourWithDuration;
                 const rejectedSum = getRejectedSum(idx);
 
                 return (
@@ -96,25 +109,31 @@ const TemperingSection = ({
                         </select>
                       </td>
                       <td className="tempering-td tempering-td--temp">
+                        {/* Tempering Temperature: Editable for EVERY hour (no restrictions) */}
                         <input
                           type="number"
                           step="0.1"
                           className="form-control tempering-input"
-                          placeholder={showTempHint ? "N/A" : ""}
+                          placeholder="°C"
                           value={row.temperingTemperature}
                           onChange={e => updateData(idx, 'temperingTemperature', e.target.value)}
-                          disabled={row.noProduction || showTempHint}
+                          disabled={row.noProduction}
                         />
                       </td>
                       <td className="tempering-td tempering-td--duration">
-                        <input
-                          type="number"
-                          className="form-control tempering-input"
-                          placeholder={showDurationHint ? "N/A" : ""}
-                          value={row.temperingDuration}
-                          onChange={e => updateData(idx, 'temperingDuration', e.target.value)}
-                          disabled={row.noProduction || showDurationHint}
-                        />
+                        {/* Tempering Duration: Once per Shift rule - disabled after first entry */}
+                        {showDurationHint ? (
+                          <span className="tempering-hint">Taken in {hourLabels[firstHourWithDuration]}</span>
+                        ) : (
+                          <input
+                            type="number"
+                            className="form-control tempering-input"
+                            placeholder="min"
+                            value={row.temperingDuration}
+                            onChange={e => updateData(idx, 'temperingDuration', e.target.value)}
+                            disabled={row.noProduction}
+                          />
+                        )}
                       </td>
                       <td rowSpan="2" className="tempering-td tempering-td--remarks">
                         <input

@@ -1,5 +1,46 @@
 import React, { useState, useMemo } from 'react';
 
+// Helper function to check if a string is a date-like value
+const isDateLike = (str) => {
+  if (!str) return false;
+  // Check for common date formats: DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY, etc.
+  return /^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}$/.test(str) ||
+         /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str) ||
+         /^\d{4}-\d{1,2}-\d{1,2}$/.test(str);
+};
+
+// Helper function to normalize date for comparison
+const normalizeDateForSearch = (dateStr) => {
+  if (!dateStr) return '';
+
+  // Remove any time portion if present
+  const datePart = dateStr.split(' ')[0];
+
+  // Try to parse and normalize the date
+  try {
+    const date = new Date(datePart);
+    if (!isNaN(date.getTime())) {
+      // Return multiple formats for flexible matching
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+
+      return [
+        `${day}/${month}/${year}`,  // DD/MM/YYYY
+        `${month}/${day}/${year}`,  // MM/DD/YYYY
+        `${year}-${month}-${day}`,  // YYYY-MM-DD
+        `${day}/${month}`,          // DD/MM (for partial search)
+        `${month}/${day}`,          // MM/DD (for partial search)
+        datePart                    // Original format
+      ].join('|');
+    }
+  } catch (e) {
+    // If parsing fails, return the original string
+  }
+
+  return datePart;
+};
+
 // Helper function to recursively search through nested objects and arrays
 const deepSearch = (obj, searchText) => {
   if (obj === null || obj === undefined) {
@@ -8,7 +49,17 @@ const deepSearch = (obj, searchText) => {
 
   // If it's a primitive value, convert to string and search
   if (typeof obj !== 'object') {
-    return String(obj).toLowerCase().includes(searchText);
+    const strValue = String(obj).toLowerCase();
+
+    // Check if this looks like a date and the search term is date-like
+    if (isDateLike(strValue) && isDateLike(searchText)) {
+      const normalizedDate = normalizeDateForSearch(strValue);
+      const normalizedSearch = searchText.toLowerCase();
+      return normalizedDate.toLowerCase().includes(normalizedSearch);
+    }
+
+    // Standard string search
+    return strValue.includes(searchText);
   }
 
   // If it's an array, search each element
@@ -27,12 +78,49 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Helper function to get rendered text from a column
+  const getRenderedText = (row, column) => {
+    if (!column.render) {
+      return String(row[column.key] || '');
+    }
+
+    try {
+      const rendered = column.render(row[column.key], row);
+      // If it's a React element, try to extract text
+      if (rendered && typeof rendered === 'object' && rendered.props) {
+        // For StatusBadge and similar components, extract the text content
+        if (rendered.props.children) {
+          return String(rendered.props.children).toLowerCase();
+        }
+      }
+      // If it's a string, return it
+      if (typeof rendered === 'string') {
+        return rendered.toLowerCase();
+      }
+    } catch (e) {
+      // If render function fails, fall back to raw value
+    }
+
+    return String(row[column.key] || '');
+  };
+
   const filteredData = useMemo(() => {
     let result = [...data];
 
     if (searchTerm) {
       const searchText = searchTerm.toLowerCase();
-      result = result.filter(row => deepSearch(row, searchText));
+      result = result.filter(row => {
+        // First try searching the raw data
+        if (deepSearch(row, searchText)) {
+          return true;
+        }
+
+        // Also search rendered column values (for status badges, formatted dates, etc.)
+        return columns.some(column => {
+          const renderedText = getRenderedText(row, column);
+          return renderedText.includes(searchText);
+        });
+      });
     }
 
     if (sortColumn) {
@@ -46,7 +134,7 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
     }
 
     return result;
-  }, [data, searchTerm, sortColumn, sortDirection]);
+  }, [data, searchTerm, sortColumn, sortDirection, columns]);
 
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;

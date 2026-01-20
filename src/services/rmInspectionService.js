@@ -155,6 +155,25 @@ export const saveVisualInspection = async (data) => {
   return result.responseData;
 };
 
+export const saveVisualInspectionPass = async (data) => {
+  const response = await fetch(`${API_BASE_URL}/visual/pass`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data)
+  });
+  const result = await handleResponse(response);
+  return result.responseData;
+};
+
+export const getVisualInspectionPass = async (callNo) => {
+  const response = await fetch(`${API_BASE_URL}/visual/pass/${callNo}`, {
+    method: 'GET',
+    headers: getAuthHeaders()
+  });
+  const data = await response.json();
+  return data.responseData;
+};
+
 // ==================== Dimensional Check ====================
 
 export const getDimensionalCheck = async (callNo) => {

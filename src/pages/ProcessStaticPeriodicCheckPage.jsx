@@ -53,6 +53,7 @@ const ProcessStaticPeriodicCheckPage = ({ call, onBack, selectedLines = [], onNa
     forgingPress: true,
     reheatingFurnace: true,
     quenchingTime: true,
+    forgingDie: true,
     oilTankCounter: 45000,
     cleaningDone: false,
   };
@@ -145,6 +146,7 @@ const ProcessStaticPeriodicCheckPage = ({ call, onBack, selectedLines = [], onNa
             forgingPress: data.forgingPressCapacityOk ?? true,
             reheatingFurnace: data.reheatingFurnaceInductionType ?? true,
             quenchingTime: data.quenchingWithin20Seconds ?? true,
+            forgingDie: data.forgingDieCheck ?? true,
             oilTankCounter: data.oilTankCounterValue ?? 45000,
             cleaningDone: false
           }
@@ -173,7 +175,7 @@ const ProcessStaticPeriodicCheckPage = ({ call, onBack, selectedLines = [], onNa
   };
 
   const allChecksPassed =
-    current.shearingPress && current.forgingPress && current.reheatingFurnace && current.quenchingTime;
+    current.shearingPress && current.forgingPress && current.reheatingFurnace && current.quenchingTime && current.forgingDie;
   const isCounterLocked = current.oilTankCounter >= 90000;
   const isQuenchingLocked = current.oilTankCounter >= 90000;
 
@@ -204,6 +206,7 @@ const ProcessStaticPeriodicCheckPage = ({ call, onBack, selectedLines = [], onNa
         forgingPressCapacityOk: current.forgingPress,
         reheatingFurnaceInductionType: current.reheatingFurnace,
         quenchingWithin20Seconds: current.quenchingTime,
+        forgingDieCheck: current.forgingDie,
         oilTankCounterValue: current.oilTankCounter,
         allChecksPassed
       };
@@ -301,6 +304,15 @@ const ProcessStaticPeriodicCheckPage = ({ call, onBack, selectedLines = [], onNa
               onChange={(e) => updateLine({ quenchingTime: e.target.checked })}
             />
             <label htmlFor="quenchingTime" style={{ fontWeight: 'var(--font-weight-medium)' }}>Is Quenching Done within 20 seconds after completion of Forging? (Yes/No)</label>
+          </div>
+          <div className="checkbox-item">
+            <input
+              type="checkbox"
+              id="forgingDie"
+              checked={current.forgingDie}
+              onChange={(e) => updateLine({ forgingDie: e.target.checked })}
+            />
+            <label htmlFor="forgingDie" style={{ fontWeight: 'var(--font-weight-medium)' }}>Is Forging Die in Good Condition? (Yes/No)</label>
           </div>
         </div>
         {allChecksPassed && (

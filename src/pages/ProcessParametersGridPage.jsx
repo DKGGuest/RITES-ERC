@@ -68,6 +68,44 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     return null;
   }, [currentProductionLine, callInitiationDataCache]);
 
+  // Determine if Turning Section should be hidden (for ERC Mk-III)
+  const shouldHideTurningSection = useMemo(() => {
+    // Debug: Log all available data sources
+    console.log('🔍 [Turning Section Debug] All data sources:', {
+      currentCallData,
+      currentLineInitiationData,
+      call,
+      currentProductionLine,
+      productionLines
+    });
+
+    // Try multiple field names where ERC type might be stored
+    // Priority order: production line data > call data > initiation data > call prop
+    const ercType = currentProductionLine?.productType ||
+                    currentCallData?.productType ||
+                    currentCallData?.ercType ||
+                    currentLineInitiationData?.typeOfErc ||
+                    currentLineInitiationData?.ercType ||
+                    call?.erc_type ||
+                    call?.ercType ||
+                    call?.product_type ||
+                    '';
+
+    const ercTypeLower = String(ercType).toLowerCase().trim();
+    console.log('🔍 [Turning Section] ERC Type found:', ercType, '| Normalized:', ercTypeLower);
+
+    // Hide turning section ONLY for Mk-III (exact match, case-insensitive)
+    // Match patterns: "mk-iii", "mk-3", "mkiii", "mk3" (but NOT "mk-v" or other variants)
+    const isMkIII = ercTypeLower === 'mk-iii' ||
+                    ercTypeLower === 'mk-3' ||
+                    ercTypeLower === 'mkiii' ||
+                    ercTypeLower === 'mk3';
+
+    console.log('🔍 [Turning Section] Should hide turning section:', isMkIII);
+    console.log('🔍 [Turning Section] Rendering TurningSection:', !isMkIII);
+    return isMkIII;
+  }, [currentCallData, currentLineInitiationData, call, currentProductionLine, productionLines]);
+
   // Get lot numbers for active line - ONLY use cached initiation data (same source as Pre-Inspection)
   const availableLotNumbers = useMemo(() => {
     console.log('📋 [Grid Lot Numbers] Current line initiation data:', currentLineInitiationData);
@@ -663,16 +701,25 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         onToggleShowAll={() => setShowAllShearing(v => !v)}
       />
 
-      {/* Turning Section */}
-      <TurningSection
-        data={turningData}
-        onDataChange={handleTurningChange}
-        availableLotNumbers={availableLotNumbers}
-        hourLabels={hourLabels}
-        visibleRows={visibleRows}
-        showAll={showAllTurning}
-        onToggleShowAll={() => setShowAllTurning(v => !v)}
-      />
+      {/* Debug indicator for turning section visibility */}
+      {shouldHideTurningSection && (
+        <div style={{ padding: '12px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', marginBottom: '16px' }}>
+          <strong>ℹ️ Turning Section Hidden:</strong> This section is not applicable for MK-III products.
+        </div>
+      )}
+
+      {/* Turning Section - Hidden for ERC Mk-III */}
+      {!shouldHideTurningSection && (
+        <TurningSection
+          data={turningData}
+          onDataChange={handleTurningChange}
+          availableLotNumbers={availableLotNumbers}
+          hourLabels={hourLabels}
+          visibleRows={visibleRows}
+          showAll={showAllTurning}
+          onToggleShowAll={() => setShowAllTurning(v => !v)}
+        />
+      )}
 
       {/* MPI Section - 8 Hour Grid */}
       <MpiSection

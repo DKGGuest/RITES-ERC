@@ -91,6 +91,21 @@
   min-width: 60px;
 }
 
+.tempering-hint {
+  font-size: 11px;
+  color: #22c55e;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.tempering-th__hint {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #666;
+  display: block;
+  margin-top: 2px;
+}
+
 .tempering-row--rejected {
   background: #e3f2fd;
 }

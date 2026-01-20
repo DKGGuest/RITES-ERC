@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Notification from '../components/Notification';
 import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
+import { saveVisualInspectionPass } from '../services/rmInspectionService';
 import './VisualInspectionPage.css';
 
 const STORAGE_KEY = 'visual_inspection_draft_data';
@@ -22,6 +23,8 @@ const LENGTH_DEFECTS = ['Distortion', 'Twist', 'Kink', 'Not Straight', 'Fold', '
 const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onNavigateSubmodule, inspectionCallNo = '' }) => {
   const [activeHeatTab, setActiveHeatTab] = useState(0);
   const [notification, setNotification] = useState({ message: '', type: 'error' });
+  const [isSaving, setIsSaving] = useState(false);
+  const [passedHeats, setPassedHeats] = useState({});
 
   const showNotification = (message, type = 'error', autoClose = true, delay = 4000) => {
     setNotification({ message, type });
@@ -79,6 +82,85 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
     const storageKey = `${STORAGE_KEY}_${inspectionCallNo}`;
     localStorage.setItem(storageKey, JSON.stringify(heatVisualData));
   }, [heatVisualData, inspectionCallNo]);
+
+  // Load visual inspection data from backend on component mount
+  const loadVisualInspectionDataFromBackend = useCallback(async () => {
+    try {
+      // Import the service function
+      const { getVisualInspection } = await import('../services/rmInspectionService');
+      const data = await getVisualInspection(inspectionCallNo);
+
+      if (data && Array.isArray(data)) {
+        // Group data by heat and defect
+        const heatDataMap = {};
+        const passedMap = {};
+
+        data.forEach(item => {
+          const heatIdx = item.heatIndex || 0;
+          if (!heatDataMap[heatIdx]) {
+            heatDataMap[heatIdx] = {
+              selectedDefects: defectList.reduce((acc, d) => { acc[d] = false; return acc; }, {}),
+              defectCounts: defectList.reduce((acc, d) => { acc[d] = ''; return acc; }, {}),
+              isPassed: false
+            };
+          }
+
+          // Mark defect as selected
+          if (item.defectName) {
+            heatDataMap[heatIdx].selectedDefects[item.defectName] = true;
+          }
+
+          // Store defect length if available
+          if (item.defectLengthMm) {
+            heatDataMap[heatIdx].defectCounts[item.defectName] = item.defectLengthMm.toString();
+          }
+
+          // Mark as passed if passedAt is set
+          if (item.passedAt) {
+            heatDataMap[heatIdx].isPassed = true;
+            passedMap[item.heatNo] = true;
+          }
+        });
+
+        // Merge backend data with existing draft data
+        // Only override draft data if backend has passed data (isPassed = true)
+        // This preserves draft data (including lengths) for unpassed heats
+        setHeatVisualData(prev => {
+          return prev.map((heatData, idx) => {
+            if (heatDataMap[idx]) {
+              // If heat has been passed, use backend data (which includes lengths)
+              if (heatDataMap[idx].isPassed) {
+                return {
+                  ...heatData,
+                  ...heatDataMap[idx]
+                };
+              } else {
+                // If heat hasn't been passed, preserve draft data but update isPassed flag
+                return {
+                  ...heatData,
+                  isPassed: heatDataMap[idx].isPassed
+                };
+              }
+            }
+            return heatData;
+          });
+        });
+
+        // Update passed heats map
+        setPassedHeats(passedMap);
+      }
+    } catch (error) {
+      console.error('Error loading visual inspection data from backend:', error);
+      // Silently fail - use localStorage draft data as fallback
+    }
+  }, [inspectionCallNo, defectList]);
+
+  // Load visual inspection data from backend on component mount
+  useEffect(() => {
+    if (inspectionCallNo) {
+      loadVisualInspectionDataFromBackend();
+    }
+  }, [inspectionCallNo, loadVisualInspectionDataFromBackend]);
 
   // Defect handlers
   const handleDefectToggle = useCallback((defectName) => {
@@ -188,10 +270,86 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
     return totalLengthMetres * factor;
   }, [productModel]);
 
+  // Handle Pass button click
+  const handlePassVisualInspection = useCallback(async () => {
+    const currentHeat = heats[activeHeatTab];
+    if (!currentHeat) {
+      showNotification('No heat selected', 'error');
+      return;
+    }
+
+    const heatNo = currentHeat.heatNo || currentHeat.heat_no;
+    if (!heatNo) {
+      showNotification('Heat number not found', 'error');
+      return;
+    }
+
+    // Get selected defects for current heat
+    const currentHeatData = heatVisualData[activeHeatTab];
+    const selectedDefects = Object.keys(currentHeatData.selectedDefects || {})
+      .filter(defect => currentHeatData.selectedDefects[defect]);
+
+    if (selectedDefects.length === 0) {
+      showNotification('Please select at least one defect before passing', 'error');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Get current user ID from localStorage
+      const userId = localStorage.getItem('userId') || 'system';
+
+      // Create payload with selected defects AND their lengths
+      // Note: Allow multiple passes for same heat (multi-shift support)
+      const payload = {
+        inspectionCallNo,
+        heatNo,
+        heatIndex: activeHeatTab,
+        createdBy: userId,
+        selectedDefects: selectedDefects,
+        defectLengths: selectedDefects.reduce((acc, defect) => {
+          acc[defect] = currentHeatData.defectCounts[defect] || '';
+          return acc;
+        }, {})
+      };
+
+      await saveVisualInspectionPass(payload);
+
+      // Update passed heats map - allows re-passing same heat
+      setPassedHeats(prev => ({ ...prev, [heatNo]: true }));
+
+      // Update localStorage draft data to mark this heat as passed
+      // This ensures the status badge shows "Pass" in the dashboard
+      // AND data persists in the Visual Inspection page
+      const storageKey = `${STORAGE_KEY}_${inspectionCallNo}`;
+      const updatedDraft = [...heatVisualData];
+      if (updatedDraft[activeHeatTab]) {
+        // Mark as passed but keep all the data intact
+        updatedDraft[activeHeatTab].isPassed = true;
+        // Data (selectedDefects, defectCounts) remains unchanged
+      }
+      localStorage.setItem(storageKey, JSON.stringify(updatedDraft));
+
+      // Update state to reflect the pass
+      // This keeps all the data visible on the page
+      setHeatVisualData(updatedDraft);
+
+      showNotification(`Heat ${heatNo} passed visual inspection successfully!`, 'success', true, 3000);
+    } catch (error) {
+      console.error('Error saving pass status:', error);
+      showNotification('Failed to save pass status: ' + error.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [activeHeatTab, heats, inspectionCallNo, heatVisualData]);
+
   // Calculate values for current heat
   const currentHeatData = heatVisualData[activeHeatTab] || {};
   const totalDefectiveLength = calculateTotalDefectiveLength(currentHeatData);
   const weightRejected = calculateWeightRejected(totalDefectiveLength);
+  const currentHeat = heats[activeHeatTab];
+  const currentHeatNo = currentHeat?.heatNo || currentHeat?.heat_no;
+  const isCurrentHeatPassed = passedHeats[currentHeatNo];
 
   return (
     <div className="visual-page-container">
@@ -380,6 +538,47 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
         <p className="visual-defect-note">
           <strong>Note:</strong> In case of defective, enter the total length of defective portion (in metres).
         </p>
+
+        {/* Pass Button Section */}
+        <div style={{
+          marginTop: '24px',
+          padding: '16px',
+          background: isCurrentHeatPassed ? '#f0fdf4' : '#fffbeb',
+          border: `2px solid ${isCurrentHeatPassed ? '#86efac' : '#fde68a'}`,
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px'
+        }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, color: isCurrentHeatPassed ? '#166534' : '#92400e' }}>
+              {isCurrentHeatPassed ? '✓ Heat Passed Visual Inspection' : 'Pass Remaining Material for Visual Inspection'}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.875rem', color: isCurrentHeatPassed ? '#15803d' : '#b45309' }}>
+              {isCurrentHeatPassed
+                ? `Heat ${currentHeatNo} has been marked as passed. Click "Pass" again to re-pass in another shift.`
+                : 'Click "Pass" to mark the remaining material as passed'}
+            </p>
+          </div>
+          <button
+            onClick={handlePassVisualInspection}
+            disabled={isSaving}
+            style={{
+              padding: '10px 20px',
+              background: isSaving ? '#d1d5db' : '#22c55e',
+              color: isSaving ? '#6b7280' : '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: 600,
+              cursor: isSaving ? 'not-allowed' : 'pointer',
+              opacity: isSaving ? 0.6 : 1,
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {isSaving ? 'Saving...' : isCurrentHeatPassed ? 'Passed ✓ - Pass Again' : 'Pass Material'}
+          </button>
+        </div>
 
       </div>
     </div>

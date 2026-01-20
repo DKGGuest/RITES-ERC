@@ -453,14 +453,18 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   /**
    * Validate visual inspection for a heat
    * Rules:
-   * - At least one defect option must be selected
-   * - If defects other than "No Defect" are selected, their counts/lengths must be filled
-   * - OK if "No Defect" is selected
-   * - NOT OK if any other defect is selected (with count filled)
-   * - Returns 'Pending' if no selection is made OR if selected defects don't have counts filled
+   * 1. If heat has been marked as passed (isPassed flag), return 'Pass'
+   * 2. If no defect is selected, return 'Pending'
+   * 3. If "No Defect" is selected, return 'OK'
+   * 4. If any other defect is selected:
+   *    - If all selected defects have their lengths filled, return 'OK' or 'NOT OK' based on selection
+   *    - If any selected defect is missing length, return 'Pending'
    */
   const validateVisualHeat = useCallback((heatVisualData) => {
     if (!heatVisualData?.selectedDefects) return 'Pending';
+
+    // If heat has been marked as passed, return Pass
+    if (heatVisualData.isPassed) return 'Pass';
 
     const selected = heatVisualData.selectedDefects;
     const counts = heatVisualData.defectCounts || {};
@@ -1514,8 +1518,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                 const heatNo = heat.heatNo || heat.heat_no;
                 const heatStatuses = heatSubmoduleStatuses[heatNo] || {};
                 const hasNotOk = Object.values(heatStatuses).some(s => s === 'NOT OK');
-                const allOk = Object.values(heatStatuses).every(s => s === 'OK');
-                return allOk && !hasNotOk;
+                const allOkOrPass = Object.values(heatStatuses).every(s => s === 'OK' || s === 'Pass');
+                return allOkOrPass && !hasNotOk;
               }).length;
 
               const rejectedCount = activeHeats.filter(heat => {
@@ -1577,9 +1581,10 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
               };
 
               // Determine overall heat status
+              // Treat "Pass" as "OK" for overall status calculation
               const hasNotOk = Object.values(heatStatuses).some(s => s === 'NOT OK');
-              const allOk = Object.values(heatStatuses).every(s => s === 'OK');
-              const isAccepted = allOk && !hasNotOk;
+              const allOkOrPass = Object.values(heatStatuses).every(s => s === 'OK' || s === 'Pass');
+              const isAccepted = allOkOrPass && !hasNotOk;
               const isRejected = hasNotOk;
 
               // Container styling based on status
@@ -1614,6 +1619,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                       const isOk = status === 'OK';
                       const isNotOk = status === 'NOT OK';
                       const isPending = status === 'Pending';
+                      const isPass = status === 'Pass';
 
                       return (
                         <span
@@ -1624,9 +1630,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                             borderRadius: '4px',
                             fontSize: '12px',
                             fontWeight: 500,
-                            background: isOk ? '#dcfce7' : isNotOk ? '#fee2e2' : '#fef3c7',
-                            color: isOk ? '#166534' : isNotOk ? '#991b1b' : '#92400e',
-                            border: `1px solid ${isOk ? '#86efac' : isNotOk ? '#fca5a5' : '#fcd34d'}`,
+                            background: isPass ? '#dcfce7' : isOk ? '#dcfce7' : isNotOk ? '#fee2e2' : '#fef3c7',
+                            color: isPass ? '#166534' : isOk ? '#166534' : isNotOk ? '#991b1b' : '#92400e',
+                            border: `1px solid ${isPass ? '#86efac' : isOk ? '#86efac' : isNotOk ? '#fca5a5' : '#fcd34d'}`,
                             cursor: isPending ? 'help' : 'default'
                           }}
                         >
