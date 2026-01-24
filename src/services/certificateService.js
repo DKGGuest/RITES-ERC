@@ -146,6 +146,67 @@ export const generateFinalProductCertificate = async (icNumber) => {
 };
 
 /**
+ * Generate Final Material Inspection Certificate by IC Number
+ * @param {string} icNumber - Inspection Call Number (e.g., "FM-IC-1767772023499")
+ * @returns {Promise<Object>} Certificate data
+ */
+export const generateFinalCertificate = async (icNumber) => {
+  try {
+    console.log('🔍 Generating Final Material certificate for IC Number:', icNumber);
+
+    // Use query parameter instead of path variable to handle slashes
+    // URL-encode the IC number to handle special characters
+    const encodedIcNumber = encodeURIComponent(icNumber);
+    console.log('📝 Encoded IC Number:', encodedIcNumber);
+
+    const response = await fetch(`${API_BASE_URL}/final-material?icNumber=${encodedIcNumber}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Failed to generate Final Material certificate: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Final Material certificate generated successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error generating Final Material certificate:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate Final Material Inspection Certificate by Call ID
+ * @param {number} callId - Inspection Call ID
+ * @returns {Promise<Object>} Certificate data
+ */
+export const generateFinalCertificateById = async (callId) => {
+  try {
+    console.log('🔍 Generating Final Material certificate for Call ID:', callId);
+
+    const response = await fetch(`${API_BASE_URL}/final-material/by-id/${callId}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Failed to generate Final Material certificate: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Final Material certificate generated successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error generating Final Material certificate:', error);
+    throw error;
+  }
+};
+
+/**
  * Download certificate as PDF (future implementation)
  * @param {string} icNumber - Inspection Call Number (will be URL-encoded automatically by generateRawMaterialCertificate)
  * @returns {Promise<Blob>} PDF blob

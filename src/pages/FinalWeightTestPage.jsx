@@ -5,6 +5,7 @@ import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import ExcelImport from '../components/ExcelImport';
 import Pagination from '../components/Pagination';
 import { getDimensionWeightAQL } from '../utils/is2500Calculations';
+import { getWeightTestsByCall } from '../services/finalInspectionSubmoduleService';
 import "./FinalWeightTestPage.css";
 
 /* Weight Tolerance Table from Excel */
@@ -63,28 +64,158 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
 
   /* State for all lots */
   const [lotStates, setLotStates] = useState(() => {
-    // Try to load persisted data first
-    const persistedData = localStorage.getItem(`weightTestData_${callNo}`);
+    // Get callNo for localStorage key
+    const currentCallNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
 
-    if (persistedData) {
-      try {
-        return JSON.parse(persistedData);
-      } catch (e) {
-        console.error('Error parsing persisted weight test data:', e);
+    // ✅ CRITICAL: Try to load from localStorage first on page load
+    if (currentCallNo) {
+      const persistedData = localStorage.getItem(`weightTestData_${currentCallNo}`);
+      if (persistedData) {
+        try {
+          const parsed = JSON.parse(persistedData);
+          console.log('✅ Loaded persisted data from localStorage on page load');
+          return parsed;
+        } catch (e) {
+          console.error('Error parsing persisted data:', e);
+        }
       }
     }
 
-    // Initialize new data
-    const initial = {};
-    lotsData.forEach(lot => {
-      initial[lot.lotNo] = {
-        weight1st: Array(lot.sampleSize).fill(''),
-        weight2nd: Array(lot.sampleSize2nd).fill(''),
-        remarks: ''
-      };
-    });
-    return initial;
+    // Fallback: Initialize empty data structure from lotsFromVendor
+    // Note: We use lotsFromVendor here because lotsData is not yet computed
+    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    if (lots.length === 0 && currentCallNo) {
+      try {
+        const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+        if (storedCache) {
+          const cacheData = JSON.parse(storedCache);
+          lots = cacheData[currentCallNo]?.finalLotDetails || [];
+        }
+      } catch (e) {
+        console.error('Error reading from sessionStorage:', e);
+      }
+    }
+
+    return lots.reduce(
+      (acc, lot) => {
+        const lotNo = lot.lotNo || lot.lotNumber;
+        const aql = getDimensionWeightAQL(lot.lotSize || lot.offeredQty || 0);
+        return {
+          ...acc,
+          [lotNo]: {
+            weight1st: Array(aql.n1).fill(''),
+            weight2nd: Array(aql.n2).fill(''),
+            remarks: ''
+          }
+        };
+      },
+      {}
+    );
   });
+
+  // Initialize state when lotsData becomes available
+  useEffect(() => {
+    if (lotsData.length > 0 && Object.keys(lotStates).length === 0) {
+      console.log('🔧 Initializing lot states for', lotsData.length, 'lots');
+      const initialState = lotsData.reduce(
+        (acc, lot) => ({
+          ...acc,
+          [lot.lotNo]: {
+            weight1st: Array(lot.sampleSize).fill(''),
+            weight2nd: Array(lot.sampleSize2nd).fill(''),
+            remarks: ''
+          }
+        }),
+        {}
+      );
+      setLotStates(initialState);
+      console.log('✅ Initialized lot states:', initialState);
+    }
+  }, [lotsData, lotStates]);
+
+  // Load data from database or localStorage when page loads
+  useEffect(() => {
+    if (lotsData.length > 0) {
+      const loadData = async () => {
+        try {
+          // Try to load persisted draft data first (highest priority)
+          const persistedData = localStorage.getItem(`weightTestData_${callNo}`);
+          if (persistedData) {
+            try {
+              const parsedData = JSON.parse(persistedData);
+              setLotStates(parsedData);
+              console.log('✅ Loaded draft data from localStorage');
+              return;
+            } catch (e) {
+              console.error('Error parsing persisted data:', e);
+            }
+          }
+
+          // If no draft data, fetch from database
+          console.log('📥 Fetching weight test data from database for call:', callNo);
+          const response = await getWeightTestsByCall(callNo);
+          const dbData = response?.responseData || [];
+
+          console.log('Weight test data from DB:', dbData);
+
+          // Merge database data with initialized lot data
+          const mergedData = { ...lotsData.reduce((acc, lot) => ({
+            ...acc,
+            [lot.lotNo]: {
+              weight1st: Array(lot.sampleSize).fill(''),
+              weight2nd: Array(lot.sampleSize2nd).fill(''),
+              remarks: ''
+            }
+          }), {}) };
+
+          // Map database records to frontend format
+          dbData.forEach(record => {
+            if (mergedData[record.lotNo]) {
+              // Extract samples by sampling number
+              const samples1st = record.samples?.filter(s => s.samplingNo === 1) || [];
+              const samples2nd = record.samples?.filter(s => s.samplingNo === 2) || [];
+
+              // Find the lot to get correct sample sizes
+              const lot = lotsData.find(l => l.lotNo === record.lotNo);
+              if (!lot) return;
+
+              // Map samples to weight values, maintaining correct array size
+              if (samples1st.length > 0) {
+                const sortedSamples = samples1st.sort((a, b) => a.sampleNo - b.sampleNo);
+                mergedData[record.lotNo].weight1st = Array(lot.sampleSize).fill('');
+                sortedSamples.forEach(s => {
+                  if (s.sampleNo > 0 && s.sampleNo <= lot.sampleSize) {
+                    mergedData[record.lotNo].weight1st[s.sampleNo - 1] = s.sampleValue ? String(s.sampleValue) : '';
+                  }
+                });
+              }
+
+              if (samples2nd.length > 0) {
+                const sortedSamples = samples2nd.sort((a, b) => a.sampleNo - b.sampleNo);
+                mergedData[record.lotNo].weight2nd = Array(lot.sampleSize2nd).fill('');
+                sortedSamples.forEach(s => {
+                  if (s.sampleNo > 0 && s.sampleNo <= lot.sampleSize2nd) {
+                    mergedData[record.lotNo].weight2nd[s.sampleNo - 1] = s.sampleValue ? String(s.sampleValue) : '';
+                  }
+                });
+              }
+
+              mergedData[record.lotNo].remarks = record.remarks || '';
+            }
+          });
+
+          setLotStates(mergedData);
+          // ✅ CRITICAL: Persist fetched data immediately to localStorage
+          localStorage.setItem(`weightTestData_${callNo}`, JSON.stringify(mergedData));
+          console.log('✅ Loaded and persisted data from database');
+        } catch (error) {
+          console.error('Error loading weight test data:', error);
+        }
+      };
+
+      loadData();
+    }
+  }, [callNo, lotsData]);
 
   // Persist data whenever lotStates changes
   useEffect(() => {
@@ -287,7 +418,12 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
 
       {/* ALL LOTS */}
       {lotsData.map(lot => {
-        const state = lotStates[lot.lotNo];
+        const state = lotStates[lot.lotNo] || {
+          weight1st: Array(lot.sampleSize).fill(''),
+          weight2nd: Array(lot.sampleSize2nd).fill(''),
+          remarks: ''
+        };
+
         const summary = getSummary(lot);
 
         /* Pagination values for 1st sampling */
@@ -428,11 +564,6 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
         );
       })}
 
-      {/* Page Actions */}
-      {/* <div className="wt-action">
-        <button className="wt-btn-outline" onClick={onBack}>Cancel</button>
-        <button className="wt-btn-primary" onClick={() => alert('Saved!')}>Save & Continue</button>
-      </div> */}
     </div>
   );
 }

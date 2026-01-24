@@ -366,12 +366,29 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       }
     }
 
-    // Initialize new data
-    const initial = {};
-    if (lotsFromVendorCall && Array.isArray(lotsFromVendorCall) && lotsFromVendorCall.length > 0) {
+    // Return empty object - will be initialized in useEffect when lots are loaded
+    return {};
+  });
+
+  // Initialize lot inspection data when lots are first loaded
+  useEffect(() => {
+    const callNo = selectedCall?.call_no;
+    if (!callNo || !lotsFromVendorCall || lotsFromVendorCall.length === 0) return;
+
+    // Check if data is already initialized for these lots
+    setLotInspectionData(prev => {
+      const needsInitialization = lotsFromVendorCall.some(lot => !prev[lot.lotNo]);
+
+      if (!needsInitialization) {
+        // All lots already have data, don't reinitialize
+        return prev;
+      }
+
+      // Initialize missing lots
+      const updated = { ...prev };
       lotsFromVendorCall.forEach(lot => {
-        if (lot && lot.lotNo) {
-          initial[lot.lotNo] = {
+        if (lot && lot.lotNo && !updated[lot.lotNo]) {
+          updated[lot.lotNo] = {
             stdPackingNo: 50,
             bagsStdPacking: '',
             nonStdBagsCount: 0,
@@ -382,9 +399,10 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
           };
         }
       });
-    }
-    return initial;
-  });
+      console.log('✅ Lot inspection data initialized for new lots');
+      return updated;
+    });
+  }, [selectedCall?.call_no, lotsFromVendorCall]);
 
   // Restore form state from localStorage on component mount
   useEffect(() => {
@@ -984,7 +1002,7 @@ Workflow Status: ✅ Transitioned to COMPLETED
       const workflowActionData = {
         workflowTransitionId: selectedCall?.workflowTransitionId || selectedCall?.id,
         requestId: callNo,
-        action: 'INSPECTION_PAUSED',
+        action: 'PAUSE_INSPECTION_RESUME_NEXT_DAY',
         remarks: 'Final Product Inspection paused - will resume next day',
         actionBy: userId,
         pincode: selectedCall?.pincode || '560001'
@@ -1196,6 +1214,56 @@ Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
           </label>
         </div>
       </div>
+  {/* CUMULATIVE RESULTS SECTION */}
+          <div className="fp-card">
+        <h2 className="fp-card-title">Cumulative Results</h2>
+        <div className="fp-cumulative-grid">
+          <FormField label="1. Quantity on Order (PO Qty)">
+            <input className="fp-input" value={poData?.po_qty || 10000} disabled />
+          </FormField>
+          <FormField label="2. Cumm. Qty Offered Previously">
+            <input className="fp-input" value={poData?.cummQtyOfferedPreviously || 2500} disabled />
+          </FormField>
+          <FormField label="3. Cumm. Qty Passed Previously">
+            <input className="fp-input" value={poData?.cummQtyPassedPreviously || 2400} disabled />
+          </FormField>
+          <FormField label="4. Qty Now Offered">
+            <input className="fp-input" value={totalQtyOffered} disabled />
+          </FormField>
+          <FormField label="5. Qty Now Passed">
+            <input
+              className="fp-input"
+              value={(() => {
+                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
+                return totalQtyOffered - ercUsed - qtyRejected;
+              })()}
+              disabled
+            />
+          </FormField>
+          <FormField label="6. Qty Now Rejected">
+            <input
+              className="fp-input"
+              value={lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0)}
+              disabled
+            />
+          </FormField>
+          <FormField label="7. Qty Still Due">
+            <input
+              className="fp-input"
+              value={(() => {
+                const poQty = poData?.po_qty || 10000;
+                const cummPassed = poData?.cummQtyPassedPreviously || 2400;
+                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
+                const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
+                return poQty - cummPassed - qtyNowPassed;
+              })()}
+              disabled
+            />
+          </FormField>
+            </div>
+          </div>
 
       {/* FINAL INSPECTION RESULTS - Each Lot Displayed Separately */}
       <div className="fp-card">
@@ -1433,57 +1501,7 @@ Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
         }) : null}
           </div>
 
-          {/* CUMULATIVE RESULTS SECTION */}
-          <div className="fp-card">
-        <h2 className="fp-card-title">Cumulative Results</h2>
-        <div className="fp-cumulative-grid">
-          <FormField label="1. Quantity on Order (PO Qty)">
-            <input className="fp-input" value={poData?.po_qty || 10000} disabled />
-          </FormField>
-          <FormField label="2. Cumm. Qty Offered Previously">
-            <input className="fp-input" value={poData?.cummQtyOfferedPreviously || 2500} disabled />
-          </FormField>
-          <FormField label="3. Cumm. Qty Passed Previously">
-            <input className="fp-input" value={poData?.cummQtyPassedPreviously || 2400} disabled />
-          </FormField>
-          <FormField label="4. Qty Now Offered">
-            <input className="fp-input" value={totalQtyOffered} disabled />
-          </FormField>
-          <FormField label="5. Qty Now Passed">
-            <input
-              className="fp-input"
-              value={(() => {
-                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
-                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
-                return totalQtyOffered - ercUsed - qtyRejected;
-              })()}
-              disabled
-            />
-          </FormField>
-          <FormField label="6. Qty Now Rejected">
-            <input
-              className="fp-input"
-              value={lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0)}
-              disabled
-            />
-          </FormField>
-          <FormField label="7. Qty Still Due">
-            <input
-              className="fp-input"
-              value={(() => {
-                const poQty = poData?.po_qty || 10000;
-                const cummPassed = poData?.cummQtyPassedPreviously || 2400;
-                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
-                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
-                const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
-                return poQty - cummPassed - qtyNowPassed;
-              })()}
-              disabled
-            />
-          </FormField>
-            </div>
-          </div>
-
+        
           {/* ACTION BUTTONS */}
           <div className="fp-actions">
             <button

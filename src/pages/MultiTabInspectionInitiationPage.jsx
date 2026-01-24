@@ -254,6 +254,42 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
         console.log('Saving initiation for call:', call.call_no, initiationData);
         const result = await saveInspectionInitiation(initiationData);
         console.log('Saved successfully:', call.call_no, result);
+
+        // Fetch the latest workflow transition ID AFTER saving inspection initiation
+        // This ensures we have the correct transition ID for the workflow action
+        try {
+          const latestTransitionAfterSave = await fetchLatestWorkflowTransition(call.call_no);
+          if (latestTransitionAfterSave && latestTransitionAfterSave.workflowTransitionId) {
+            workflowTransitionId = latestTransitionAfterSave.workflowTransitionId;
+            console.log(`✅ Updated workflowTransitionId after save: ${workflowTransitionId} for ${call.call_no}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Failed to fetch latest workflow transition after save for ${call.call_no}, using previous ID:`, error);
+          // Continue with the previous workflowTransitionId
+        }
+
+        // Trigger workflow API with ENTER_SHIFT_DETAILS_AND_START_INSPECTION action
+        console.log('🔄 Triggering workflow API for Inspection Initiation...');
+        const workflowActionData = {
+          workflowTransitionId: workflowTransitionId,
+          requestId: call.call_no,
+          action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
+          remarks: `Inspection initiated - Shift: ${initiateShift}, Date: ${initiateDate}`,
+          actionBy: userId,
+          pincode: call.pincode || '560001',
+          materialAvailable: 'YES'
+        };
+
+        console.log('Workflow Action Data:', workflowActionData);
+
+        try {
+          await performTransitionAction(workflowActionData);
+          console.log('✅ Workflow transition successful for call:', call.call_no);
+        } catch (workflowError) {
+          console.error('❌ Workflow API error for call:', call.call_no, workflowError);
+          throw new Error(workflowError.message || `Failed to initiate inspection for ${call.call_no} via workflow`);
+        }
+
         savedCalls.push(call.call_no);
       }
 

@@ -571,18 +571,34 @@ const VisualMaterialTestingPage = ({ onBack, heats = [], productModel = 'ERC-12'
 
           {/* Heat selector buttons */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              {heats.map((h, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
-                  onClick={() => setActiveHeatTab(idx)}
-                >
-                  {`Heat ${h.heatNo || `#${idx + 1}`}`}
-                </button>
-              ))}
-            </div>
+            {(() => {
+              // Check if all heats have the same heat number
+              const uniqueHeatNumbers = new Set(heats.map(h => h.heatNo || h.heat_no));
+              const hasSingleUniqueHeat = uniqueHeatNumbers.size === 1;
+
+              if (hasSingleUniqueHeat) {
+                return (
+                  <div style={{ padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 600, color: '#166534' }}>{`Heat ${heats[0].heatNo || `#1`}`}</span>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  {heats.map((h, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
+                      onClick={() => setActiveHeatTab(idx)}
+                    >
+                      {`Heat ${h.heatNo || `#${idx + 1}`}`}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Visual Defects Checklist */}
             <h4 style={{ marginBottom: '12px' }}>Visual Defects Checklist</h4>

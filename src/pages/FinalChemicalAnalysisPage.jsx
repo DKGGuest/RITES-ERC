@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
-import { getLadleValuesByCall } from "../services/finalInspectionSubmoduleService";
+import { getChemicalAnalysisByCall } from "../services/finalInspectionSubmoduleService";
 import "./FinalChemicalAnalysisPage.css";
 
 const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
@@ -55,43 +55,83 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
     return {};
   });
 
-  const [ladleValues, setLadleValues] = useState({});
-
   // Map live lot data to component format (after state declarations)
+  // Ladle values are always 0 for all lots
   const availableLots = lotsFromVendor.map(lot => ({
     lotNo: lot.lotNo || lot.lotNumber,
     heatNo: lot.heatNo || lot.heatNumber,
     quantity: lot.lotSize || lot.offeredQty || 0,
-    // Use fetched ladle values if available, otherwise use defaults
-    ladleAnalysis: ladleValues[lot.lotNo || lot.lotNumber] || { c: 0, si: 0, mn: 0, s: 0, p: 0 },
+    // Ladle values always display as 0
+    ladleAnalysis: { c: 0, si: 0, mn: 0, s: 0, p: 0 },
   }));
 
   const [expandedLot, setExpandedLot] = useState(availableLots[0]?.lotNo || ""); // Default to first lot
 
-  // Fetch ladle values from backend
+  // Fetch product values from backend
   useEffect(() => {
     if (callNo) {
-      getLadleValuesByCall(callNo)
-        .then((response) => {
-          if (response?.data) {
-            // Convert array of ladle values to object keyed by lotNo
-            const ladleMap = {};
-            response.data.forEach((ladle) => {
-              ladleMap[ladle.lotNo] = {
-                c: ladle.percentC,
-                si: ladle.percentSi,
-                mn: ladle.percentMn,
-                s: ladle.percentS,
-                p: ladle.percentP,
-              };
+      getChemicalAnalysisByCall(callNo)
+        .then((chemicalResponse) => {
+          // Extract product values (final composition analysis already entered)
+          const chemicalData = chemicalResponse?.responseData || chemicalResponse?.data || [];
+          if (Array.isArray(chemicalData) && chemicalData.length > 0) {
+            const chemMap = {};
+            const remarksMap = {};
+            chemicalData.forEach((chem) => {
+              const lotNo = chem.lotNo;
+              if (!chemMap[lotNo]) {
+                chemMap[lotNo] = {};
+              }
+              // Store product values by element
+              chemMap[lotNo].c = chem.carbonPercent;
+              chemMap[lotNo].si = chem.siliconPercent;
+              chemMap[lotNo].mn = chem.manganesePercent;
+              chemMap[lotNo].s = chem.sulphurPercent;
+              chemMap[lotNo].p = chem.phosphorusPercent;
+              // Extract remarks from API response
+              remarksMap[lotNo] = chem.remarks || "";
             });
-            setLadleValues(ladleMap);
-            console.log('✅ Ladle values loaded:', ladleMap);
+
+            // Merge with persisted data - persisted data takes priority (user edits)
+            setChemValues((prevChemValues) => {
+              const mergedValues = { ...chemMap };
+              // If user has already edited values, keep them
+              Object.keys(prevChemValues).forEach((lotNo) => {
+                if (mergedValues[lotNo]) {
+                  // Keep any non-empty user-edited values
+                  Object.keys(prevChemValues[lotNo]).forEach((element) => {
+                    if (prevChemValues[lotNo][element] !== "" && prevChemValues[lotNo][element] !== undefined) {
+                      mergedValues[lotNo][element] = prevChemValues[lotNo][element];
+                    }
+                  });
+                } else {
+                  // If lot doesn't exist in API response, keep user's data
+                  mergedValues[lotNo] = prevChemValues[lotNo];
+                }
+              });
+              console.log('✅ Product values loaded and merged:', mergedValues);
+              return mergedValues;
+            });
+
+            // Merge remarks with persisted data - persisted data takes priority (user edits)
+            setRemarks((prevRemarks) => {
+              const mergedRemarks = { ...remarksMap };
+              // If user has already edited remarks, keep them
+              Object.keys(prevRemarks).forEach((lotNo) => {
+                if (prevRemarks[lotNo] !== "" && prevRemarks[lotNo] !== undefined) {
+                  mergedRemarks[lotNo] = prevRemarks[lotNo];
+                }
+              });
+              console.log('✅ Remarks loaded and merged:', mergedRemarks);
+              return mergedRemarks;
+            });
+          } else {
+            console.log('ℹ️ No product values found - starting fresh');
           }
         })
         .catch((error) => {
-          console.error('❌ Error loading ladle values:', error);
-          // Continue without ladle values - they're optional
+          console.error('❌ Error loading product values:', error);
+          // Continue without data - they're optional
         });
     }
   }, [callNo]);

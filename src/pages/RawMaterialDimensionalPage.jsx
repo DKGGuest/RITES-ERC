@@ -128,18 +128,34 @@ const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'MK-III
           </div>
 
           {/* Heat selector buttons */}
-          <div className="dim-heat-selector">
-            {heats.map((h, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
-                onClick={() => setActiveHeatTab(idx)}
-              >
-                {`Heat ${h.heatNo || `#${idx + 1}`}`}
-              </button>
-            ))}
-          </div>
+          {(() => {
+            // Check if all heats have the same heat number
+            const uniqueHeatNumbers = new Set(heats.map(h => h.heatNo || h.heat_no));
+            const hasSingleUniqueHeat = uniqueHeatNumbers.size === 1;
+
+            if (hasSingleUniqueHeat) {
+              return (
+                <div className="dim-heat-selector dim-heat-single">
+                  <span className="dim-heat-single-label">{`Heat ${heats[0].heatNo || `#1`}`}</span>
+                </div>
+              );
+            }
+
+            return (
+              <div className="dim-heat-selector">
+                {heats.map((h, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
+                    onClick={() => setActiveHeatTab(idx)}
+                  >
+                    {`Heat ${h.heatNo || `#${idx + 1}`}`}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Standard Diameter Info */}
           <div className="dim-form-grid">
@@ -191,7 +207,9 @@ const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'MK-III
               const hd = heatDimData[activeHeatTab] || {};
               const samples = hd.dimSamples || [];
               return samples.map((s, idx) => {
-                const validationStatus = validateSample(s.diameter);
+                // Handle null or undefined sample objects
+                const sample = s || { diameter: '' };
+                const validationStatus = validateSample(sample.diameter);
                 const inputClassName = `dim-form-input${validationStatus === 'valid' ? ' dim-input--valid' : ''}${validationStatus === 'invalid' ? ' dim-input--invalid' : ''}`;
                 return (
                   <div key={idx} className="dim-form-group dimensional-sample-card">
@@ -202,7 +220,7 @@ const RawMaterialDimensionalPage = ({ onBack, heats = [], productModel = 'MK-III
                       type="number"
                       step="0.01"
                       className={inputClassName}
-                      value={s.diameter}
+                      value={sample.diameter}
                       onChange={(e) => handleDimSampleChange(idx, e.target.value)}
                       placeholder="Bar Diameter (mm)"
                     />

@@ -1,6 +1,6 @@
 import React from "react";
 
-const ErcFinalIc = ({ data = {} }) => {
+const ErcFinalIc = ({ data = {}, isEditing = false, onFieldChange = () => {} }) => {
   const {
     certificateNo = "",
     certificateDate = "",
@@ -30,7 +30,7 @@ const ErcFinalIc = ({ data = {} }) => {
     sealingPattern = "",
     facsimileText = "",
     reasonsForRejection = "Not Applicable",
-    inspectingEngineer = "",
+    inspectingEngineer = ""
   } = data;
 
   const cell = "border border-black p-2 align-top break-words dynamic-text";
@@ -41,6 +41,33 @@ const ErcFinalIc = ({ data = {} }) => {
     .replace(/[\uFEFF\u200B]/g, '')
     .replace(/[\r\n]+/g, ' ')
     .trim();
+
+  // Editable field component
+  const EditableField = ({ value, fieldName, placeholder = "" }) => {
+    if (isEditing) {
+      return (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onFieldChange(fieldName, e.target.value)}
+          placeholder={placeholder}
+          style={{
+            width: "100%",
+            padding: "4px",
+            border: "1px solid #ccc",
+            borderRadius: "2px",
+            fontSize: "inherit",
+            fontFamily: "inherit"
+          }}
+        />
+      );
+    }
+    return <span>{value}</span>;
+  };
+
+  // Note: Additional fields from API (lotDetails, remarks, totalLots, totalOfferedQty, totalAcceptedQty, totalRejectedQty)
+  // are available but not displayed in the current certificate layout.
+  // These can be used for future enhancements or additional reporting.
 
   return (
     <div className="a4-page">
@@ -83,8 +110,8 @@ const ErcFinalIc = ({ data = {} }) => {
                   <div className="font-bold text-center text-sm">
                     प्रमाणपत्र सं. Certificate No.
                   </div>
-                  <div className="mt-1 text-red-600 text-center whitespace-pre-wrap">
-                    {displayCertificateNo}
+                  <div className="mt-1 text-red-600 text-center whitespace-pre-wrap" style={{ cursor: isEditing ? "text" : "default" }}>
+                    <EditableField value={displayCertificateNo} fieldName="certificateNo" placeholder="Enter Certificate No." />
                   </div>
                 </div>
               </th>
@@ -93,8 +120,8 @@ const ErcFinalIc = ({ data = {} }) => {
                   <div className="font-bold text-center text-sm">
                     दिनांक Date
                   </div>
-                  <div className="mt-1 text-red-600 text-center whitespace-pre-wrap">
-                    {certificateDate}
+                  <div className="mt-1 text-red-600 text-center whitespace-pre-wrap" style={{ cursor: isEditing ? "text" : "default" }}>
+                    <EditableField value={certificateDate} fieldName="certificateDate" placeholder="DD.MM.YYYY" />
                   </div>
                 </div>
               </th>

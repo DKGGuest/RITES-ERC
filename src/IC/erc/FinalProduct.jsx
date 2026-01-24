@@ -1,63 +1,62 @@
 // src/IC/erc/FinalProductCertificate.jsx
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import ErcFinalIc from "./ErcFinalIc";
 import { exportToPdf } from "../../utils/exportUtils";
 
 /**
  * FINAL PRODUCT CERTIFICATE (Wrapper)
- * Shows EMPTY layout by default and renders API data when provided.
+ * Displays blank certificate with certificate number and date.
+ * All fields are editable.
  *
- * - NO mock data
- * - NO default values
- * - Layout NEVER changes
- * - API integration becomes trivial
+ * - NO API calls
+ * - Editable fields
+ * - Print and Export functionality
  */
 export default function FinalProductCertificate({ call = {}, onBack }) {
   const printAreaRef = useRef();
+  const [isEditing, setIsEditing] = useState(false);
+  const [data, setData] = useState({
+    certificateNo: call.icNo || "",
+    certificateDate: new Date().toLocaleDateString('en-GB'),
+    offeredInstNo: "",
+    passedInstNo: "",
+    contractor: "",
+    placeOfInspection: "",
+    contractRef: "",
+    contractRefDate: "",
+    billPayingOfficer: "",
+    consignee: "",
+    purchasingAuthority: "",
+    description: "",
+    quantityNowPassedText: "",
+    qtyOnOrder: "",
+    qtyOfferedPreviously: "",
+    qtyPassedPreviously: "",
+    qtyNowOffered: "",
+    qtyNowPassed: "",
+    qtyNowRejected: "",
+    qtyStillDue: "",
+    noOfItemsChecked: "",
+    dateOfCall: "",
+    noOfVisits: "",
+    datesOfInspection: "",
+    trRecDate: "",
+    sealingPattern: "",
+    facsimileText: "",
+    reasonsForRejection: "Not Applicable",
+    inspectingEngineer: "",
+    lotDetails: [],
+    remarks: "",
+  });
 
-  /**
-   * Transform API response to component format.
-   * KEEP IT MINIMAL: Do NOT insert default values.
-   */
-  const transformCallToIC = (c) => {
-    if (!c || Object.keys(c).length === 0) return {};
-
-    return {
-      certificateNo: c.certificateNo || "",
-      certificateDate: c.certificateDate || "",
-      offeredInstNo: c.offeredInstNo || "",
-      passedInstNo: c.passedInstNo || "",
-      contractor: c.contractor || "",
-      placeOfInspection: c.placeOfInspection || "",
-      contractRef: c.contractRef || "",
-      contractRefDate: c.contractRefDate || "",
-      billPayingOfficer: c.billPayingOfficer || "",
-      consignee: c.consignee || "",
-      purchasingAuthority: c.purchasingAuthority || "",
-      description: c.description || "",
-      quantityNowPassedText: c.quantityNowPassedText || "",
-      qtyOnOrder: c.qtyOnOrder || "",
-      qtyOfferedPreviously: c.qtyOfferedPreviously || "",
-      qtyPassedPreviously: c.qtyPassedPreviously || "",
-      qtyNowOffered: c.qtyNowOffered || "",
-      qtyNowPassed: c.qtyNowPassed || "",
-      qtyNowRejected: c.qtyNowRejected || "",
-      qtyStillDue: c.qtyStillDue || "",
-      noOfItemsChecked: c.noOfItemsChecked || "",
-      dateOfCall: c.dateOfCall || "",
-      noOfVisits: c.noOfVisits || "",
-      datesOfInspection: c.datesOfInspection || "",
-      trRecDate: c.trRecDate || "",
-      sealingPattern: c.sealingPattern || "",
-      facsimileText: c.facsimileText || "",
-      reasonsForRejection: c.reasonsForRejection || "Not Applicable",
-      inspectingEngineer: c.inspectingEngineer || "",
-    };
+  // Handle field changes when editing
+  const handleFieldChange = (fieldName, value) => {
+    setData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
   };
-
-  // FINAL DATA: empty layout OR API populated
-  const data = transformCallToIC(call);
 
   const handleExport = async () => {
     if (!printAreaRef.current) return;
@@ -77,15 +76,28 @@ export default function FinalProductCertificate({ call = {}, onBack }) {
         <button onClick={onBack} className="btn btn-outline">← Back</button>
 
         <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className={isEditing ? "btn btn-primary" : "btn btn-outline"}
+          >
+            {isEditing ? "✓ Done Editing" : "✎ Edit"}
+          </button>
           <button onClick={() => window.print()} className="btn btn-outline">Print</button>
           <button onClick={handleExport} className="btn btn-primary">Export PDF</button>
         </div>
       </div>
 
+      {/* Edit Mode Info */}
+      {isEditing && (
+        <div className="no-print" style={{ padding: 12, backgroundColor: "#fff3cd", borderRadius: 4, marginBottom: 12 }}>
+          <p style={{ margin: 0, color: "#856404" }}>✎ Edit mode enabled - Click fields to edit certificate data</p>
+        </div>
+      )}
+
       {/* Printable content - Wrapped for proper print isolation */}
       <div className="certificate-print-wrapper" ref={printAreaRef}>
         <div className="certificate-page">
-          <ErcFinalIc data={data} />
+          <ErcFinalIc data={data} isEditing={isEditing} onFieldChange={handleFieldChange} />
         </div>
       </div>
     </div>

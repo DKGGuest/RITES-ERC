@@ -732,12 +732,13 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
       }
 
       onFormDataChange({ sectionBVerified: true, sectionBStatus: 'approved' });
-      // COMMENTED OUT: Section C not needed for Process Inspection
-      // const productType = call?.product_type || '';
-      // const isSectionCRequired = productType === 'Raw Material' || productType.includes('Process');
-      // if (isSectionCRequired) {
-      //   setSectionCExpanded(true);
-      // }
+
+      // Auto-expand Section C when Section B is approved (for Raw Material only)
+      const productType = call?.product_type || '';
+      const isSectionCRequired = productType === 'Raw Material' || productType.includes('Raw');
+      if (isSectionCRequired) {
+        setSectionCExpanded(true);
+      }
     } catch (error) {
       console.error('Error saving Section B:', error);
       setSaveError(error.message || 'Failed to save Section B. Please try again.');

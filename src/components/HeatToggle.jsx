@@ -2,7 +2,7 @@ import './HeatToggle.css';
 
 /**
  * Heat Toggle Component - Allows switching between heats in Raw Material submodules
- * Similar implementation to Visual Defects Checklist heat selector
+ * Consolidates duplicate heat numbers to show only unique heats
  */
 const HeatToggle = ({ heats = [], activeHeatIndex = 0, onHeatChange }) => {
   // Filter out empty heats (heats with no heatNo)
@@ -19,16 +19,44 @@ const HeatToggle = ({ heats = [], activeHeatIndex = 0, onHeatChange }) => {
     );
   }
 
+  // Consolidate duplicate heat numbers - create a map of unique heat numbers to their first occurrence index
+  const uniqueHeatsMap = new Map();
+  const uniqueHeatsArray = [];
+
+  validHeats.forEach((heat, idx) => {
+    const heatNo = heat.heatNo || heat.heat_no;
+    if (!uniqueHeatsMap.has(heatNo)) {
+      uniqueHeatsMap.set(heatNo, idx);
+      uniqueHeatsArray.push({ heat, originalIndex: idx, heatNo });
+    }
+  });
+
+  // Find which unique heat index corresponds to the active heat
+  const activeHeatNo = validHeats[activeHeatIndex]?.heatNo || validHeats[activeHeatIndex]?.heat_no;
+  const activeUniqueIndex = uniqueHeatsArray.findIndex(item => item.heatNo === activeHeatNo);
+
+  // If only one unique heat, display as a simple label without toggle buttons
+  if (uniqueHeatsArray.length === 1) {
+    const singleHeat = uniqueHeatsArray[0];
+    return (
+      <div className="heat-toggle-container heat-single-display">
+        <span className="heat-single-label">
+          Heat {singleHeat.heatNo || `H${String(1).padStart(3, '0')}`}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="heat-toggle-container">
-      {validHeats.map((heat, idx) => (
+      {uniqueHeatsArray.map((item, uniqueIdx) => (
         <button
-          key={idx}
+          key={item.heatNo}
           type="button"
-          className={`heat-toggle-btn ${idx === activeHeatIndex ? 'active' : ''}`}
-          onClick={() => onHeatChange(idx)}
+          className={`heat-toggle-btn ${uniqueIdx === activeUniqueIndex ? 'active' : ''}`}
+          onClick={() => onHeatChange(item.originalIndex)}
         >
-          {`Heat ${heat.heatNo || heat.heat_no || `H${String(idx + 1).padStart(3, '0')}`}`}
+          {`Heat ${item.heatNo || `H${String(uniqueIdx + 1).padStart(3, '0')}`}`}
         </button>
       ))}
     </div>

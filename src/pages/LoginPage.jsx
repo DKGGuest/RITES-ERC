@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { loginUser, storeAuthData, isAuthenticated, getStoredUser } from '../services/authService';
 import { ROUTES } from '../routes';
@@ -18,23 +18,25 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // Redirect if already authenticated - based on role
-  if (isAuthenticated()) {
-    const currentUser = getStoredUser();
-    let redirectPath = ROUTES.LANDING;
+  // Use useEffect to avoid calling navigate during render
+  useEffect(() => {
+    if (isAuthenticated()) {
+      const currentUser = getStoredUser();
+      let redirectPath = ROUTES.LANDING;
 
-    if (currentUser?.roleName === 'CM') {
-      redirectPath = ROUTES.CM_DASHBOARD;
-    } else if (currentUser?.roleName === 'CALL_DESK') {
-      redirectPath = ROUTES.CALL_DESK;
-    } else if (currentUser?.roleName === 'Finance') {
-      redirectPath = ROUTES.FINANCE;
-    } else {
-      redirectPath = location.state?.from?.pathname || ROUTES.LANDING;
+      if (currentUser?.roleName === 'CM') {
+        redirectPath = ROUTES.CM_DASHBOARD;
+      } else if (currentUser?.roleName === 'CALL_DESK') {
+        redirectPath = ROUTES.CALL_DESK;
+      } else if (currentUser?.roleName === 'Finance') {
+        redirectPath = ROUTES.FINANCE;
+      } else {
+        redirectPath = location.state?.from?.pathname || ROUTES.LANDING;
+      }
+
+      navigate(redirectPath, { replace: true });
     }
-
-    navigate(redirectPath, { replace: true });
-    return null;
-  }
+  }, [navigate, location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

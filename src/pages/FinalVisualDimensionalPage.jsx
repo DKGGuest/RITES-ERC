@@ -1,7 +1,8 @@
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
+import { getVisualInspectionByCallNo, getDimensionalInspectionFlatByCallNo } from "../services/finalVisualDimensionalService";
 
 // Table 2 mapping for Dimension & Weight AQL 2.5
 const samplingTable = [
@@ -82,6 +83,9 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
 
   const availableLots = useMemo(() => getAvailableLots(lotsFromVendor), [lotsFromVendor]);
 
+  // Track if we've already loaded data to prevent infinite loops
+  const dataLoadedRef = useRef(false);
+
   /* Section collapse states */
   const [visualExpanded, setVisualExpanded] = useState(true);
   const [dimensionalExpanded, setDimensionalExpanded] = useState(true);
@@ -95,6 +99,24 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
   const [dimPopupLot, setDimPopupLot] = useState(null);
 
   const [lotData, setLotData] = useState(() => {
+    // Get callNo for localStorage key
+    const currentCallNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
+
+    // ✅ CRITICAL: Try to load from localStorage first on page load
+    if (currentCallNo) {
+      const persistedData = localStorage.getItem(`visualDimensionalData_${currentCallNo}`);
+      if (persistedData) {
+        try {
+          const parsed = JSON.parse(persistedData);
+          console.log('✅ Loaded persisted data from localStorage on page load');
+          return parsed;
+        } catch (e) {
+          console.error('Error parsing persisted data:', e);
+        }
+      }
+    }
+
+    // Fallback: Initialize empty data structure
     return availableLots.reduce(
       (acc, lot) => ({
         ...acc,
@@ -139,23 +161,95 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
     });
   }, [availableLots]);
 
-  // Reinitialize lotData when call changes (when navigating back from other submodules)
+  // Load data from database or localStorage when page loads
   useEffect(() => {
-    if (availableLots.length > 0) {
-      // Try to load persisted data first
-      const persistedData = localStorage.getItem(`visualDimensionalData_${callNo}`);
+    if (availableLots.length > 0 && callNo && !dataLoadedRef.current) {
+      dataLoadedRef.current = true;
 
-      if (persistedData) {
+      const loadData = async () => {
         try {
-          const parsedData = JSON.parse(persistedData);
-          setLotData(parsedData);
-        } catch (e) {
-          console.error('Error parsing persisted data:', e);
+          // Try to load persisted draft data first (highest priority)
+          const persistedData = localStorage.getItem(`visualDimensionalData_${callNo}`);
+          if (persistedData) {
+            try {
+              const parsedData = JSON.parse(persistedData);
+              setLotData(parsedData);
+              console.log('✅ Loaded draft data from localStorage');
+              return;
+            } catch (e) {
+              console.error('Error parsing persisted data:', e);
+            }
+          }
+
+          // If no draft data, fetch from database
+          console.log('📥 Fetching data from database for call:', callNo);
+          const [visualResponse, dimensionalResponse] = await Promise.all([
+            getVisualInspectionByCallNo(callNo),
+            getDimensionalInspectionFlatByCallNo(callNo)
+          ]);
+
+          const visualData = visualResponse?.responseData || [];
+          const dimensionalData = dimensionalResponse?.responseData || [];
+
+          console.log('Visual data from DB:', visualData);
+          console.log('Dimensional data from DB:', dimensionalData);
+
+          // Merge database data with initialized lot data
+          const mergedData = { ...availableLots.reduce((acc, lot) => ({
+            ...acc,
+            [lot.lotNo]: {
+              visualR1: "",
+              visualR2: "",
+              visualRemark: "",
+              dimGo1: "",
+              dimNoGo1: "",
+              dimFlat1: "",
+              dimGo2: "",
+              dimNoGo2: "",
+              dimFlat2: "",
+              dimRemark: ""
+            }
+          }), {}) };
+
+          // Merge visual inspection data
+          visualData.forEach(record => {
+            if (mergedData[record.lotNo]) {
+              mergedData[record.lotNo].visualR1 = record.firstSampleRejected > 0 ? String(record.firstSampleRejected) : "";
+              mergedData[record.lotNo].visualR2 = record.secondSampleRejected > 0 ? String(record.secondSampleRejected) : "";
+              mergedData[record.lotNo].visualRemark = record.remarks || "";
+              console.log(`✅ Merged visual data for lot ${record.lotNo}:`, mergedData[record.lotNo]);
+            }
+          });
+
+          // Merge dimensional inspection data (FLAT STRUCTURE)
+          dimensionalData.forEach(record => {
+            if (mergedData[record.lotNo]) {
+              // 1st Sampling - map flat fields
+              mergedData[record.lotNo].dimGo1 = record.firstSampleGoGaugeFail > 0 ? String(record.firstSampleGoGaugeFail) : "";
+              mergedData[record.lotNo].dimNoGo1 = record.firstSampleNoGoFail > 0 ? String(record.firstSampleNoGoFail) : "";
+              mergedData[record.lotNo].dimFlat1 = record.firstSampleFlatBearingFail > 0 ? String(record.firstSampleFlatBearingFail) : "";
+
+              // 2nd Sampling - map flat fields
+              mergedData[record.lotNo].dimGo2 = record.secondSampleGoGaugeFail > 0 ? String(record.secondSampleGoGaugeFail) : "";
+              mergedData[record.lotNo].dimNoGo2 = record.secondSampleNoGoFail > 0 ? String(record.secondSampleNoGoFail) : "";
+              mergedData[record.lotNo].dimFlat2 = record.secondSampleFlatBearingFail > 0 ? String(record.secondSampleFlatBearingFail) : "";
+
+              mergedData[record.lotNo].dimRemark = record.remarks || "";
+              console.log(`✅ Merged dimensional data for lot ${record.lotNo}:`, mergedData[record.lotNo]);
+            }
+          });
+
+          setLotData(mergedData);
+          // ✅ CRITICAL: Persist fetched data to localStorage immediately
+          localStorage.setItem(`visualDimensionalData_${callNo}`, JSON.stringify(mergedData));
+          console.log('✅ Loaded data from database, merged, and persisted to localStorage');
+        } catch (error) {
+          console.error('Error loading data from database:', error);
           initializeLotData();
         }
-      } else {
-        initializeLotData();
-      }
+      };
+
+      loadData();
     }
   }, [callNo, availableLots, initializeLotData]);
 
@@ -167,11 +261,15 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
   }, [lotData, callNo]);
 
   const handleChange = (lotNo, field, value) => {
+    // Text fields: visualRemark, dimRemark - keep as string
+    // Numeric fields: all others - convert to number
+    const isTextField = field === "visualRemark" || field === "dimRemark";
+
     setLotData(prev => ({
       ...prev,
       [lotNo]: {
         ...prev[lotNo],
-        [field]: value === "" ? "" : Number(value)
+        [field]: isTextField ? value : (value === "" ? "" : Number(value))
       }
     }));
   };
@@ -563,10 +661,15 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
               const show2nd = !!showVisual2ndMap[lot.lotNo];
               const totalRejected = r1 + (show2nd ? r2 : 0);
 
+              // Check if any data has been filled
+              const hasData = d.visualR1 !== "" || d.visualR2 !== "" || d.visualRemark !== "";
+
               /* 2nd sampling logic: If R1 > Acceptance No., show 2nd sampling */
-              /* Final status: OK if R1 <= AccpNo, NOT OK if total >= CummRejNo */
+              /* Final status: OK if R1 <= AccpNo, NOT OK if total >= CummRejNo, PENDING if no data */
               const status =
-                r1 <= lot.accpNo
+                !hasData
+                  ? { text: "PENDING", color: "#f59e0b" }
+                  : r1 <= lot.accpNo
                   ? { text: "OK", color: "#22c55e" }
                   : totalRejected >= lot.cummRejNo
                   ? { text: "NOT OK", color: "#ef4444" }
@@ -675,8 +778,16 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
               const show2nd = !!showDim2ndMap[lot.lotNo];
               const totalRejected = r1 + (show2nd ? r2 : 0);
 
+              // Check if any data has been filled
+              const hasData = d.dimGo1 !== "" || d.dimNoGo1 !== "" || d.dimFlat1 !== "" ||
+                              d.dimGo2 !== "" || d.dimNoGo2 !== "" || d.dimFlat2 !== "" ||
+                              d.dimRemark !== "";
+
+              /* Final status: OK if R1 <= AccpNo, NOT OK if total >= CummRejNo, PENDING if no data */
               const status =
-                r1 <= lot.accpNo
+                !hasData
+                  ? { text: "PENDING", color: "#f59e0b" }
+                  : r1 <= lot.accpNo
                   ? { text: "OK", color: "#22c55e" }
                   : totalRejected >= lot.cummRejNo
                   ? { text: "NOT OK", color: "#ef4444" }

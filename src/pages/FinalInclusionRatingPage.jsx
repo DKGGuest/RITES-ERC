@@ -1,6 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useInspection } from '../context/InspectionContext';
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
+import {
+  getDepthOfDecarburizationByCall,
+  getInclusionRatingByCall,
+  getMicrostructureTestByCall,
+  getFreedomFromDefectsTestByCall
+} from '../services/finalInspectionSubmoduleService';
 
 /*
   Lots Data - Auto-fetched from Final Product Dashboard
@@ -106,6 +112,215 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       localStorage.setItem(`inclusionRatingData_${callNo}`, JSON.stringify(lotData));
     }
   }, [lotData, callNo]);
+
+  // Load data from backend when page loads (after pause/resume)
+  useEffect(() => {
+    if (callNo) {
+      const loadDataFromBackend = async () => {
+        try {
+          // Load persisted data for merging (to preserve user edits)
+          let persistedData = null;
+          const persistedDataStr = localStorage.getItem(`inclusionRatingData_${callNo}`);
+          if (persistedDataStr) {
+            try {
+              persistedData = JSON.parse(persistedDataStr);
+              console.log('📦 Loaded persisted data from localStorage for merging');
+            } catch (e) {
+              console.error('Error parsing persisted data:', e);
+            }
+          }
+
+          // Always fetch from backend to get latest data
+          console.log('📥 Fetching data from backend for call:', callNo);
+
+          const [decarbResponse, inclusionResponse, microstructureResponse, defectsResponse] = await Promise.all([
+            getDepthOfDecarburizationByCall(callNo),
+            getInclusionRatingByCall(callNo),
+            getMicrostructureTestByCall(callNo),
+            getFreedomFromDefectsTestByCall(callNo)
+          ]);
+
+          // Extract responseData from each response (handleResponse returns full response object)
+          const decarbData = decarbResponse?.responseData || [];
+          const inclusionData = inclusionResponse?.responseData || [];
+          const microstructureData = microstructureResponse?.responseData || [];
+          const defectsData = defectsResponse?.responseData || [];
+
+          console.log('✅ Backend responses received:', {
+            decarb: decarbData?.length || 0,
+            inclusion: inclusionData?.length || 0,
+            microstructure: microstructureData?.length || 0,
+            defects: defectsData?.length || 0
+          });
+
+          // Transform backend data to frontend format
+          const mergedData = {};
+          lotsWithSampleSize.forEach((lot) => {
+            mergedData[lot.lotNo] = {
+              microstructure1st: Array(lot.sampleSize).fill(''),
+              decarb1st: Array(lot.sampleSize).fill(''),
+              decarb2nd: Array(lot.sampleSize).fill(''),
+              inclusion1st: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
+              inclusion2nd: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
+              defects1st: Array(lot.sampleSize).fill(''),
+              defects2nd: Array(lot.sampleSize).fill(''),
+              microstructureRemarks: '',
+              decarbRemarks: '',
+              inclusionRemarks: '',
+              defectsRemarks: ''
+            };
+          });
+
+          // Merge Depth of Decarburization data
+          if (decarbData && Array.isArray(decarbData)) {
+            console.log('🔄 Merging decarb data:', decarbData);
+            decarbData.forEach((test) => {
+              const lotNo = test.lotNo;
+              if (lotNo && mergedData[lotNo]) {
+                mergedData[lotNo].decarbRemarks = test.remarks || '';
+
+                // Populate decarb samples
+                if (test.samples && Array.isArray(test.samples)) {
+                  test.samples.forEach((sample) => {
+                    if (sample.samplingNo === 1) {
+                      mergedData[lotNo].decarb1st[sample.sampleNo - 1] = sample.sampleValue || '';
+                    } else if (sample.samplingNo === 2) {
+                      mergedData[lotNo].decarb2nd[sample.sampleNo - 1] = sample.sampleValue || '';
+                    }
+                  });
+                }
+              }
+            });
+          }
+
+          // Merge Inclusion Rating data
+          if (inclusionData && Array.isArray(inclusionData)) {
+            console.log('🔄 Merging inclusion data:', inclusionData);
+            inclusionData.forEach((test) => {
+              const lotNo = test.lotNo;
+              if (lotNo && mergedData[lotNo]) {
+                mergedData[lotNo].inclusionRemarks = test.remarks || '';
+
+                // Populate inclusion samples
+                if (test.samples && Array.isArray(test.samples)) {
+                  test.samples.forEach((sample) => {
+                    const sampleIndex = sample.sampleNo - 1;
+                    const sampleData = {
+                      A: sample.sampleValueA || '',
+                      B: sample.sampleValueB || '',
+                      C: sample.sampleValueC || '',
+                      D: sample.sampleValueD || '',
+                      type: 'Thick'
+                    };
+
+                    if (sample.samplingNo === 1) {
+                      mergedData[lotNo].inclusion1st[sampleIndex] = sampleData;
+                    } else if (sample.samplingNo === 2) {
+                      mergedData[lotNo].inclusion2nd[sampleIndex] = sampleData;
+                    }
+                  });
+                }
+              }
+            });
+          }
+
+          // Merge Microstructure data
+          if (microstructureData && Array.isArray(microstructureData)) {
+            console.log('🔄 Merging microstructure data:', microstructureData);
+            microstructureData.forEach((test) => {
+              const lotNo = test.lotNo;
+              if (lotNo && mergedData[lotNo]) {
+                mergedData[lotNo].microstructureRemarks = test.remarks || '';
+
+                // Populate microstructure samples
+                if (test.samples && Array.isArray(test.samples)) {
+                  test.samples.forEach((sample) => {
+                    mergedData[lotNo].microstructure1st[sample.sampleNo - 1] = sample.sampleType || '';
+                  });
+                }
+              }
+            });
+          }
+
+          // Merge Freedom from Defects data
+          if (defectsData && Array.isArray(defectsData)) {
+            console.log('🔄 Merging defects data:', defectsData);
+            defectsData.forEach((test) => {
+              const lotNo = test.lotNo;
+              if (lotNo && mergedData[lotNo]) {
+                mergedData[lotNo].defectsRemarks = test.remarks || '';
+
+                // Populate defects samples
+                if (test.samples && Array.isArray(test.samples)) {
+                  test.samples.forEach((sample) => {
+                    if (sample.samplingNo === 1) {
+                      mergedData[lotNo].defects1st[sample.sampleNo - 1] = sample.sampleType || '';
+                    } else if (sample.samplingNo === 2) {
+                      mergedData[lotNo].defects2nd[sample.sampleNo - 1] = sample.sampleType || '';
+                    }
+                  });
+                }
+              }
+            });
+          }
+
+          // Merge with persisted data - user edits take priority
+          if (persistedData) {
+            console.log('🔄 Merging API data with persisted user edits');
+            Object.keys(persistedData).forEach((lotNo) => {
+              if (mergedData[lotNo]) {
+                // Preserve user-edited values from localStorage
+                // For arrays: keep non-empty user values
+                ['microstructure1st', 'decarb1st', 'decarb2nd', 'defects1st', 'defects2nd'].forEach((key) => {
+                  if (persistedData[lotNo][key]) {
+                    persistedData[lotNo][key].forEach((val, idx) => {
+                      if (val !== '' && val !== null && val !== undefined) {
+                        mergedData[lotNo][key][idx] = val;
+                      }
+                    });
+                  }
+                });
+
+                // For inclusion arrays (objects with A, B, C, D)
+                ['inclusion1st', 'inclusion2nd'].forEach((key) => {
+                  if (persistedData[lotNo][key]) {
+                    persistedData[lotNo][key].forEach((sample, idx) => {
+                      if (sample && typeof sample === 'object') {
+                        ['A', 'B', 'C', 'D', 'type'].forEach((field) => {
+                          if (sample[field] !== '' && sample[field] !== null && sample[field] !== undefined) {
+                            mergedData[lotNo][key][idx][field] = sample[field];
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+
+                // Preserve remarks
+                ['microstructureRemarks', 'decarbRemarks', 'inclusionRemarks', 'defectsRemarks'].forEach((key) => {
+                  if (persistedData[lotNo][key]) {
+                    mergedData[lotNo][key] = persistedData[lotNo][key];
+                  }
+                });
+              }
+            });
+            console.log('✅ User edits merged with API data');
+          }
+
+          console.log('📊 Final merged data before setting state:', mergedData);
+          setLotData(mergedData);
+          // ✅ CRITICAL: Persist merged data to localStorage immediately
+          localStorage.setItem(`inclusionRatingData_${callNo}`, JSON.stringify(mergedData));
+          console.log('✅ Loaded data from backend, merged with user edits, and persisted to localStorage');
+        } catch (error) {
+          console.error('Error loading data from backend:', error);
+          // Initialize empty data on error - data structure already initialized in useState
+        }
+      };
+
+      loadDataFromBackend();
+    }
+  }, [callNo, lotsWithSampleSize]);
 
   /* Handler for Microstructure change */
   const handleMicrostructureChange = (lotNo, idx, value) => {

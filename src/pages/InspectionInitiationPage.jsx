@@ -441,7 +441,43 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
         }
       } else {
         // Raw Material: Call real API
+        console.log('🔧 Raw Material: Calling saveInspectionInitiation and workflow API...');
         await saveInspectionInitiation(initiationData);
+
+        // Fetch the latest workflow transition ID AFTER saving inspection initiation for Raw Material
+        // This ensures we have the correct transition ID for the workflow action
+        try {
+          const latestTransitionAfterSave = await fetchLatestWorkflowTransition(call.call_no);
+          if (latestTransitionAfterSave && latestTransitionAfterSave.workflowTransitionId) {
+            workflowTransitionId = latestTransitionAfterSave.workflowTransitionId;
+            console.log(`✅ Updated workflowTransitionId after save: ${workflowTransitionId} for ${call.call_no}`);
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to fetch latest workflow transition after save, using previous ID:', error);
+          // Continue with the previous workflowTransitionId
+        }
+
+        // Trigger workflow API for Raw Material with ENTER_SHIFT_DETAILS_AND_START_INSPECTION action
+        console.log('🔄 Triggering workflow API for Raw Material Inspection Initiation...');
+        const workflowActionData = {
+          workflowTransitionId: workflowTransitionId,
+          requestId: call.call_no,
+          action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
+          remarks: `Inspection initiated - Shift: ${shiftOfInspection}, Date: ${dateOfInspection}`,
+          actionBy: userId,
+          pincode: call.pincode || '560001',
+          materialAvailable: 'YES'
+        };
+
+        console.log('Workflow Action Data:', workflowActionData);
+
+        try {
+          await performTransitionAction(workflowActionData);
+          console.log('✅ Workflow transition successful for Raw Material');
+        } catch (workflowError) {
+          console.error('❌ Workflow API error:', workflowError);
+          throw new Error(workflowError.message || 'Failed to initiate inspection via workflow');
+        }
       }
 
       // Mark call as under inspection in local storage

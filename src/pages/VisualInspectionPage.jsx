@@ -13,7 +13,8 @@ const WEIGHT_FACTORS = {
 };
 
 // Defects that contribute to total defective length
-const LENGTH_DEFECTS = ['Distortion', 'Twist', 'Kink', 'Not Straight', 'Fold', 'Lap', 'Crack'];
+// Includes all defect types: Distortion, Twist, Kink, Not Straight, Fold, Lap, Crack, Pit, Groove, Excessive Scaling, Internal Defect
+const LENGTH_DEFECTS = ['Distortion', 'Twist', 'Kink', 'Not Straight', 'Fold', 'Lap', 'Crack', 'Pit', 'Groove', 'Excessive Scaling', 'Internal Defect (Piping, Segregation)'];
 
 /**
  * Visual Inspection Page - Raw Material Sub-module
@@ -84,13 +85,25 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
   }, [heatVisualData, inspectionCallNo]);
 
   // Load visual inspection data from backend on component mount
+  // ONLY load from backend if localStorage is empty (preserve user edits)
   const loadVisualInspectionDataFromBackend = useCallback(async () => {
+    // Check if localStorage already has data - if yes, don't overwrite with backend data
+    const storageKey = `${STORAGE_KEY}_${inspectionCallNo}`;
+    const existingLocalData = localStorage.getItem(storageKey);
+
+    if (existingLocalData) {
+      console.log('⏭️ Skipping backend load - localStorage data exists (preserving user edits)');
+      return;
+    }
+
     try {
+      console.log('📥 Loading visual inspection data from backend for call:', inspectionCallNo);
       // Import the service function
       const { getVisualInspection } = await import('../services/rmInspectionService');
       const data = await getVisualInspection(inspectionCallNo);
 
       if (data && Array.isArray(data)) {
+        console.log('✅ Visual inspection data loaded from backend:', data);
         // Group data by heat and defect
         const heatDataMap = {};
         const passedMap = {};
@@ -105,14 +118,23 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
             };
           }
 
-          // Mark defect as selected
-          if (item.defectName) {
-            heatDataMap[heatIdx].selectedDefects[item.defectName] = true;
+          // NEW FORMAT: Backend returns one record per heat with defects and defectLengths maps
+          if (item.defects) {
+            // Convert defects map to selectedDefects
+            Object.entries(item.defects).forEach(([defectName, isSelected]) => {
+              if (isSelected) {
+                heatDataMap[heatIdx].selectedDefects[defectName] = true;
+              }
+            });
           }
 
-          // Store defect length if available
-          if (item.defectLengthMm) {
-            heatDataMap[heatIdx].defectCounts[item.defectName] = item.defectLengthMm.toString();
+          // Convert defectLengths map to defectCounts
+          if (item.defectLengths) {
+            Object.entries(item.defectLengths).forEach(([defectName, length]) => {
+              if (length !== null && length !== undefined) {
+                heatDataMap[heatIdx].defectCounts[defectName] = length.toString();
+              }
+            });
           }
 
           // Mark as passed if passedAt is set
@@ -122,25 +144,14 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
           }
         });
 
-        // Merge backend data with existing draft data
-        // Only override draft data if backend has passed data (isPassed = true)
-        // This preserves draft data (including lengths) for unpassed heats
+        // Set backend data to state (only runs if localStorage was empty)
         setHeatVisualData(prev => {
           return prev.map((heatData, idx) => {
             if (heatDataMap[idx]) {
-              // If heat has been passed, use backend data (which includes lengths)
-              if (heatDataMap[idx].isPassed) {
-                return {
-                  ...heatData,
-                  ...heatDataMap[idx]
-                };
-              } else {
-                // If heat hasn't been passed, preserve draft data but update isPassed flag
-                return {
-                  ...heatData,
-                  isPassed: heatDataMap[idx].isPassed
-                };
-              }
+              return {
+                ...heatData,
+                ...heatDataMap[idx]
+              };
             }
             return heatData;
           });
@@ -148,9 +159,10 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
 
         // Update passed heats map
         setPassedHeats(passedMap);
+        console.log('✅ Visual inspection data loaded from backend and saved to state');
       }
     } catch (error) {
-      console.error('Error loading visual inspection data from backend:', error);
+      console.error('❌ Error loading visual inspection data from backend:', error);
       // Silently fail - use localStorage draft data as fallback
     }
   }, [inspectionCallNo, defectList]);
@@ -240,7 +252,7 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
 
   /**
    * Calculate total defective length for current heat
-   * Sum of all length-based defects (Distortion, Twist, Kink, Not Straight, Fold, Lap, Crack)
+   * Sum of all length-based defects (Distortion, Twist, Kink, Not Straight, Fold, Lap, Crack, Pit, Groove, Excessive Scaling, Internal Defect)
    * Input is in metres, output is in metres
    */
   const calculateTotalDefectiveLength = useCallback((heatData) => {
@@ -351,11 +363,60 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
   const currentHeatNo = currentHeat?.heatNo || currentHeat?.heat_no;
   const isCurrentHeatPassed = passedHeats[currentHeatNo];
 
+  // Calculate total offered qty for all heats with the same heat number
+  const totalOfferedQty = useMemo(() => {
+    if (!currentHeatNo) return 0;
+    return heats
+      .filter(h => (h.heatNo || h.heat_no) === currentHeatNo)
+      .reduce((sum, h) => sum + (parseFloat(h.weight) || 0), 0);
+  }, [heats, currentHeatNo]);
+
+  // Validation: Check if rejected weight exceeds total offered qty
+  const isValidationFailed = weightRejected > totalOfferedQty;
+
+  // Calculate Accepted Qty (Tons) = Offered Qty - Rejected Weight
+  // Note: acceptedQtyTons and wtAcceptedNumbers are calculated but not currently used in the UI
+  // const acceptedQtyTons = totalOfferedQty - weightRejected;
+  // const wtAcceptedNumbers = (acceptedQtyTons * 1000) / 1.15;
+
+  // Show notification when validation fails
+  useEffect(() => {
+    if (isValidationFailed) {
+      const message = `⚠️ Rejected weight (${weightRejected.toFixed(6)} T) exceeds offered quantity (${totalOfferedQty.toFixed(3)} T). Edit highlighted defect values to reduce weight.`;
+      showNotification(message, 'warning', true, 8000);
+    }
+  }, [isValidationFailed, weightRejected, totalOfferedQty]);
+
+  // Wrapper functions to check validation before allowing navigation
+  const handleSelectHeatWithValidation = useCallback((idx) => {
+    if (isValidationFailed) {
+      showNotification('Please resolve the validation error before switching to another heat.', 'warning');
+      return;
+    }
+    handleSelectHeat(idx);
+  }, [isValidationFailed, handleSelectHeat]);
+
+  const handleBackClickWithValidation = useCallback(() => {
+    if (isValidationFailed) {
+      showNotification('Please resolve the validation error before going back.', 'warning');
+      return;
+    }
+    handleBackClick();
+  }, [isValidationFailed, handleBackClick]);
+
+  const handleNavigateSubmoduleWithValidation = useCallback((sub) => {
+    if (isValidationFailed) {
+      showNotification('Please resolve the validation error before navigating to another section.', 'warning');
+      return;
+    }
+    handleNavigateSubmodule(sub);
+  }, [isValidationFailed, handleNavigateSubmodule]);
+
   return (
     <div className="visual-page-container">
       <div className="visual-page-header">
         <h1 className="visual-page-title">👁️ Visual Inspection</h1>
-        <button className="visual-back-btn" onClick={handleBackClick}>
+        <button className="visual-back-btn" onClick={handleBackClickWithValidation}>
           ← Back to Raw Material Dashboard
         </button>
       </div>
@@ -363,7 +424,7 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
       {/* Submodule Navigation */}
       <RawMaterialSubmoduleNav
         currentSubmodule="visual-inspection"
-        onNavigate={handleNavigateSubmodule}
+        onNavigate={handleNavigateSubmoduleWithValidation}
       />
 
       {/* App notification */}
@@ -372,7 +433,7 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
         type={notification.type}
         onClose={() => setNotification({ message: '', type: notification.type })}
         autoClose={true}
-        autoCloseDelay={4000}
+        autoCloseDelay={notification.type === 'warning' ? 8000 : 4000}
       />
 
       <div className="card">
@@ -404,18 +465,34 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
         </div>
 
         {/* Heat selector buttons */}
-        <div className="visual-heat-selector">
-          {heats.map((h, idx) => (
-            <button
-              key={idx}
-              type="button"
-              className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
-                onClick={() => handleSelectHeat(idx)}
-            >
-              {`Heat ${h.heatNo || `#${idx + 1}`}`}
-            </button>
-          ))}
-        </div>
+        {(() => {
+          // Check if all heats have the same heat number
+          const uniqueHeatNumbers = new Set(heats.map(h => h.heatNo || h.heat_no));
+          const hasSingleUniqueHeat = uniqueHeatNumbers.size === 1;
+
+          if (hasSingleUniqueHeat) {
+            return (
+              <div className="visual-heat-selector visual-heat-single">
+                <span className="visual-heat-single-label">{`Heat ${heats[0].heatNo || `#1`}`}</span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="visual-heat-selector">
+              {heats.map((h, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={idx === activeHeatTab ? 'btn btn-primary' : 'btn btn-outline'}
+                  onClick={() => handleSelectHeatWithValidation(idx)}
+                >
+                  {`Heat ${h.heatNo || `#${idx + 1}`}`}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Visual Defects Grid */}
         <div className="visual-defect-grid">
@@ -434,24 +511,30 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
                 isMatchingDefectType ? 'matching' : 'non-matching'
               ].join(' ');
               return (
-                <div key={d} className={rowClassName}>
+                <div key={d} className={rowClassName} style={{ opacity: isValidationFailed && !checked ? 0.5 : 1 }}>
                   <input
                     type="checkbox"
                     id={`defect-${d}`}
                     checked={!!checked}
                     onChange={() => handleDefectToggle(d)}
-                    disabled={disabled}
+                    disabled={disabled || (isValidationFailed && !checked)}
+                    title={isValidationFailed && !checked ? 'Cannot add more defects - rejected weight exceeds offered quantity' : ''}
                   />
                   <label htmlFor={`defect-${d}`}>{d}</label>
                   {!isNoDefect && selected[d] && (
                     <input
                       type="number"
                       className="form-control visual-defect-count"
-                      value={counts[d]}
+                      value={counts[d] || ''}
                       onChange={(e) => handleDefectCountChange(d, e.target.value)}
                       placeholder="Length (m)"
                       min="0"
                       step="0.001"
+                      style={{
+                        backgroundColor: isValidationFailed ? '#fef3c7' : '#fff',
+                        borderColor: isValidationFailed ? '#fcd34d' : '#e5e7eb'
+                      }}
+                      title={isValidationFailed ? 'Edit this value to reduce rejected weight' : ''}
                     />
                   )}
                 </div>
@@ -471,6 +554,37 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
           gap: '16px'
         }}>
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: '#64748b',
+              marginBottom: '8px'
+            }}>
+              Offered Qty (tonnes)
+            </label>
+            <div style={{
+              padding: '12px',
+              background: '#fff',
+              border: '2px solid #e2e8f0',
+              borderRadius: '6px',
+              fontSize: '1.125rem',
+              fontWeight: 600,
+              color: '#0369a1'
+            }}>
+              {totalOfferedQty.toFixed(3)} T
+            </div>
+            <p style={{
+              margin: '8px 0 0',
+              fontSize: '0.75rem',
+              color: '#94a3b8',
+              fontStyle: 'italic'
+            }}>
+              Total offered quantity for all heats with number {currentHeatNo}
+            </p>
+          </div>
+
           <div>
             <label style={{
               display: 'block',
@@ -515,11 +629,11 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
             <div style={{
               padding: '12px',
               background: '#fff',
-              border: '2px solid #e2e8f0',
+              border: `2px solid ${isValidationFailed ? '#dc2626' : '#e2e8f0'}`,
               borderRadius: '6px',
               fontSize: '1.125rem',
               fontWeight: 600,
-              color: weightRejected > 0 ? '#dc2626' : '#64748b'
+              color: isValidationFailed ? '#dc2626' : (weightRejected > 0 ? '#dc2626' : '#64748b')
             }}>
               {weightRejected.toFixed(6)} T
             </div>
@@ -534,10 +648,36 @@ const VisualInspectionPage = ({ onBack, heats = [], productModel = 'MK-III', onN
           </div>
         </div>
 
+        {/* Validation Error Message - Inline Alert */}
+        {isValidationFailed && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 16px',
+            background: '#fef3c7',
+            border: '2px solid #fcd34d',
+            borderRadius: '8px',
+            color: '#92400e',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '18px', marginTop: '2px' }}>⚠️</span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 600 }}>Validation Alert - Cannot Add New Defects</p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.875rem', fontWeight: 400 }}>
+                Rejected weight ({weightRejected.toFixed(6)} T) exceeds total offered quantity ({totalOfferedQty.toFixed(3)} T).
+                <br />
+                <strong>You can edit existing defect values</strong> (highlighted in yellow) to reduce the rejected weight, but cannot add new defects. Please adjust the defect lengths to proceed.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Note for defective portion */}
-        <p className="visual-defect-note">
+        {/* <p className="visual-defect-note">
           <strong>Note:</strong> In case of defective, enter the total length of defective portion (in metres).
-        </p>
+        </p> */}
 
         {/* Pass Button Section */}
         <div style={{

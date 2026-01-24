@@ -23,15 +23,30 @@ const getAuthHeaders = () => {
 
 /**
  * Handle API response and surface errors
+ * Handles both JSON and plain text responses
  */
 const handleResponse = async (response) => {
   let body = null;
+  const contentType = response.headers.get('content-type');
+
   try {
-    body = await response.json();
+    // Try to parse as JSON if content-type indicates JSON
+    if (contentType && contentType.includes('application/json')) {
+      body = await response.json();
+    } else {
+      // Otherwise treat as plain text
+      body = await response.text();
+    }
   } catch (e) {
+    // If JSON parsing fails, try to get text
     const text = await response.text().catch(() => '');
-    throw new Error(`HTTP ${response.status} ${response.statusText} - ${text}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText} - ${text}`);
+    }
+    // For successful responses with unparseable body, return the text
+    return text;
   }
+
   if (!response.ok) {
     const serverMsg = body && (body.message || body.error || JSON.stringify(body));
     throw new Error(`HTTP ${response.status} ${response.statusText} - ${serverMsg}`);

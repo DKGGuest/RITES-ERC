@@ -4,10 +4,8 @@ import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
 import ExcelImport from "../components/ExcelImport";
 import Pagination from "../components/Pagination";
 import "./FinalHardnessTestPage.css";
-import {
-  getHardnessToeLoadAQL,
-  // calculateBagsForSampling,
-} from "../utils/is2500Calculations";
+import { getHardnessToeLoadAQL } from "../utils/is2500Calculations";
+import { getHardnessTestsByCall } from "../services/finalInspectionSubmoduleService";
 
 const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
   // Get live lot data from context
@@ -63,18 +61,24 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
 
   /* --- Initial Hardness Data Storage --- */
   const [lotData, setLotData] = useState(() => {
-    // Try to load persisted data first
-    const persistedData = localStorage.getItem(`hardnessTestData_${callNo}`);
+    // Get callNo for localStorage key
+    const currentCallNo = selectedCall?.call_no || sessionStorage.getItem('selectedCallNo');
 
-    if (persistedData) {
-      try {
-        return JSON.parse(persistedData);
-      } catch (e) {
-        console.error('Error parsing persisted hardness data:', e);
+    // ✅ CRITICAL: Try to load from localStorage first on page load
+    if (currentCallNo) {
+      const persistedData = localStorage.getItem(`hardnessTestData_${currentCallNo}`);
+      if (persistedData) {
+        try {
+          const parsed = JSON.parse(persistedData);
+          console.log('✅ Loaded persisted data from localStorage on page load');
+          return parsed;
+        } catch (e) {
+          console.error('Error parsing persisted data:', e);
+        }
       }
     }
 
-    // Initialize new data
+    // Fallback: Initialize empty data structure
     return availableLots.reduce(
       (acc, lot) => ({
         ...acc,
@@ -87,6 +91,95 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
       {}
     );
   });
+
+  // Load data from database or localStorage when page loads
+  useEffect(() => {
+    if (availableLots.length > 0 && callNo) {
+      const loadData = async () => {
+        try {
+          // Try to load persisted draft data first (highest priority)
+          const persistedData = localStorage.getItem(`hardnessTestData_${callNo}`);
+          if (persistedData) {
+            try {
+              const parsedData = JSON.parse(persistedData);
+              setLotData(parsedData);
+              console.log('✅ Loaded draft data from localStorage');
+              return;
+            } catch (e) {
+              console.error('Error parsing persisted data:', e);
+            }
+          }
+
+          // If no draft data, fetch from database
+          console.log('📥 Fetching hardness test data from database for call:', callNo);
+          const response = await getHardnessTestsByCall(callNo);
+          const dbData = response?.responseData || [];
+
+          console.log('Hardness test data from DB:', dbData);
+
+          // Merge database data with initialized lot data
+          const mergedData = { ...availableLots.reduce((acc, lot) => ({
+            ...acc,
+            [lot.lotNo]: {
+              hardness1st: Array(lot.sampleSize).fill(""),
+              hardness2nd: Array(lot.sample2Size).fill(""),
+              remarks: "",
+            }
+          }), {}) };
+
+          // Map database records to frontend format
+          dbData.forEach(record => {
+            if (mergedData[record.lotNo]) {
+              // Extract samples by sampling number
+              const samples1st = record.samples?.filter(s => s.samplingNo === 1) || [];
+              const samples2nd = record.samples?.filter(s => s.samplingNo === 2) || [];
+
+              // Populate 1st sampling - preserve full array size
+              if (samples1st.length > 0) {
+                const sortedSamples = samples1st.sort((a, b) => a.sampleNo - b.sampleNo);
+                sortedSamples.forEach(s => {
+                  if (s.sampleNo > 0 && s.sampleNo <= mergedData[record.lotNo].hardness1st.length) {
+                    mergedData[record.lotNo].hardness1st[s.sampleNo - 1] = s.sampleValue ? String(s.sampleValue) : "";
+                  }
+                });
+              }
+
+              // Populate 2nd sampling - preserve full array size
+              if (samples2nd.length > 0) {
+                const sortedSamples = samples2nd.sort((a, b) => a.sampleNo - b.sampleNo);
+                sortedSamples.forEach(s => {
+                  if (s.sampleNo > 0 && s.sampleNo <= mergedData[record.lotNo].hardness2nd.length) {
+                    mergedData[record.lotNo].hardness2nd[s.sampleNo - 1] = s.sampleValue ? String(s.sampleValue) : "";
+                  }
+                });
+              }
+
+              mergedData[record.lotNo].remarks = record.remarks || "";
+            }
+          });
+
+          setLotData(mergedData);
+          // ✅ CRITICAL: Persist fetched data to localStorage immediately
+          localStorage.setItem(`hardnessTestData_${callNo}`, JSON.stringify(mergedData));
+          console.log('✅ Loaded data from database, merged, and persisted to localStorage');
+        } catch (error) {
+          console.error('Error loading data from database:', error);
+          // Initialize empty data on error
+          const emptyData = availableLots.reduce((acc, lot) => ({
+            ...acc,
+            [lot.lotNo]: {
+              hardness1st: Array(lot.sampleSize).fill(""),
+              hardness2nd: Array(lot.sample2Size).fill(""),
+              remarks: "",
+            }
+          }), {});
+          setLotData(emptyData);
+        }
+      };
+
+      loadData();
+    }
+  }, [callNo, availableLots]);
 
   // Persist data whenever lotData changes
   useEffect(() => {

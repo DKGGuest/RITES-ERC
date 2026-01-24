@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import RawMaterialSubmoduleNav from '../components/RawMaterialSubmoduleNav';
-import { getLadleValuesByCallNo } from '../services/rmInspectionService';
+import { getLadleValuesByCallNo, getMaterialTesting } from '../services/rmInspectionService';
 import './MaterialTestingPage.css';
 
 const STORAGE_KEY = 'material_testing_draft_data';
@@ -123,6 +123,88 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
     fetchLadleValues();
   }, [inspectionCallNo]);
 
+  // Load existing material testing data from backend if available
+  // ONLY load from backend if localStorage is empty (preserve user edits)
+  useEffect(() => {
+    const loadExistingData = async () => {
+      if (!inspectionCallNo) return;
+
+      // Check if localStorage already has data - if yes, don't overwrite with backend data
+      const storageKey = `${STORAGE_KEY}_${inspectionCallNo}`;
+      const existingLocalData = localStorage.getItem(storageKey);
+
+      if (existingLocalData) {
+        console.log('⏭️ Skipping backend load - localStorage data exists (preserving user edits)');
+        return;
+      }
+
+      try {
+        console.log('📥 Loading existing material testing data from backend for call:', inspectionCallNo);
+        const existingData = await getMaterialTesting(inspectionCallNo);
+
+        if (existingData && Array.isArray(existingData) && existingData.length > 0) {
+          console.log('✅ Existing material testing data loaded from backend:', existingData);
+
+          // Convert backend data to frontend format
+          const materialDataByHeat = {};
+
+          existingData.forEach(record => {
+            const heatNo = record.heatNo;
+            const sampleNum = record.sampleNumber || 1;
+
+            if (!materialDataByHeat[heatNo]) {
+              materialDataByHeat[heatNo] = {
+                samples: [
+                  { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclTypeA: '', inclA: '', inclTypeB: '', inclB: '', inclTypeC: '', inclC: '', inclTypeD: '', inclD: '', hardness: '', decarb: '', remarks: '' },
+                  { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclTypeA: '', inclA: '', inclTypeB: '', inclB: '', inclTypeC: '', inclC: '', inclTypeD: '', inclD: '', hardness: '', decarb: '', remarks: '' }
+                ]
+              };
+            }
+
+            const sampleIndex = sampleNum - 1;
+            if (sampleIndex >= 0 && sampleIndex < 2) {
+              materialDataByHeat[heatNo].samples[sampleIndex] = {
+                c: record.carbonPercent || '',
+                si: record.siliconPercent || '',
+                mn: record.manganesePercent || '',
+                p: record.phosphorusPercent || '',
+                s: record.sulphurPercent || '',
+                grainSize: record.grainSize || '',
+                inclTypeA: record.inclusionTypeA || '',
+                inclA: record.inclusionA || '',
+                inclTypeB: record.inclusionTypeB || '',
+                inclB: record.inclusionB || '',
+                inclTypeC: record.inclusionTypeC || '',
+                inclC: record.inclusionC || '',
+                inclTypeD: record.inclusionTypeD || '',
+                inclD: record.inclusionD || '',
+                hardness: record.hardnessHrc || '',
+                decarb: record.decarbDepthMm || '',
+                remarks: record.remarks || ''
+              };
+            }
+          });
+
+          // Convert to array format matching heats order
+          const loadedData = heats.map(heat => materialDataByHeat[heat.heatNo] || {
+            samples: [
+              { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclTypeA: '', inclA: '', inclTypeB: '', inclB: '', inclTypeC: '', inclC: '', inclTypeD: '', inclD: '', hardness: '', decarb: '', remarks: '' },
+              { c: '', si: '', mn: '', p: '', s: '', grainSize: '', inclTypeA: '', inclA: '', inclTypeB: '', inclB: '', inclTypeC: '', inclC: '', inclTypeD: '', inclD: '', hardness: '', decarb: '', remarks: '' }
+            ]
+          });
+
+          setMaterialData(loadedData);
+          console.log('✅ Material testing data loaded from backend and saved to state');
+        }
+      } catch (error) {
+        console.error('❌ Error loading existing material testing data:', error);
+        // Continue with empty data if fetch fails
+      }
+    };
+
+    loadExistingData();
+  }, [inspectionCallNo, heats]);
+
   // Get ladle values for the currently selected heat
   // BUSINESS RULE: Each heat has its own ladle values from vendor's chemical analysis
   const currentLadleHeat = useMemo(() => {
@@ -216,21 +298,37 @@ const MaterialTestingPage = ({ onBack, heats = [], onNavigateSubmodule, inspecti
         </div>
 
         {/* Heat Toggle */}
-        <div className="material-heat-toggle">
-          <span className="heat-toggle-label">Select Heat:</span>
-          <div className="heat-toggle-buttons">
-            {heats.map((heat, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className={`heat-toggle-btn ${idx === activeHeatTab ? 'active' : ''}`}
-                onClick={() => setActiveHeatTab(idx)}
-              >
-                Heat {heat.heatNo || `#${idx + 1}`}
-              </button>
-            ))}
-          </div>
-        </div>
+        {(() => {
+          // Check if all heats have the same heat number
+          const uniqueHeatNumbers = new Set(heats.map(h => h.heatNo || h.heat_no));
+          const hasSingleUniqueHeat = uniqueHeatNumbers.size === 1;
+
+          if (hasSingleUniqueHeat) {
+            return (
+              <div className="material-heat-toggle material-heat-single">
+                <span className="heat-single-label">Heat {heats[0].heatNo || `#1`}</span>
+              </div>
+            );
+          }
+
+          return (
+            <div className="material-heat-toggle">
+              <span className="heat-toggle-label">Select Heat:</span>
+              <div className="heat-toggle-buttons">
+                {heats.map((heat, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`heat-toggle-btn ${idx === activeHeatTab ? 'active' : ''}`}
+                    onClick={() => setActiveHeatTab(idx)}
+                  >
+                    Heat {heat.heatNo || `#${idx + 1}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {heats.length > 0 && (
           <div style={{ marginBottom: '24px' }}>

@@ -359,35 +359,15 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     }
   };
 
-  // Handle Start/Resume button - calls Azure API when status is IE_SCHEDULED
-  const handleStart = async (call, scheduleInfo) => {
+  // Handle Start/Resume button - routes immediately, validates in background
+  const handleStart = (call, scheduleInfo) => {
     console.log('🔍 handleStart called for:', call.call_no);
     console.log('🔍 Call status:', call.status);
 
-    // Enforce schedule rule for Raw Material and Final: if scheduled date is after today, block start
-    try {
-      const productTypeLowerEarly = (call.product_type || '').toString().toLowerCase();
-      const requiresScheduleEarly = productTypeLowerEarly.includes('raw') || productTypeLowerEarly.includes('final');
-      if (requiresScheduleEarly) {
-        const existingScheduleEarly = scheduleInfo || (await getScheduleByCallNo(call.call_no));
-        const scheduledDateRawEarly = existingScheduleEarly?.scheduleDate || existingScheduleEarly?.schedule_date || null;
-        const scheduledDateEarly = normalizeToYMD(scheduledDateRawEarly);
-        const todayEarly = new Date().toISOString().split('T')[0];
-        if (scheduledDateEarly && new Date(scheduledDateEarly) > new Date(todayEarly)) {
-          showNotification(`This call is scheduled for ${scheduledDateRawEarly || scheduledDateEarly}. Start is allowed on or after this date.`, 'error');
-          return;
-        }
-      }
-    } catch (schedVerifyErr) {
-      console.error('Error verifying schedule before start', schedVerifyErr);
-      showNotification('Unable to verify schedule. Please try again.', 'error');
-      return;
-    }
-
-    // TEMPORARY: Always route to inspection initiation page for VERIFY_PO_DETAILS status
-    // This allows IE to review/edit inspection initiation data before going to dashboard
+    // Route immediately to inspection initiation page
+    // All validations and API calls will happen in the background
     if (call.status === 'VERIFY_PO_DETAILS') {
-      console.log('🔄 VERIFY_PO_DETAILS status - routing to inspection initiation page');
+      console.log('🔄 VERIFY_PO_DETAILS status - routing immediately to inspection initiation page');
       onStartInspection(call);
       return;
     }
@@ -490,63 +470,62 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       return;
     }
 
-    console.log('🆕 START flow - navigating to initiation page');
+    console.log('🆕 START flow - routing immediately to initiation page');
 
-    // Not initiated yet - proceed with normal START flow
-    // DO NOT mark as under inspection here - it will be marked when user enters shift/date
+    // Route immediately to inspection initiation page
+    // All validations and API calls will happen in the background
+    onStartInspection(call);
 
-    // Only call Azure API if status is IE_SCHEDULED
+    // Perform validations and API calls in the background (non-blocking)
+    // This ensures the UI routes immediately without waiting for async operations
     if (call.status === 'IE_SCHEDULED') {
-      try {
-        // For Raw Material and Final calls, ensure scheduled date equals today's date before starting
-        const productTypeLowerCheck = (call.product_type || '').toString().toLowerCase();
-        const requiresScheduleToday = productTypeLowerCheck.includes('raw') || productTypeLowerCheck.includes('final');
-        if (requiresScheduleToday) {
-          try {
-            const existingSchedule = await getScheduleByCallNo(call.call_no);
-            const scheduledDate = existingSchedule?.scheduleDate || existingSchedule?.schedule_date || null;
-            const today = new Date().toISOString().split('T')[0];
-            if (!scheduledDate) {
-              showNotification('This call is not scheduled. Please schedule it before starting.', 'error');
+      // Run background validation and API call asynchronously
+      (async () => {
+        try {
+          // For Raw Material and Final calls, ensure scheduled date equals today's date before starting
+          const productTypeLowerCheck = (call.product_type || '').toString().toLowerCase();
+          const requiresScheduleToday = productTypeLowerCheck.includes('raw') || productTypeLowerCheck.includes('final');
+          if (requiresScheduleToday) {
+            try {
+              const existingSchedule = await getScheduleByCallNo(call.call_no);
+              const scheduledDate = existingSchedule?.scheduleDate || existingSchedule?.schedule_date || null;
+              const today = new Date().toISOString().split('T')[0];
+              if (!scheduledDate) {
+                showNotification('This call is not scheduled. Please schedule it before starting.', 'error');
+                return;
+              }
+              if (scheduledDate !== today) {
+                showNotification(`This call is scheduled for ${scheduledDate}. Start is only allowed on the scheduled date (${today}).`, 'error');
+                return;
+              }
+            } catch (schedErr) {
+              console.error('Error fetching schedule for start validation', schedErr);
+              // Don't show error notification for background validation
               return;
             }
-            if (scheduledDate !== today) {
-              showNotification(`This call is scheduled for ${scheduledDate}. Start is only allowed on the scheduled date (${today}).`, 'error');
-              return;
-            }
-          } catch (schedErr) {
-            console.error('Error fetching schedule for start validation', schedErr);
-            showNotification('Unable to verify schedule. Please try again.', 'error');
-            return;
           }
+          const currentUser = getStoredUser();
+          const userId = currentUser?.userId || 0;
+
+          const actionData = {
+            workflowTransitionId: call.workflowTransitionId || call.id,
+            requestId: call.call_no,
+            action: 'INITIATE_INSPECTION',
+            remarks: 'Starting inspection',
+            actionBy: userId,
+            pincode: '560001'
+          };
+
+          await performTransitionAction(actionData);
+          console.log('✅ Inspection initiated successfully in background');
+
+          // Refresh the pending calls list (force refresh to get updated status)
+          fetchPendingData(true);
+        } catch (error) {
+          console.error('Background API error:', error);
+          // Don't show error notification for background operations
         }
-        const currentUser = getStoredUser();
-        const userId = currentUser?.userId || 0;
-
-        const actionData = {
-          workflowTransitionId: call.workflowTransitionId || call.id,
-          requestId: call.call_no,
-          action: 'INITIATE_INSPECTION',
-          remarks: 'Starting inspection',
-          actionBy: userId,
-          pincode: '560001'
-        };
-
-        await performTransitionAction(actionData);
-        showNotification('Inspection initiated successfully!', 'success');
-
-        // Refresh the pending calls list (force refresh to get updated status)
-        fetchPendingData(true);
-
-        // Proceed to inspection page
-        onStartInspection(call);
-      } catch (error) {
-        showNotification(error.message || 'Failed to initiate inspection', 'error');
-      }
-    } else {
-      // For other statuses, just navigate (legacy behavior - commented out local API)
-      // Local API call would go here
-      onStartInspection(call);
+      })();
     }
   };
 
@@ -561,17 +540,6 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     setShiftDetailsDate(new Date().toISOString().split('T')[0]);
     setShiftDetailsError('');
     setShowEnterShiftDetailsModal(true);
-  };
-
-  // Helper to check if call is Process or Final Product
-  const isProcessOrFinalProduct = (productType) => {
-    if (!productType) return false;
-    return (
-      productType === 'PROCESS_MATERIAL' ||
-      productType === 'FINAL_PRODUCT' ||
-      productType.includes('Process') ||
-      productType.includes('Final')
-    );
   };
 
   // Handle Enter Shift Details modal confirm
@@ -607,37 +575,33 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
       }
 
-      // Call workflow API for Process/Final Product, or skip for Raw Material
-      if (isProcessOrFinalProduct(shiftDetailsCall?.product_type)) {
-        console.log('🏭 Process/Final Product: Calling workflow API for enter shift details...');
+      // Call workflow API for all product types (Process/Final Product and Raw Material)
+      console.log('🔄 Calling workflow API for enter shift details...');
 
-        // Determine the action based on call status
-        // If status is INSPECTION_PAUSED, use INSPECTION_PAUSED action, otherwise use ENTER_SHIFT_DETAILS_AND_START_INSPECTION
-        const action = shiftDetailsCall?.status === 'INSPECTION_PAUSED'
-          ? 'INSPECTION_PAUSED'
-          : 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION';
+      // Determine the action based on call status
+      // If status is INSPECTION_PAUSED, use INSPECTION_PAUSED action, otherwise use ENTER_SHIFT_DETAILS_AND_START_INSPECTION
+      const action = shiftDetailsCall?.status === 'INSPECTION_PAUSED'
+        ? 'INSPECTION_PAUSED'
+        : 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION';
 
-        const workflowActionData = {
-          workflowTransitionId: workflowTransitionId,
-          requestId: shiftDetailsCall?.call_no,
-          action: action,
-          remarks: `Shift details entered - Shift: ${shiftDetailsShift}, Date: ${shiftDetailsDate}`,
-          actionBy: userId,
-          pincode: shiftDetailsCall?.pincode || '560001',
-          materialAvailable: 'YES'
-        };
+      const workflowActionData = {
+        workflowTransitionId: workflowTransitionId,
+        requestId: shiftDetailsCall?.call_no,
+        action: action,
+        remarks: `Shift details entered - Shift: ${shiftDetailsShift}, Date: ${shiftDetailsDate}`,
+        actionBy: userId,
+        pincode: shiftDetailsCall?.pincode || '560001',
+        materialAvailable: 'YES'
+      };
 
-        console.log('Workflow Action Data:', workflowActionData);
+      console.log('Workflow Action Data:', workflowActionData);
 
-        try {
-          await performTransitionAction(workflowActionData);
-          console.log('✅ Workflow transition successful for Process/Final Product');
-        } catch (workflowError) {
-          console.error('❌ Workflow API error:', workflowError);
-          throw new Error(workflowError.message || 'Failed to enter shift details via workflow');
-        }
-      } else {
-        console.log('🔧 Raw Material: Skipping workflow API call');
+      try {
+        await performTransitionAction(workflowActionData);
+        console.log('✅ Workflow transition successful');
+      } catch (workflowError) {
+        console.error('❌ Workflow API error:', workflowError);
+        throw new Error(workflowError.message || 'Failed to enter shift details via workflow');
       }
 
       // Store shift and date in sessionStorage for dashboard to use

@@ -54,6 +54,21 @@ export const finishInspection = async (data) => {
 };
 
 /**
+ * Pause Raw Material inspection - saves all submodule data WITHOUT changing status
+ * Called when inspector clicks "Pause Inspection" button
+ * @param {Object} data - Contains all submodule data
+ */
+export const pauseRawMaterialInspection = async (data) => {
+  const response = await fetch(`${API_BASE_URL}/pause`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data)
+  });
+  const result = await handleResponse(response);
+  return result.responseData;
+};
+
+/**
  * Get all Raw Material inspection data by call number
  * Fetches complete inspection data including:
  * - Pre-inspection summary (cumulative data)
