@@ -1,8 +1,8 @@
 /* =====================================================
-   FORGING SECTION COMPONENT STYLES
+   TESTING & FINISHING SECTION COMPONENT STYLES
    ===================================================== */
 
-.forging-section {
+.testing-finishing-section {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -10,7 +10,7 @@
   margin-bottom: 16px;
 }
 
-.forging-section__header {
+.testing-finishing-section__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -19,37 +19,37 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
-.forging-section__title {
+.testing-finishing-section__title {
   font-size: 1.125rem;
   font-weight: 600;
   color: #1f2937;
   margin: 0;
 }
 
-.forging-section__subtitle {
+.testing-finishing-section__subtitle {
   font-size: 0.875rem;
   color: #6b7280;
   margin: 4px 0 0;
 }
 
-.forging-section__toggle {
+.testing-finishing-section__toggle {
   padding: 8px 16px;
   font-size: 1.25rem;
 }
 
 /* Table Styles */
-.forging-table-wrapper {
+.testing-finishing-table-wrapper {
   padding: 12px;
   overflow-x: auto;
 }
 
-.forging-table {
+.testing-finishing-table {
   width: 100%;
   border-collapse: collapse;
   border: 2px solid #4a7c59;
 }
 
-.forging-th {
+.testing-finishing-th {
   background-color: #fef7f0;
   color: #1f4d2e;
   border: 1px solid #4a7c59;
@@ -60,40 +60,36 @@
   vertical-align: middle;
 }
 
-.forging-th--time {
-  min-width: 90px;
+.testing-finishing-th--time {
+  min-width: 80px;
   border-left: 3px solid #0d0d0d;
 }
 
-.forging-th--checkbox {
-  min-width: 90px;
+.testing-finishing-th--checkbox {
+  min-width: 80px;
 }
 
-.forging-th--lot {
+.testing-finishing-th--lot {
   min-width: 100px;
 }
 
-.forging-th--temp {
+.testing-finishing-th--toe-load {
   min-width: 100px;
 }
 
-.forging-th--stabilisation {
+.testing-finishing-th--weight {
+  min-width: 100px;
+}
+
+.testing-finishing-th--paint {
   min-width: 120px;
 }
 
-.forging-th--improper {
-  min-width: 120px;
-}
-
-.forging-th--defect {
+.testing-finishing-th--erc-coating {
   min-width: 140px;
 }
 
-.forging-th--embossing {
-  min-width: 120px;
-}
-
-.forging-td {
+.testing-finishing-td {
   border: 1px solid #4a7c59;
   padding: 4px 8px;
   text-align: center;
@@ -101,47 +97,27 @@
   background-color: #fff;
 }
 
-.forging-td--time {
+.testing-finishing-td--time {
   font-weight: 600;
   border-left: 3px solid #0d0d0d;
   font-size: 12px;
 }
 
-.forging-checkbox {
+.testing-finishing-checkbox {
   width: 16px;
   height: 16px;
   cursor: pointer;
 }
 
-.forging-select {
+.testing-finishing-select {
   width: 100%;
   padding: 4px 6px;
   border: 1px solid #d1d5db;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.forging-td--temp-input {
-  padding: 2px 6px;
-}
-
-.forging-td--stabilisation-input {
-  padding: 2px 6px;
-}
-
-.forging-td--improper-input {
-  padding: 2px 6px;
-}
-
-.forging-td--defect-input {
-  padding: 2px 6px;
-}
-
-.forging-td--embossing-input {
-  padding: 2px 6px;
-}
-
-.forging-input {
+.testing-finishing-input {
   width: 100%;
   padding: 4px 6px;
   border: 1px solid #d1d5db;
@@ -151,27 +127,27 @@
 }
 
 /* Rejected Row */
-.forging-row--rejected {
-  background-color: #e0f2fe;
+.testing-finishing-row--rejected {
+  background-color: #e3f2fd;
 }
 
-.forging-td--rejected-label {
-  background-color: #e0f2fe;
-  padding: 4px 8px;
+.testing-finishing-td--rejected-label {
+  background-color: #e3f2fd;
+  font-weight: 600;
+  color: #1565c0;
 }
 
-.forging-rejected-label {
-  font-weight: 500;
-  color: #333;
+.testing-finishing-rejected-label {
   font-size: 11px;
+  font-weight: 600;
 }
 
-.forging-td--rejected-input {
+.testing-finishing-td--rejected-input {
   background-color: #fff;
   padding: 2px 6px;
 }
 
-.forging-td--rejected-input input {
+.testing-finishing-td--rejected-input input {
   width: 100%;
   padding: 4px 6px;
   border: 1px solid #d1d5db;
@@ -180,55 +156,51 @@
   text-align: center;
 }
 
-.forging-input--rejected {
-  text-align: center;
-}
-
-/* Remarks row styling */
-.forging-row--remarks {
+/* Remarks Row */
+.testing-finishing-row--remarks {
   background-color: #f5f5f5;
 }
 
-.forging-td--remarks-label {
+.testing-finishing-td--remarks-label {
   background-color: #f5f5f5;
   padding: 4px 8px;
   width: 80px;
 }
 
-.forging-remarks-label {
+.testing-finishing-remarks-label {
   font-weight: 500;
   color: #333;
   font-size: 11px;
 }
 
-.forging-td--remarks-input {
+.testing-finishing-td--remarks-input {
   background-color: #fff;
   padding: 2px 6px;
   text-align: center;
 }
 
-.forging-td--remarks-input .form-control {
+.testing-finishing-td--remarks-input .form-control {
   text-align: center;
   max-width: 300px;
   margin: 0 auto;
 }
 
 /* Mobile Cards - hidden on desktop */
-.forging-mobile-cards {
+.testing-finishing-mobile-cards {
   display: none;
 }
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
-  .forging-table {
+  .testing-finishing-table {
     display: none;
   }
 
-  .forging-mobile-cards {
+  .testing-finishing-mobile-cards {
     display: block;
   }
 
-  .forging-mobile-card {
+  .testing-finishing-mobile-card {
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -236,7 +208,7 @@
     overflow: hidden;
   }
 
-  .forging-mobile-card__header {
+  .testing-finishing-mobile-card__header {
     background-color: #fef7f0;
     padding: 10px 12px;
     border-bottom: 1px solid #e5e7eb;
@@ -245,17 +217,25 @@
     align-items: center;
   }
 
-  .forging-mobile-card__time {
+  .testing-finishing-mobile-card__time {
     font-weight: 600;
     font-size: 14px;
     color: #1f2937;
   }
 
-  .forging-mobile-card__body {
+  .testing-finishing-mobile-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .testing-finishing-mobile-card__body {
     padding: 12px;
   }
 
-  .forging-mobile-field {
+  .testing-finishing-mobile-field {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -263,11 +243,11 @@
     border-bottom: 1px solid #f3f4f6;
   }
 
-  .forging-mobile-field:last-child {
+  .testing-finishing-mobile-field:last-child {
     border-bottom: none;
   }
 
-  .forging-mobile-field__label {
+  .testing-finishing-mobile-field__label {
     background-color: #dc2626;
     color: #fff;
     padding: 6px 12px;
@@ -277,13 +257,13 @@
     min-width: 100px;
   }
 
-  .forging-mobile-field__value {
+  .testing-finishing-mobile-field__value {
     flex: 1;
     margin-left: 12px;
   }
 
-  .forging-mobile-field__value input,
-  .forging-mobile-field__value select {
+  .testing-finishing-mobile-field__value input,
+  .testing-finishing-mobile-field__value select {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid #d1d5db;
@@ -291,29 +271,28 @@
     font-size: 14px;
   }
 
-  .forging-mobile-field--rejected {
-    background-color: #e0f2fe;
-    margin: 0 -12px;
-    padding: 8px 12px;
+  .testing-finishing-mobile-field__value--multi {
+    display: flex;
+    gap: 8px;
   }
 
-  .forging-mobile-field--rejected .forging-mobile-field__label {
-    background-color: #0284c7;
+  .testing-finishing-mobile-field__value--multi select {
+    flex: 1;
   }
 }
 
 @media (max-width: 480px) {
-  .forging-mobile-field {
+  .testing-finishing-mobile-field {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .forging-mobile-field__label {
+  .testing-finishing-mobile-field__label {
     margin-bottom: 6px;
     text-align: center;
   }
 
-  .forging-mobile-field__value {
+  .testing-finishing-mobile-field__value {
     margin-left: 0;
   }
 }

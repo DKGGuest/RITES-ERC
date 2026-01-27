@@ -51,18 +51,21 @@ const ForgingSection = ({
                 <th className="forging-th forging-th--checkbox">No Production</th>
                 <th className="forging-th forging-th--lot">Lot No.</th>
                 <th className="forging-th forging-th--temp">Forging Temp.</th>
-                <th className="forging-th forging-th--remarks">Remarks</th>
+                <th className="forging-th forging-th--stabilisation">Forging Stabilisation Rejection</th>
+                <th className="forging-th forging-th--improper">Improper Forging</th>
+                <th className="forging-th forging-th--defect">Forging Defect (Marks / Notches)</th>
+                <th className="forging-th forging-th--embossing">Embossing Defect</th>
               </tr>
             </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
-                <React.Fragment key={row.hour}>
-                  {/* Row 1: Dropdown and Forging Temp */}
-                  <tr className="forging-row">
-                    <td rowSpan="2" className="forging-td forging-td--time">
+                <>
+                  {/* Row 1: First sample */}
+                  <tr key={`${row.hour}-r1`} className="forging-row">
+                    <td rowSpan="3" className="forging-td forging-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
-                    <td rowSpan="2" className="forging-td forging-td--checkbox">
+                    <td rowSpan="3" className="forging-td forging-td--checkbox">
                       <input
                         type="checkbox"
                         checked={row.noProduction}
@@ -70,7 +73,7 @@ const ForgingSection = ({
                         className="forging-checkbox"
                       />
                     </td>
-                    <td className="forging-td forging-td--lot">
+                    <td rowSpan="2" className="forging-td forging-td--lot">
                       <select
                         className="form-control forging-select"
                         value={row.lotNo}
@@ -87,13 +90,149 @@ const ForgingSection = ({
                       <input
                         type="number"
                         className="form-control forging-input"
-                        placeholder="°C"
+                        placeholder="Float"
                         value={row.forgingTemperature[0] || ''}
                         onChange={e => updateData(idx, 'forgingTemperature', e.target.value, 0)}
                         disabled={row.noProduction}
                       />
                     </td>
-                    <td rowSpan="2" className="forging-td forging-td--remarks">
+                    <td className="forging-td forging-td--stabilisation-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.forgingStabilisation[0] || ''}
+                        onChange={e => updateData(idx, 'forgingStabilisation', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="forging-td forging-td--improper-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.improperForging[0] || ''}
+                        onChange={e => updateData(idx, 'improperForging', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="forging-td forging-td--defect-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.forgingDefect[0] || ''}
+                        onChange={e => updateData(idx, 'forgingDefect', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="forging-td forging-td--embossing-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.embossingDefect[0] || ''}
+                        onChange={e => updateData(idx, 'embossingDefect', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                  </tr>
+                  {/* Row 2: Second sample */}
+                  <tr key={`${row.hour}-r2`} className="forging-row">
+                    <td className="forging-td forging-td--temp-input">
+                      <input
+                        type="number"
+                        className="form-control forging-input"
+                        placeholder="Float"
+                        value={row.forgingTemperature[1] || ''}
+                        onChange={e => updateData(idx, 'forgingTemperature', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="forging-td forging-td--stabilisation-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.forgingStabilisation[1] || ''}
+                        onChange={e => updateData(idx, 'forgingStabilisation', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="forging-td forging-td--improper-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.improperForging[1] || ''}
+                        onChange={e => updateData(idx, 'improperForging', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="forging-td forging-td--defect-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.forgingDefect[1] || ''}
+                        onChange={e => updateData(idx, 'forgingDefect', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="forging-td forging-td--embossing-input">
+                      <select
+                        className="form-control forging-select"
+                        value={row.embossingDefect[1] || ''}
+                        onChange={e => updateData(idx, 'embossingDefect', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                  </tr>
+                  {/* Row 3: Rejected No. for Forging Defects - 5 separate inputs */}
+                  <tr key={`${row.hour}-r3`} className="forging-row forging-row--rejected">
+                    <td className="forging-td forging-td--rejected-label">
+                      <span className="forging-rejected-label">Rejected No. for Forging Defects</span>
+                    </td>
+                    <td className="forging-td forging-td--rejected-input">
+                      <input type="number" value={row.forgingTemperatureRejected || ''} onChange={e => updateData(idx, 'forgingTemperatureRejected', e.target.value)} />
+                    </td>
+                    <td className="forging-td forging-td--rejected-input">
+                      <input type="number" value={row.forgingStabilisationRejected || ''} onChange={e => updateData(idx, 'forgingStabilisationRejected', e.target.value)} />
+                    </td>
+                    <td className="forging-td forging-td--rejected-input">
+                      <input type="number" value={row.improperForgingRejected || ''} onChange={e => updateData(idx, 'improperForgingRejected', e.target.value)} />
+                    </td>
+                    <td className="forging-td forging-td--rejected-input">
+                      <input type="number" value={row.forgingDefectRejected || ''} onChange={e => updateData(idx, 'forgingDefectRejected', e.target.value)} />
+                    </td>
+                    <td className="forging-td forging-td--rejected-input">
+                      <input type="number" value={row.embossingDefectRejected || ''} onChange={e => updateData(idx, 'embossingDefectRejected', e.target.value)} />
+                    </td>
+                  </tr>
+                  {/* Row 4: Remarks */}
+                  <tr key={`${row.hour}-r4`} className="forging-row forging-row--remarks">
+                    <td className="forging-td forging-td--remarks-label">
+                      <span className="forging-remarks-label">Remarks</span>
+                    </td>
+                    <td colSpan="7" className="forging-td forging-td--remarks-input">
                       <input
                         type="text"
                         className="form-control forging-input"
@@ -102,22 +241,7 @@ const ForgingSection = ({
                       />
                     </td>
                   </tr>
-                  {/* Row 2: Rejected No. */}
-                  <tr className="forging-row forging-row--rejected">
-                    <td className="forging-td forging-td--rejected-label">
-                      <span className="forging-rejected-label">Rejected No.</span>
-                    </td>
-                    <td className="forging-td forging-td--rejected-input">
-                      <input
-                        type="number"
-                        className="form-control forging-input forging-input--rejected"
-                        value={row.rejectedQty}
-                        onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction}
-                      />
-                    </td>
-                  </tr>
-                </React.Fragment>
+                </>
               ))}
             </tbody>
           </table>
@@ -151,14 +275,85 @@ const ForgingSection = ({
                       </select>
                     </div>
                   </div>
-                  <div className="forging-mobile-field">
-                    <span className="forging-mobile-field__label">Forging Temp.</span>
+                  {[0, 1].map(sampleIdx => (
+                    <div key={sampleIdx}>
+                      <div className="forging-mobile-field">
+                        <span className="forging-mobile-field__label">Forging Temp. (S{sampleIdx + 1})</span>
+                        <div className="forging-mobile-field__value">
+                          <input
+                            type="number"
+                            placeholder="Float"
+                            value={row.forgingTemperature[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'forgingTemperature', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          />
+                        </div>
+                      </div>
+                      <div className="forging-mobile-field">
+                        <span className="forging-mobile-field__label">Forging Stabilisation (S{sampleIdx + 1})</span>
+                        <div className="forging-mobile-field__value">
+                          <select
+                            value={row.forgingStabilisation[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'forgingStabilisation', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          >
+                            <option value="">OK / Not OK</option>
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="forging-mobile-field">
+                        <span className="forging-mobile-field__label">Improper Forging (S{sampleIdx + 1})</span>
+                        <div className="forging-mobile-field__value">
+                          <select
+                            value={row.improperForging[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'improperForging', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          >
+                            <option value="">OK / Not OK</option>
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="forging-mobile-field">
+                        <span className="forging-mobile-field__label">Forging Defect (S{sampleIdx + 1})</span>
+                        <div className="forging-mobile-field__value">
+                          <select
+                            value={row.forgingDefect[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'forgingDefect', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          >
+                            <option value="">OK / Not OK</option>
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="forging-mobile-field">
+                        <span className="forging-mobile-field__label">Embossing Defect (S{sampleIdx + 1})</span>
+                        <div className="forging-mobile-field__value">
+                          <select
+                            value={row.embossingDefect[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'embossingDefect', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          >
+                            <option value="">OK / Not OK</option>
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="forging-mobile-field forging-mobile-field--rejected">
+                    <span className="forging-mobile-field__label">Rejected No. for Forging Defects</span>
                     <div className="forging-mobile-field__value">
                       <input
                         type="number"
-                        placeholder="°C"
-                        value={row.forgingTemperature[0] || ''}
-                        onChange={e => updateData(idx, 'forgingTemperature', e.target.value, 0)}
+                        value={row.rejectedQty || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
                         disabled={row.noProduction}
                       />
                     </div>
@@ -170,17 +365,6 @@ const ForgingSection = ({
                         type="text"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="forging-mobile-field forging-mobile-field--rejected">
-                    <span className="forging-mobile-field__label">Rejected No.</span>
-                    <div className="forging-mobile-field__value">
-                      <input
-                        type="number"
-                        value={row.rejectedQty}
-                        onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction}
                       />
                     </div>
                   </div>

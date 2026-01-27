@@ -483,6 +483,158 @@ const staticDataStyles = `
     }
   }
 
+  /* Heat Wise Accoutnal Table - Mobile Responsive */
+  .heat-wise-accoutnal-table thead {
+    display: none;
+  }
+
+  .heat-wise-accoutnal-table tbody tr {
+    display: block;
+    margin-bottom: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .heat-wise-accoutnal-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .heat-wise-accoutnal-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .heat-wise-accoutnal-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #64748b;
+    margin-right: 12px;
+    min-width: 120px;
+  }
+
+  @media (min-width: 769px) {
+    .heat-wise-accoutnal-table thead {
+      display: table-header-group;
+    }
+
+    .heat-wise-accoutnal-table tbody tr {
+      display: table-row;
+      margin-bottom: 0;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    .heat-wise-accoutnal-table tbody tr:hover {
+      background-color: #f8fdf6;
+    }
+
+    .heat-wise-accoutnal-table tbody td {
+      display: table-cell;
+      justify-content: auto;
+      padding: 12px 16px;
+      border: none;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .heat-wise-accoutnal-table tbody td::before {
+      display: none;
+    }
+  }
+
+  /* Production Lines Table - Mobile Responsive */
+  .production-lines-table thead {
+    display: none;
+  }
+
+  .production-lines-table tbody tr {
+    display: block;
+    margin-bottom: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .production-lines-table tbody td {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .production-lines-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .production-lines-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .production-lines-table tbody td input,
+  .production-lines-table tbody td select {
+    width: 100% !important;
+    min-width: auto !important;
+  }
+
+  .production-lines-table tbody td button {
+    width: 100%;
+  }
+
+  @media (min-width: 769px) {
+    .production-lines-table thead {
+      display: table-header-group;
+    }
+
+    .production-lines-table tbody tr {
+      display: table-row;
+      margin-bottom: 0;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+    }
+
+    .production-lines-table tbody tr:hover {
+      background-color: #f8fafc;
+    }
+
+    .production-lines-table tbody td {
+      display: table-cell;
+      flex-direction: row;
+      padding: 12px 16px;
+      border: none;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .production-lines-table tbody td::before {
+      display: none;
+    }
+
+    .production-lines-table tbody td input,
+    .production-lines-table tbody td select {
+      width: auto !important;
+      min-width: auto !important;
+    }
+
+    .production-lines-table tbody td button {
+      width: auto;
+    }
+  }
+
 `;
 
 
@@ -1404,6 +1556,11 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     return sessionStorage.getItem('processSelectedLineTab') || 'Line-1';
   });
 
+  // Track selected lot number for the toggle tab display
+  const [selectedLotForDisplay, setSelectedLotForDisplay] = useState(() => {
+    return sessionStorage.getItem('selectedLotForBreakup') || null;
+  });
+
   // Track selected lot number for each production line
   // This is the lot that the IE selected in the 8-hour grid for that line
   // Note: Currently not used but kept for future enhancement
@@ -1413,6 +1570,26 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   useEffect(() => {
     sessionStorage.setItem('processSelectedLineTab', selectedLine);
   }, [selectedLine]);
+
+  // Persist selected lot for display
+  useEffect(() => {
+    if (selectedLotForDisplay) {
+      sessionStorage.setItem('selectedLotForBreakup', selectedLotForDisplay);
+    }
+  }, [selectedLotForDisplay]);
+
+  // Listen for lot selection events from toggle tab buttons
+  useEffect(() => {
+    const handleLotSelected = (event) => {
+      console.log('📋 [Lot Selection] Lot selected:', event.detail.lot);
+      setSelectedLotForDisplay(event.detail.lot);
+    };
+
+    window.addEventListener('lotSelected', handleLotSelected);
+    return () => {
+      window.removeEventListener('lotSelected', handleLotSelected);
+    };
+  }, []);
 
   // Lot data is now auto-fetched from the call's rm_heat_tc_mapping (read-only)
 
@@ -1955,11 +2132,17 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const rawMaterialAccepted = quantitySummary.rawMaterialAccepted;
   // const poOrderedQty = 450; // Qty Ordered in PO - Not currently used
 
-  // Manual entry state for "Manufactured" column - PER LINE (keyed by selectedLine)
-  // Initialize from localStorage if available
-  const [manufacturedQtyByLine, setManufacturedQtyByLine] = useState(() => {
+  // Manual entry state for "Manufactured" column - PER LINE PER LOT (keyed by [line][lot])
+  // Initialize as empty - will be populated by useEffect after callInitiationDataCache is available
+  const [manufacturedQtyByLine, setManufacturedQtyByLine] = useState({});
+
+  // Load manufactured quantities from localStorage for all lines and lots
+  useEffect(() => {
+    if (!callInitiationDataCache || Object.keys(callInitiationDataCache).length === 0) {
+      return; // Wait for cache to be populated
+    }
+
     try {
-      // Try to load all manufactured quantities from localStorage for all lines
       const allMfgQty = {};
       localProductionLines.forEach((prodLine, lineIndex) => {
         const lineNo = `Line-${lineIndex + 1}`;
@@ -1967,55 +2150,44 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         const inspectionCallNo = call?.call_no || '';
 
         if (inspectionCallNo && poNo) {
-          const lineFinalResult = loadFromLocalStorage('lineFinalResult', inspectionCallNo, poNo, lineNo);
-          if (lineFinalResult) {
-            allMfgQty[lineNo] = {
-              shearing: lineFinalResult.shearingManufactured ? String(lineFinalResult.shearingManufactured) : '',
-              turning: lineFinalResult.turningManufactured ? String(lineFinalResult.turningManufactured) : '',
-              mpiTesting: lineFinalResult.mpiManufactured ? String(lineFinalResult.mpiManufactured) : '',
-              forging: lineFinalResult.forgingManufactured ? String(lineFinalResult.forgingManufactured) : '',
-              quenching: lineFinalResult.quenchingManufactured ? String(lineFinalResult.quenchingManufactured) : '',
-              tempering: lineFinalResult.temperingManufactured ? String(lineFinalResult.temperingManufactured) : ''
-            };
-            console.log(`📋 [Init] Loaded manufactured quantities for ${lineNo}:`, allMfgQty[lineNo]);
+          // Initialize line object if not exists
+          if (!allMfgQty[lineNo]) {
+            allMfgQty[lineNo] = {};
           }
+
+          // Get all lots for this line from the initiation data
+          const initiationData = callInitiationDataCache[prodLine.icNumber];
+          const lotsForThisLine = initiationData?.lotDetailsList?.map(lot => lot.lotNumber) || [];
+
+          // Load manufactured quantities for each lot in this line
+          lotsForThisLine.forEach(lotNo => {
+            const lineFinalResult = loadFromLocalStorage('lineFinalResult', inspectionCallNo, poNo, lineNo, lotNo);
+            if (lineFinalResult) {
+              // Store manufactured quantities per lot
+              allMfgQty[lineNo][lotNo] = {
+                shearing: lineFinalResult.shearingManufactured ? String(lineFinalResult.shearingManufactured) : '',
+                turning: lineFinalResult.turningManufactured ? String(lineFinalResult.turningManufactured) : '',
+                mpiTesting: lineFinalResult.mpiManufactured ? String(lineFinalResult.mpiManufactured) : '',
+                forging: lineFinalResult.forgingManufactured ? String(lineFinalResult.forgingManufactured) : '',
+                quenching: lineFinalResult.quenchingManufactured ? String(lineFinalResult.quenchingManufactured) : '',
+                tempering: lineFinalResult.temperingManufactured ? String(lineFinalResult.temperingManufactured) : ''
+              };
+              console.log(`📋 [Load] Loaded manufactured quantities for ${lineNo}, Lot ${lotNo}:`, allMfgQty[lineNo][lotNo]);
+            }
+          });
         }
       });
-      return allMfgQty;
+
+      if (Object.keys(allMfgQty).length > 0) {
+        setManufacturedQtyByLine(allMfgQty);
+      }
     } catch (error) {
-      console.error('❌ [Init] Error loading manufactured quantities:', error);
-      return {};
+      console.error('❌ [Load] Error loading manufactured quantities:', error);
     }
-  });
+  }, [callInitiationDataCache, localProductionLines, call?.call_no, call?.po_no]);
 
-  // Get manufactured qty for current line
-  const manufacturedQty = useMemo(() => {
-    return manufacturedQtyByLine[selectedLine] || {
-      shearing: '',
-      turning: '',
-      mpiTesting: '',
-      forging: '',
-      quenching: '',
-      tempering: ''
-    };
-  }, [manufacturedQtyByLine, selectedLine]);
-
-  // Helper function to validate manufactured quantity against rejected quantity (on blur)
-  const handleManufacturedBlur = (field, value, rejectedValue) => {
-    const numValue = parseInt(value) || 0;
-    const numRejected = rejectedValue || 0;
-
-    // If user enters a value less than rejected, show alert and clear the field
-    if (value !== '' && numValue < numRejected) {
-      showNotification('error', `Manufactured quantity (${numValue}) cannot be less than rejected quantity (${numRejected})`);
-      setManufacturedQtyByLine(prev => ({
-        ...prev,
-        [selectedLine]: { ...prev[selectedLine], [field]: '' }
-      }));
-    }
-  };
-
-  // Get the selected lot for the current line from the 8-hour grid data
+  // Get the selected lot for the current line from the 8-hour grid data (returns first lot only)
+  // MUST be defined before manufacturedQty useMemo that uses it
   const getSelectedLotForCurrentLine = useCallback(() => {
     try {
       const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
@@ -2062,6 +2234,112 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     } catch (error) {
       console.error('❌ [Selected Lot] Error getting selected lot:', error);
       return null;
+    }
+  }, [call?.call_no, call?.po_no, selectedLine, localProductionLines]);
+
+  // Get manufactured qty for current line and selected lot
+  const manufacturedQty = useMemo(() => {
+    // Use selectedLotForDisplay if available, otherwise get the first lot
+    let lotNo = selectedLotForDisplay;
+    if (!lotNo) {
+      lotNo = getSelectedLotForCurrentLine();
+    }
+
+    return (manufacturedQtyByLine[selectedLine] && manufacturedQtyByLine[selectedLine][lotNo]) || {
+      shearing: '',
+      turning: '',
+      mpiTesting: '',
+      forging: '',
+      quenching: '',
+      tempering: ''
+    };
+  }, [manufacturedQtyByLine, selectedLine, selectedLotForDisplay, getSelectedLotForCurrentLine]);
+
+  // Helper function to validate manufactured quantity against rejected quantity (on blur)
+  const handleManufacturedBlur = (field, value, rejectedValue) => {
+    const numValue = parseInt(value) || 0;
+    const numRejected = rejectedValue || 0;
+
+    // If user enters a value less than rejected, show alert and clear the field
+    if (value !== '' && numValue < numRejected) {
+      showNotification('error', `Manufactured quantity (${numValue}) cannot be less than rejected quantity (${numRejected})`);
+      setManufacturedQtyByLine(prev => ({
+        ...prev,
+        [selectedLine]: { ...prev[selectedLine], [field]: '' }
+      }));
+    }
+  };
+
+  // Get ALL selected lots from the 8-hour grid data (across all sections)
+  const getAllSelectedLotsForCurrentLine = useCallback(() => {
+    try {
+      const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
+      const prodLine = localProductionLines[currentLineIndex] || localProductionLines[0] || {};
+      const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
+      const inspectionCallNo = call?.call_no || '';
+
+      console.log('📋 [All Selected Lots] Getting all lots for:', { selectedLine, poNo, inspectionCallNo });
+
+      // Get all process data from localStorage
+      const allData = getAllProcessData(inspectionCallNo, poNo, selectedLine);
+      console.log('📋 [All Selected Lots] All data from localStorage:', allData);
+
+      // Collect all unique lot numbers from all modules
+      const lotsSet = new Set();
+      const modules = ['shearingData', 'turningData', 'mpiData', 'forgingData', 'quenchingData', 'temperingData', 'finalCheckData'];
+
+      modules.forEach((moduleName) => {
+        if (allData?.[moduleName] && Array.isArray(allData[moduleName])) {
+          console.log(`📋 [All Selected Lots] Checking ${moduleName} data:`, allData[moduleName]);
+          allData[moduleName].forEach((hourData) => {
+            if (hourData.lotNo && hourData.lotNo.trim()) {
+              lotsSet.add(hourData.lotNo);
+              console.log(`📋 [All Selected Lots] Found lot from ${moduleName}:`, hourData.lotNo);
+            }
+          });
+        }
+      });
+
+      const allLots = Array.from(lotsSet).sort();
+      console.log('✅ [All Selected Lots] All unique lots found:', allLots);
+      return allLots;
+    } catch (error) {
+      console.error('❌ [All Selected Lots] Error getting all selected lots:', error);
+      return [];
+    }
+  }, [call?.call_no, call?.po_no, selectedLine, localProductionLines]);
+
+  // Get selected lots from a SPECIFIC section/module only
+  const getSelectedLotsForModule = useCallback((moduleName) => {
+    try {
+      const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
+      const prodLine = localProductionLines[currentLineIndex] || localProductionLines[0] || {};
+      const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
+      const inspectionCallNo = call?.call_no || '';
+
+      console.log(`📋 [Module Lots] Getting lots for module ${moduleName}:`, { selectedLine, poNo, inspectionCallNo });
+
+      // Get all process data from localStorage
+      const allData = getAllProcessData(inspectionCallNo, poNo, selectedLine);
+
+      // Collect unique lot numbers from ONLY this specific module
+      const lotsSet = new Set();
+      if (allData?.[moduleName] && Array.isArray(allData[moduleName])) {
+        console.log(`📋 [Module Lots] Checking ${moduleName} data:`, allData[moduleName]);
+        allData[moduleName].forEach((hourData) => {
+          if (hourData.lotNo && hourData.lotNo.trim()) {
+            lotsSet.add(hourData.lotNo);
+            console.log(`📋 [Module Lots] Found lot in ${moduleName}:`, hourData.lotNo);
+          }
+        });
+      }
+
+      const moduleLots = Array.from(lotsSet).sort();
+      console.log(`✅ [Module Lots] Unique lots in ${moduleName}:`, moduleLots);
+      return moduleLots;
+    } catch (error) {
+      console.error(`❌ [Module Lots] Error getting lots for ${moduleName}:`, error);
+      return [];
     }
   }, [call?.call_no, call?.po_no, selectedLine, localProductionLines]);
 
@@ -2123,21 +2401,59 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     return totalRejected;
   }, [call?.call_no, call?.po_no]);
 
+  // Get total rejected quantities for a SPECIFIC lot across ALL stages
+  // Used by "Lot Wise Quantity Breakup" table to show lot-specific rejected quantities
+  // Reads from the saved lineFinalResult which already has all rejected quantities calculated
+  const getTotalRejectedForLot = useCallback((lotNo) => {
+    const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
+    const prodLine = localProductionLines[currentLineIndex] || localProductionLines[0] || {};
+    const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
+    const inspectionCallNo = call?.call_no || '';
+
+    // Load the saved lineFinalResult for this lot
+    const lineFinalResult = loadFromLocalStorage('lineFinalResult', inspectionCallNo, poNo, selectedLine, lotNo);
+
+    if (!lineFinalResult) {
+      console.log(`📦 [Lot Wise] No lineFinalResult found for ${lotNo}`);
+      return 0;
+    }
+
+    // Sum all rejected quantities from the saved lineFinalResult
+    const totalRejected = (lineFinalResult.shearingRejected || 0) +
+                         (lineFinalResult.turningRejected || 0) +
+                         (lineFinalResult.mpiRejected || 0) +
+                         (lineFinalResult.forgingRejected || 0) +
+                         (lineFinalResult.quenchingRejected || 0) +
+                         (lineFinalResult.temperingRejected || 0) +
+                         (lineFinalResult.visualCheckRejected || 0) +
+                         (lineFinalResult.dimensionsCheckRejected || 0) +
+                         (lineFinalResult.hardnessCheckRejected || 0);
+
+    console.log(`📦 [Lot Wise] Total rejected for ${lotNo}:`, totalRejected, 'from lineFinalResult:', lineFinalResult);
+    return totalRejected;
+  }, [selectedLine, localProductionLines, call?.call_no, call?.po_no]);
+
   // Calculate rejected quantities from submodule localStorage data
-  // Now filters by the selected lot number
+  // Now filters by the selected lot number (from toggle tab or first lot if only one)
   const calculateRejectedFromSubmodule = useCallback((submoduleName, rejectedField = null) => {
-    // Get the selected lot for this line
-    const selectedLot = getSelectedLotForCurrentLine();
+    // Use selectedLotForDisplay if available (from toggle tab), otherwise get the first lot
+    let selectedLot = selectedLotForDisplay;
+
+    if (!selectedLot) {
+      selectedLot = getSelectedLotForCurrentLine();
+    }
+
     console.log(`📋 [${submoduleName}] Calculating rejected for selected lot:`, selectedLot);
 
     const totalRejected = calculateRejectedForSpecificLot(submoduleName, selectedLot, selectedLine, rejectedField);
 
     console.log(`📋 [${submoduleName}] Total rejected for selected lot (${selectedLot}):`, totalRejected);
     return totalRejected;
-  }, [selectedLine, getSelectedLotForCurrentLine, calculateRejectedForSpecificLot]);
+  }, [selectedLine, selectedLotForDisplay, getSelectedLotForCurrentLine, calculateRejectedForSpecificLot]);
 
-  // Calculate rejected quantities for Final Check section (special handling for array field)
-  const calculateFinalCheckRejected = useCallback((arrayIndex) => {
+  // Calculate rejected quantities for Final Check section
+  // checkType: 'visual' | 'dimensions' | 'hardness'
+  const calculateFinalCheckRejected = useCallback((checkType) => {
     const currentLineIndex = parseInt(selectedLine.replace('Line-', ''), 10) - 1;
     const prodLine = localProductionLines[currentLineIndex] || localProductionLines[0] || {};
     const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
@@ -2149,12 +2465,24 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       return 0;
     }
 
-    // Get the selected lot for this line
-    const selectedLot = getSelectedLotForCurrentLine();
-    console.log(`📋 [Final Check] Calculating rejected for selected lot:`, selectedLot);
+    // Use selectedLotForDisplay if available (from toggle tab), otherwise get the first lot
+    let selectedLot = selectedLotForDisplay;
+    if (!selectedLot) {
+      selectedLot = getSelectedLotForCurrentLine();
+    }
+    console.log(`📋 [Final Check] Calculating ${checkType} rejected for selected lot:`, selectedLot);
 
     const finalCheckData = allData.finalCheckData;
     let totalRejected = 0;
+
+    // Define which fields to sum for each check type
+    const fieldMap = {
+      visual: ['surfaceDefectRejected', 'embossingDefectRejected', 'markingRejected'],
+      dimensions: ['boxGaugeRejected', 'flatBearingAreaRejected', 'fallingGaugeRejected'],
+      hardness: ['temperingHardnessRejected']
+    };
+
+    const fieldsToSum = fieldMap[checkType] || [];
 
     if (Array.isArray(finalCheckData)) {
       finalCheckData.forEach((hourData) => {
@@ -2163,45 +2491,52 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           return; // Skip this hour if it's for a different lot
         }
 
-        // Case A: legacy array field `rejectedNo`
-        if (hourData.rejectedNo && Array.isArray(hourData.rejectedNo)) {
-          const val = hourData.rejectedNo[arrayIndex];
-          const num = parseInt(val) || 0;
-          totalRejected += num;
-          return;
-        }
-
-        // Case B: transformed numbered fields `rejectedNo1`, `rejectedNo2`, `rejectedNo3`
-        const key = `rejectedNo${arrayIndex + 1}`;
-        if (hourData[key] !== undefined && hourData[key] !== null) {
-          const num = parseInt(hourData[key]) || 0;
-          totalRejected += num;
-        }
+        // Sum the specified fields for this check type
+        fieldsToSum.forEach(field => {
+          if (hourData[field] !== undefined && hourData[field] !== null) {
+            const num = parseInt(hourData[field]) || 0;
+            totalRejected += num;
+          }
+        });
       });
     }
 
     return totalRejected;
-  }, [call?.call_no, call?.po_no, selectedLine, localProductionLines, getSelectedLotForCurrentLine]);
+  }, [call?.call_no, call?.po_no, selectedLine, localProductionLines, selectedLotForDisplay, getSelectedLotForCurrentLine]);
 
   // Calculate rejected quantities for each section
   const rejectedQty = useMemo(() => {
-    const visualCheckRejected = calculateFinalCheckRejected(0); // rejectedNo[0] - Visual Check
-    const dimensionsCheckRejected = calculateFinalCheckRejected(1); // rejectedNo[1] - Dimension Check
-    const hardnessCheckRejected = calculateFinalCheckRejected(2); // rejectedNo[2] - Hardness Check
+    const visualCheckRejected = calculateFinalCheckRejected('visual'); // Surface Defect + Embossing Defect + Marking
+    const dimensionsCheckRejected = calculateFinalCheckRejected('dimensions'); // Box Gauge + Flat Bearing Area + Falling Gauge
+    const hardnessCheckRejected = calculateFinalCheckRejected('hardness'); // Tempering Hardness
 
     // Tempering rejected = sum of all Final Check rejected (Visual + Dimension + Hardness)
     const temperingRejected = visualCheckRejected + dimensionsCheckRejected + hardnessCheckRejected;
+
+    // Testing & Finishing rejected = sum of all 4 rejection fields from testingFinishingData
+    const testingFinishingRejected = calculateRejectedFromSubmodule('testingFinishingData', 'toeLoadRejected') +
+                                     calculateRejectedFromSubmodule('testingFinishingData', 'weightRejected') +
+                                     calculateRejectedFromSubmodule('testingFinishingData', 'paintIdentificationRejected') +
+                                     calculateRejectedFromSubmodule('testingFinishingData', 'ercCoatingRejected');
 
     return {
       shearing: calculateRejectedFromSubmodule('shearingData'),
       turning: calculateRejectedFromSubmodule('turningData'),
       mpiTesting: calculateRejectedFromSubmodule('mpiData'),
-      forging: calculateRejectedFromSubmodule('forgingData'),
-      quenching: calculateRejectedFromSubmodule('quenchingData'),
+      forging: calculateRejectedFromSubmodule('forgingData', 'forgingTemperatureRejected') +
+               calculateRejectedFromSubmodule('forgingData', 'forgingStabilisationRejected') +
+               calculateRejectedFromSubmodule('forgingData', 'improperForgingRejected') +
+               calculateRejectedFromSubmodule('forgingData', 'forgingDefectRejected') +
+               calculateRejectedFromSubmodule('forgingData', 'embossingDefectRejected'),
+      quenching: calculateRejectedFromSubmodule('quenchingData', 'quenchingHardnessRejected') +
+                 calculateRejectedFromSubmodule('quenchingData', 'boxGaugeRejected') +
+                 calculateRejectedFromSubmodule('quenchingData', 'flatBearingAreaRejected') +
+                 calculateRejectedFromSubmodule('quenchingData', 'fallingGaugeRejected'),
       tempering: temperingRejected, // Calculated from Final Check section
       visualCheck: visualCheckRejected,
       dimensionsCheck: dimensionsCheckRejected,
-      hardnessCheck: hardnessCheckRejected
+      hardnessCheck: hardnessCheckRejected,
+      testingFinishing: testingFinishingRejected
     };
   }, [calculateRejectedFromSubmodule, calculateFinalCheckRejected]);
 
@@ -2261,12 +2596,12 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
         // For each lot in this line, calculate manufactured and accepted
         lotsSet.forEach((lot) => {
-          // Get manufactured qty for this line from the state (manually entered in stage-wise table)
+          // Get manufactured qty for this specific lot from the state (manually entered in stage-wise table)
           // IMPORTANT: Only use SHEARING manufactured quantity, not sum from all stages
-          const lineMfgQty = manufacturedQtyByLine[lineNo] || {};
-          const lotManufactured = parseInt(lineMfgQty.shearing) || 0;
+          const lineMfgQtyByLot = (manufacturedQtyByLine[lineNo] && manufacturedQtyByLine[lineNo][lot]) || {};
+          const lotManufactured = parseInt(lineMfgQtyByLot.shearing) || 0;
 
-          console.log(`📦 [Final Results] Line ${lineIndex + 1}, Lot ${lot}: lineMfgQty=`, lineMfgQty, 'Shearing Manufactured=', lotManufactured);
+          console.log(`📦 [Final Results] Line ${lineIndex + 1}, Lot ${lot}: lineMfgQtyByLot=`, lineMfgQtyByLot, 'Shearing Manufactured=`, lotManufactured);
 
           // Calculate rejected for this lot from all modules (shearing, turning, mpi, forging, quenching, tempering)
           // Use the helper function to properly filter by lot
@@ -2314,9 +2649,14 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     if (!inspectionCallNo || !poNo) return;
 
-    // Get lot and heat numbers from initiation data
+    // Get the lot number - use selectedLotForDisplay if available, otherwise get the first lot
+    let lotNumber = selectedLotForDisplay;
+    if (!lotNumber) {
+      lotNumber = getSelectedLotForCurrentLine();
+    }
+
+    // Get heat number from initiation data
     const initiationData = callInitiationDataCache[prodLine.icNumber];
-    const lotNumber = initiationData?.lotNumber || null;
     const heatNumber = initiationData?.heatNumber || null;
 
     // Calculate total manufactured (sum of all stage manufactured quantities)
@@ -2366,9 +2706,10 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       remarks: finalInspectionRemarks || null
     };
 
-    console.log(`💾 [Save] Saving lineFinalResult for ${selectedLine}:`, lineFinalResult);
-    saveToLocalStorage('lineFinalResult', inspectionCallNo, poNo, selectedLine, lineFinalResult);
-  }, [manufacturedQty, acceptedQty, rejectedQty, selectedLine, localProductionLines, call?.call_no, call?.po_no, processInspectionAccepted, finalInspectionRemarks, callInitiationDataCache]);
+    console.log(`💾 [Save] Saving lineFinalResult for ${selectedLine}, Lot ${lotNumber}:`, lineFinalResult);
+    // Save with lot number as part of the key for per-lot storage
+    saveToLocalStorage('lineFinalResult', inspectionCallNo, poNo, selectedLine, lineFinalResult, lotNumber);
+  }, [manufacturedQty, acceptedQty, rejectedQty, selectedLine, selectedLotForDisplay, localProductionLines, call?.call_no, call?.po_no, processInspectionAccepted, finalInspectionRemarks, callInitiationDataCache, getSelectedLotForCurrentLine]);
 
   // Handle line change - updates selected line tab
   const handleLineChange = (line) => {
@@ -2396,7 +2737,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     if (lineFinalResult) {
       console.log(`📋 [Load Data] Found saved data for ${selectedLine}:`, lineFinalResult);
 
-      // Restore manufactured quantities from saved data - PER LINE
+      // Restore manufactured quantities from saved data - PER LOT
+      const lotNo = lineFinalResult.lotNumber || 'default';
       const restoredMfg = {
         shearing: lineFinalResult.shearingManufactured ? String(lineFinalResult.shearingManufactured) : '',
         turning: lineFinalResult.turningManufactured ? String(lineFinalResult.turningManufactured) : '',
@@ -2405,11 +2747,14 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         quenching: lineFinalResult.quenchingManufactured ? String(lineFinalResult.quenchingManufactured) : '',
         tempering: lineFinalResult.temperingManufactured ? String(lineFinalResult.temperingManufactured) : ''
       };
-      console.log(`📋 [Load Data] Restoring manufactured quantities for ${selectedLine}:`, restoredMfg);
+      console.log(`📋 [Load Data] Restoring manufactured quantities for ${selectedLine}, Lot ${lotNo}:`, restoredMfg);
 
       setManufacturedQtyByLine(prev => ({
         ...prev,
-        [selectedLine]: restoredMfg
+        [selectedLine]: {
+          ...prev[selectedLine],
+          [lotNo]: restoredMfg
+        }
       }));
 
       // Restore final inspection remarks
@@ -2419,18 +2764,9 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       }
     } else {
       console.log(`📋 [Load Data] No saved data found for ${selectedLine}`);
-      // Clear the manufactured quantities for this line if no saved data
-      setManufacturedQtyByLine(prev => ({
-        ...prev,
-        [selectedLine]: {
-          shearing: '',
-          turning: '',
-          mpiTesting: '',
-          forging: '',
-          quenching: '',
-          tempering: ''
-        }
-      }));
+      // Note: We don't clear manufactured quantities here anymore since they're per-lot
+      // Each lot will have its own data loaded when needed
+      // The initialization already loads all lots from localStorage
     }
   }, [selectedLine, localProductionLines, call?.call_no, call?.po_no]);
 
@@ -2448,6 +2784,12 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const getShearingManufacturedQty = useCallback(() => {
     return parseInt(manufacturedQty.shearing) || 0;
   }, [manufacturedQty.shearing]);
+
+  // Get manufactured quantity for a specific lot from Shearing input field
+  const getShearingManufacturedQtyForLot = useCallback((lotNo) => {
+    const lotMfgQty = (manufacturedQtyByLine[selectedLine] && manufacturedQtyByLine[selectedLine][lotNo]) || {};
+    return parseInt(lotMfgQty.shearing) || 0;
+  }, [manufacturedQtyByLine, selectedLine]);
 
   // Get PO data based on the call selected in current production line
   const currentCallData = allCallOptions.find(c => c.call_no === currentProductionLine.icNumber);
@@ -2751,7 +3093,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           <>
             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>All data points must be collected for each line number separately.</p>
             <div style={{ overflowX: 'auto' }}>
-              <table className="data-table">
+              <table className="production-lines-table">
                 <thead>
                   <tr>
                     <th>Line Number</th>
@@ -2765,7 +3107,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                 <tbody>
                   {localProductionLines.map((line, idx) => (
                     <tr key={idx}>
-                      <td>
+                      <td data-label="Line Number">
                         <input
                           type="number"
                           className="form-input"
@@ -2775,7 +3117,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                           style={{ width: '80px', backgroundColor: '#f3f4f6', fontWeight: '500' }}
                         />
                       </td>
-                      <td>
+                      <td data-label="Inspection Call Number">
                         <select
                           className="form-input"
                           value={line.icNumber || ''}
@@ -2795,7 +3137,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td data-label="PO Number">
                         <input
                           type="text"
                           className="form-input"
@@ -2805,7 +3147,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                           style={{ minWidth: '120px', backgroundColor: '#f3f4f6' }}
                         />
                       </td>
-                      <td>
+                      <td data-label="Raw Material IC">
                         <input
                           type="text"
                           className="form-input"
@@ -2815,7 +3157,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                           style={{ minWidth: '150px', backgroundColor: '#f3f4f6' }}
                         />
                       </td>
-                      <td>
+                      <td data-label="Product Type">
                         <input
                           type="text"
                           className="form-input"
@@ -2825,7 +3167,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                           style={{ minWidth: '100px', backgroundColor: '#f3f4f6' }}
                         />
                       </td>
-                      <td>
+                      <td data-label="Actions">
                         <button
                           type="button"
                           className="btn btn-outline"
@@ -3065,15 +3407,172 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           </div>
         </div>
 
+       
+        {/* Heat Wise Accoutnal Section */}
+        {(() => {
+          // Only show if we have heat/lot data
+          if (!lineLotNumbers || lineLotNumbers.length === 0) {
+            return null;
+          }
+
+          return (
+            <div style={{
+              padding: 'var(--space-16)',
+              backgroundColor: '#f9fafb',
+              borderTop: '1px solid #e2e8f0',
+              borderBottom: '1px solid #e2e8f0'
+            }}>
+              <div style={{
+                fontSize: '16px',
+                fontWeight: 700,
+                color: '#15803d',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                🔥 Heat Wise Accoutnal
+               </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="heat-wise-accoutnal-table" style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#dcfce7', borderBottom: '2px solid #86efac' }}>
+                      <th style={{
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: '#15803d',
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        minWidth: '120px'
+                      }}>Heat No.</th>
+                      <th style={{
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: '#15803d',
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        minWidth: '140px'
+                      }}>Accepted RM (MT)</th>
+                      <th style={{
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: '#15803d',
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        minWidth: '140px'
+                      }}>Max ERC Mfg</th>
+                      <th style={{
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: '#15803d',
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        minWidth: '140px'
+                      }}>Mfg ERC</th>
+                      <th style={{
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: '#15803d',
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        minWidth: '140px'
+                      }}>Rejected ERC</th>
+                      <th style={{
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: '#15803d',
+                        fontSize: '13px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        minWidth: '140px'
+                      }}>Accepted ERC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineLotNumbers.map((lot) => {
+                      const heatNo = lineHeatNumbersMap[lot] || '-';
+                      const offeredQty = lotOfferedQtyMap[lot] || 0;
+
+                      // Calculate manufactured ERC for this specific lot
+                      const shearingManufacturedQty = getShearingManufacturedQtyForLot(lot);
+
+                      // Calculate total rejected for THIS SPECIFIC LOT (not based on selectedLotForDisplay)
+                      const totalRejected = getTotalRejectedForLot(lot);
+
+                      // Accepted = Manufactured - Total Rejected
+                      const acceptedErc = Math.max(0, shearingManufacturedQty - totalRejected);
+
+                      return (
+                        <tr key={lot} style={{
+                          borderBottom: '1px solid #e5e7eb'
+                        }}>
+                          <td data-label="Heat No." style={{
+                            padding: '12px 16px',
+                            fontWeight: 600,
+                            color: '#1f2937'
+                          }}>{heatNo}</td>
+                          <td data-label="Accepted RM (MT)" style={{
+                            padding: '12px 16px',
+                            color: '#64748b',
+                            fontWeight: 500
+                          }}>{offeredQty > 0 ? offeredQty : '-'}</td>
+                          <td data-label="Max ERC Mfg" style={{
+                            padding: '12px 16px',
+                            color: '#3b82f6',
+                            fontWeight: 500
+                          }}>{shearingManufacturedQty > 0 ? shearingManufacturedQty : '-'}</td>
+                          <td data-label="Mfg ERC" style={{
+                            padding: '12px 16px',
+                            color: '#3b82f6',
+                            fontWeight: 500
+                          }}>{shearingManufacturedQty > 0 ? shearingManufacturedQty : '-'}</td>
+                          <td data-label="Rejected ERC" style={{
+                            padding: '12px 16px',
+                            color: '#ef4444',
+                            fontWeight: 600
+                          }}>{totalRejected > 0 ? totalRejected : '-'}</td>
+                          <td data-label="Accepted ERC" style={{
+                            padding: '12px 16px',
+                            color: '#22c55e',
+                            fontWeight: 600
+                          }}>{acceptedErc > 0 ? acceptedErc : '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Lot Wise Quantity Breakup Section */}
         {(() => {
-          // Get the selected lot from the 8-hour grid
-          const selectedLot = getSelectedLotForCurrentLine();
+          // Get ALL selected lots from the 8-hour grid (across all sections)
+          const allSelectedLots = getAllSelectedLotsForCurrentLine();
 
-          console.log('📦 [Lot Wise Breakup] Selected lot:', selectedLot);
+          console.log('📦 [Lot Wise Breakup] All selected lots:', allSelectedLots);
 
-          // Only show the table if a lot is selected in the 8-hour grid
-          if (!selectedLot) {
+          // Only show the table if lots are selected in the 8-hour grid
+          if (!allSelectedLots || allSelectedLots.length === 0) {
             return null;
           }
 
@@ -3093,27 +3592,18 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                     </tr>
                   </thead>
                   <tbody>
-                    {(() => {
-                      // Get shearing manufactured quantity from input field
-                      const shearingManufacturedQty = getShearingManufacturedQty();
+                    {allSelectedLots.map((selectedLot) => {
+                      // Get shearing manufactured quantity for THIS SPECIFIC LOT from input field
+                      const shearingManufacturedQty = getShearingManufacturedQtyForLot(selectedLot);
 
-                      // Calculate total rejected from all stages (already filtered by lot in calculateRejectedFromSubmodule)
-                      const totalRejected = (rejectedQty.shearing || 0) + (rejectedQty.turning || 0) +
-                                           (rejectedQty.mpiTesting || 0) + (rejectedQty.forging || 0) +
-                                           (rejectedQty.quenching || 0) + (rejectedQty.tempering || 0) +
-                                           (rejectedQty.visualCheck || 0) + (rejectedQty.dimensionsCheck || 0) +
-                                           (rejectedQty.hardnessCheck || 0);
+                      // Calculate total rejected from all stages for THIS SPECIFIC LOT (not based on selectedLotForDisplay)
+                      const totalRejected = getTotalRejectedForLot(selectedLot);
 
                       // Accepted = Manufactured - Total Rejected
-                      let lotAcceptedQty = Math.max(0, shearingManufacturedQty - totalRejected);
+                      const lotAcceptedQty = Math.max(0, shearingManufacturedQty - totalRejected);
 
                       // Get offered quantity for this specific lot from the map
                       const lotOfferedQty = lotOfferedQtyMap[selectedLot] || rawMaterialAccepted || '-';
-
-                      // Accepted quantity should NOT exceed offered quantity
-                      if (typeof lotOfferedQty === 'number' && lotAcceptedQty > lotOfferedQty) {
-                        lotAcceptedQty = lotOfferedQty;
-                      }
 
                       console.log(`📦 [Lot Wise Breakup] Lot: ${selectedLot}, Offered: ${lotOfferedQty}, Manufactured: ${shearingManufacturedQty}, Rejected: ${totalRejected}, Accepted: ${lotAcceptedQty}`);
 
@@ -3125,7 +3615,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                           <td className="quantity-cell-accepted">{lotAcceptedQty > 0 ? lotAcceptedQty : '-'}</td>
                         </tr>
                       );
-                    })()}
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -3133,6 +3623,113 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           );
         })()}
 
+        
+         {/* Lot Number Toggle Tabs */}
+        {(() => {
+          // Get lots from the SHEARING section only (the primary section)
+          const shearingLots = getSelectedLotsForModule('shearingData');
+
+          if (!shearingLots || shearingLots.length === 0) {
+            return null;
+          }
+
+          // If only one lot is selected in shearing, show it as a display (not toggle tabs)
+          if (shearingLots.length === 1) {
+            return (
+              <div style={{
+                padding: 'var(--space-16)',
+                backgroundColor: '#f9fafb',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center'
+              }}>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#374151'
+                }}>
+                  📋 Selected Lot:
+                </span>
+                <div style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '2px solid #0d9488',
+                  backgroundColor: '#f0fdfa',
+                  color: '#0d9488',
+                  fontWeight: 600,
+                  fontSize: '13px'
+                }}>
+                  Lot {shearingLots[0]}
+                </div>
+              </div>
+            );
+          }
+
+          // If multiple lots are selected in shearing, show toggle tabs
+          return (
+            <div style={{
+              padding: 'var(--space-16)',
+              backgroundColor: '#f9fafb',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              gap: '8px',
+              flexWrap: 'wrap',
+              alignItems: 'center'
+            }}>
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#374151',
+                marginRight: '8px'
+              }}>
+                📋 Select Lot:
+              </span>
+              {shearingLots.map((lot) => {
+                const isSelected = selectedLotForDisplay === lot;
+                return (
+                  <button
+                    key={lot}
+                    onClick={() => {
+                      // Store selected lot in sessionStorage for persistence
+                      sessionStorage.setItem('selectedLotForBreakup', lot);
+                      // Trigger re-render by updating a state if needed
+                      window.dispatchEvent(new CustomEvent('lotSelected', { detail: { lot } }));
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      border: '2px solid #0d9488',
+                      backgroundColor: isSelected ? '#0d9488' : '#fff',
+                      color: isSelected ? '#fff' : '#0d9488',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      transition: 'all 0.2s ease',
+                      boxShadow: isSelected ? '0 2px 8px rgba(13, 148, 136, 0.3)' : '0 1px 2px rgba(0, 0, 0, 0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.target.style.backgroundColor = '#f0fdfa';
+                        e.target.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.target.style.backgroundColor = '#fff';
+                        e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+                      }
+                    }}
+                  >
+                    Lot {lot}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        
         {/* Stage-wise Results Table */}
         <div className="final-inspection-table-wrapper" style={{ overflowX: 'auto', padding: 'var(--space-16)' }}>
           <table className="data-table final-inspection-table">
@@ -3154,10 +3751,16 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.shearing}
-                    onChange={(e) => setManufacturedQtyByLine(prev => ({
-                      ...prev,
-                      [selectedLine]: { ...prev[selectedLine], shearing: e.target.value }
-                    }))}
+                    onChange={(e) => {
+                      const lotNo = selectedLotForDisplay || getSelectedLotForCurrentLine();
+                      setManufacturedQtyByLine(prev => ({
+                        ...prev,
+                        [selectedLine]: {
+                          ...prev[selectedLine],
+                          [lotNo]: { ...(prev[selectedLine]?.[lotNo] || {}), shearing: e.target.value }
+                        }
+                      }));
+                    }}
                     onBlur={(e) => handleManufacturedBlur('shearing', e.target.value, rejectedQty.shearing)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
@@ -3178,10 +3781,16 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.turning}
-                    onChange={(e) => setManufacturedQtyByLine(prev => ({
-                      ...prev,
-                      [selectedLine]: { ...prev[selectedLine], turning: e.target.value }
-                    }))}
+                    onChange={(e) => {
+                      const lotNo = selectedLotForDisplay || getSelectedLotForCurrentLine();
+                      setManufacturedQtyByLine(prev => ({
+                        ...prev,
+                        [selectedLine]: {
+                          ...prev[selectedLine],
+                          [lotNo]: { ...(prev[selectedLine]?.[lotNo] || {}), turning: e.target.value }
+                        }
+                      }));
+                    }}
                     onBlur={(e) => handleManufacturedBlur('turning', e.target.value, rejectedQty.turning)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
@@ -3202,10 +3811,16 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.mpiTesting}
-                    onChange={(e) => setManufacturedQtyByLine(prev => ({
-                      ...prev,
-                      [selectedLine]: { ...prev[selectedLine], mpiTesting: e.target.value }
-                    }))}
+                    onChange={(e) => {
+                      const lotNo = selectedLotForDisplay || getSelectedLotForCurrentLine();
+                      setManufacturedQtyByLine(prev => ({
+                        ...prev,
+                        [selectedLine]: {
+                          ...prev[selectedLine],
+                          [lotNo]: { ...(prev[selectedLine]?.[lotNo] || {}), mpiTesting: e.target.value }
+                        }
+                      }));
+                    }}
                     onBlur={(e) => handleManufacturedBlur('mpiTesting', e.target.value, rejectedQty.mpiTesting)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
@@ -3226,10 +3841,16 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.forging}
-                    onChange={(e) => setManufacturedQtyByLine(prev => ({
-                      ...prev,
-                      [selectedLine]: { ...prev[selectedLine], forging: e.target.value }
-                    }))}
+                    onChange={(e) => {
+                      const lotNo = selectedLotForDisplay || getSelectedLotForCurrentLine();
+                      setManufacturedQtyByLine(prev => ({
+                        ...prev,
+                        [selectedLine]: {
+                          ...prev[selectedLine],
+                          [lotNo]: { ...(prev[selectedLine]?.[lotNo] || {}), forging: e.target.value }
+                        }
+                      }));
+                    }}
                     onBlur={(e) => handleManufacturedBlur('forging', e.target.value, rejectedQty.forging)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
@@ -3250,10 +3871,16 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.quenching}
-                    onChange={(e) => setManufacturedQtyByLine(prev => ({
-                      ...prev,
-                      [selectedLine]: { ...prev[selectedLine], quenching: e.target.value }
-                    }))}
+                    onChange={(e) => {
+                      const lotNo = selectedLotForDisplay || getSelectedLotForCurrentLine();
+                      setManufacturedQtyByLine(prev => ({
+                        ...prev,
+                        [selectedLine]: {
+                          ...prev[selectedLine],
+                          [lotNo]: { ...(prev[selectedLine]?.[lotNo] || {}), quenching: e.target.value }
+                        }
+                      }));
+                    }}
                     onBlur={(e) => handleManufacturedBlur('quenching', e.target.value, rejectedQty.quenching)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
@@ -3274,10 +3901,16 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   <input
                     type="text"
                     value={manufacturedQty.tempering}
-                    onChange={(e) => setManufacturedQtyByLine(prev => ({
-                      ...prev,
-                      [selectedLine]: { ...prev[selectedLine], tempering: e.target.value }
-                    }))}
+                    onChange={(e) => {
+                      const lotNo = selectedLotForDisplay || getSelectedLotForCurrentLine();
+                      setManufacturedQtyByLine(prev => ({
+                        ...prev,
+                        [selectedLine]: {
+                          ...prev[selectedLine],
+                          [lotNo]: { ...(prev[selectedLine]?.[lotNo] || {}), tempering: e.target.value }
+                        }
+                      }));
+                    }}
                     onBlur={(e) => handleManufacturedBlur('tempering', e.target.value, rejectedQty.tempering)}
                     style={{ width: '100%', padding: '4px 8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
                   />
@@ -3323,9 +3956,20 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                 </td>
               </tr>
 
-              {/* 10. Accepted - Completely Blank Row */}
+              {/* 10. Testing & Finishing */}
               <tr>
                 <td data-label="S.No.">10</td>
+                <td data-label="Stage"><strong>Testing & Finishing</strong></td>
+                <td data-label="Manufactured">-</td>
+                <td data-label="Accepted">-</td>
+                <td data-label="Rejected" style={{ color: '#ef4444', fontWeight: 600 }}>
+                  {rejectedQty.testingFinishing || '-'}
+                </td>
+              </tr>
+
+              {/* 11. Accepted - Completely Blank Row */}
+              <tr>
+                <td data-label="S.No.">11</td>
                 <td data-label="Stage"><strong>Accepted</strong></td>
                 <td data-label="Manufactured">-</td>
                 <td data-label="Accepted">-</td>

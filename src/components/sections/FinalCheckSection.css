@@ -73,20 +73,32 @@
   min-width: 100px;
 }
 
-.final-check-th--visual {
+.final-check-th--box-gauge {
   min-width: 100px;
 }
 
-.final-check-th--dimension {
+.final-check-th--flat-bearing {
+  min-width: 120px;
+}
+
+.final-check-th--falling-gauge {
   min-width: 100px;
 }
 
-.final-check-th--hardness {
+.final-check-th--surface-defect {
   min-width: 100px;
 }
 
-.final-check-th--remarks {
+.final-check-th--embossing-defect {
+  min-width: 120px;
+}
+
+.final-check-th--marking {
   min-width: 100px;
+}
+
+.final-check-th--tempering-hardness {
+  min-width: 120px;
 }
 
 .final-check-td {
@@ -130,24 +142,33 @@
   background-color: #f9fafb;
 }
 
-/* Rejected Row */
-.final-check-row--rejected {
-  background-color: #e0f2fe;
+/* Remarks Row */
+.final-check-row--remarks {
+  background-color: #f5f5f5;
 }
 
-.final-check-td--rejected-label {
-  background-color: #e0f2fe;
+.final-check-td--remarks-label {
+  background-color: #f5f5f5;
   padding: 4px 8px;
+  width: 80px;
 }
 
-.final-check-rejected-label {
+.final-check-remarks-label {
   font-weight: 500;
   color: #333;
   font-size: 11px;
 }
 
-.final-check-td--placeholder {
-  background-color: #f3f4f6;
+.final-check-td--remarks-input {
+  background-color: #fff;
+  padding: 2px 6px;
+  text-align: center;
+}
+
+.final-check-td--remarks-input .form-control {
+  text-align: center;
+  max-width: 300px;
+  margin: 0 auto;
 }
 
 /* Mobile Cards - hidden on desktop */
@@ -244,6 +265,27 @@
   .final-check-mobile-field__value--multi select {
     flex: 1;
   }
+}
+
+/* Rejected No. Row */
+.final-check-row--rejected {
+  background-color: #e3f2fd;
+}
+
+.final-check-td--rejected-label {
+  background-color: #e3f2fd;
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.final-check-rejected-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.final-check-td--rejected-input {
+  background-color: #fff;
+  padding: 2px 6px;
 }
 
 @media (max-width: 480px) {

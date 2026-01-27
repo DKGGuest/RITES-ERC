@@ -12,9 +12,6 @@ const QuenchingSection = ({
 }) => {
   const [expanded] = useState(true);
 
-  // Check if Duration is taken in first hour (Once/Shift rule)
-  const isDurationTakenInFirstHour = data[0]?.quenchingDuration && data[0].quenchingDuration !== '';
-
   const updateData = (idx, field, value, sampleIndex = null) => {
     const newData = [...data];
     if (sampleIndex !== null && Array.isArray(newData[idx][field])) {
@@ -54,228 +51,356 @@ const QuenchingSection = ({
                 <th className="quenching-th quenching-th--checkbox">No Production</th>
                 <th className="quenching-th quenching-th--lot">Lot No.</th>
                 <th className="quenching-th quenching-th--temp">Quenching Temp.</th>
-                <th className="quenching-th quenching-th--duration">
-                  Quenching Duration
-                  <br /><small className="quenching-th__hint">Once/Shift</small>
-                </th>
+                <th className="quenching-th quenching-th--duration">Quenching Duration</th>
                 <th className="quenching-th quenching-th--hardness">Quenching Hardness</th>
-                <th className="quenching-th quenching-th--remarks">Remarks</th>
+                <th className="quenching-th quenching-th--box-gauge">Box Gauge</th>
+                <th className="quenching-th quenching-th--flat-bearing">Flat Bearing Area</th>
+                <th className="quenching-th quenching-th--falling-gauge">Falling Gauge</th>
               </tr>
             </thead>
             <tbody>
-              {visibleRows(data, showAll).map(({ row, idx }) => {
-                // Once/Shift rule: if taken in 1st hour, show hint in other hours
-                const showDurationHint = idx > 0 && isDurationTakenInFirstHour;
-
-                return (
-                  <React.Fragment key={row.hour}>
-                    {/* Row 1: First hardness input */}
-                    <tr className="quenching-row">
-                      <td rowSpan="3" className="quenching-td quenching-td--time">
-                        <strong>{hourLabels[idx]}</strong>
-                      </td>
-                      <td rowSpan="3" className="quenching-td quenching-td--checkbox">
-                        <input
-                          type="checkbox"
-                          checked={row.noProduction}
-                          onChange={e => updateData(idx, 'noProduction', e.target.checked)}
-                          className="quenching-checkbox"
-                        />
-                      </td>
-                      <td rowSpan="2" className="quenching-td quenching-td--lot">
-                        <select
-                          className="form-control quenching-select"
-                          value={row.lotNo}
-                          onChange={e => updateData(idx, 'lotNo', e.target.value)}
-                          disabled={row.noProduction}
-                        >
-                          <option value="">Select Lot No.</option>
-                          {availableLotNumbers.map(lot => (
-                            <option key={lot} value={lot}>{lot}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td rowSpan="2" className="quenching-td quenching-td--temp-input">
-                        <input
-                          type="number"
-                          className="form-control quenching-input"
-                          placeholder="°C"
-                          value={row.quenchingTemperature}
-                          onChange={e => updateData(idx, 'quenchingTemperature', e.target.value)}
-                          disabled={row.noProduction}
-                        />
-                      </td>
-                      <td rowSpan="2" className="quenching-td quenching-td--duration-input">
-                        {showDurationHint ? (
-                          <span className="quenching-hint">Taken in Hr 1</span>
-                        ) : (
-                          <input
-                            type="number"
-                            className="form-control quenching-input"
-                            placeholder="min"
-                            value={row.quenchingDuration}
-                            onChange={e => updateData(idx, 'quenchingDuration', e.target.value)}
-                            disabled={row.noProduction}
-                          />
-                        )}
-                      </td>
-                      <td className="quenching-td quenching-td--hardness-input">
-                        <input
-                          type="number"
-                          className="form-control quenching-input"
-                          placeholder="HRc"
-                          value={row.quenchingHardness[0]}
-                          onChange={e => updateData(idx, 'quenchingHardness', e.target.value, 0)}
-                          disabled={row.noProduction}
-                        />
-                      </td>
-                      <td rowSpan="3" className="quenching-td quenching-td--remarks">
-                        <input
-                          type="text"
-                          className="form-control quenching-input"
-                          value={row.remarks}
-                          onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        />
-                      </td>
-                    </tr>
-                    {/* Row 2: Second hardness input */}
-                    <tr className="quenching-row">
-                      <td className="quenching-td quenching-td--hardness-input">
-                        <input
-                          type="number"
-                          className="form-control quenching-input"
-                          placeholder="HRc"
-                          value={row.quenchingHardness[1]}
-                          onChange={e => updateData(idx, 'quenchingHardness', e.target.value, 1)}
-                          disabled={row.noProduction}
-                        />
-                      </td>
-                    </tr>
-                    {/* Row 3: Rejected No. */}
-                    <tr className="quenching-row quenching-row--rejected">
-                      <td className="quenching-td quenching-td--rejected-label">
-                        <span className="quenching-rejected-label">Rejected No.</span>
-                      </td>
-                      <td className="quenching-td quenching-td--placeholder">-</td>
-                      <td className="quenching-td quenching-td--placeholder">-</td>
-                      <td className="quenching-td quenching-td--rejected-input">
-                        <input
-                          type="number"
-                          className="form-control quenching-input quenching-input--rejected"
-                          value={row.rejectedQty}
-                          onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                          disabled={row.noProduction}
-                        />
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Mobile Card Layout */}
-          <div className="quenching-mobile-cards">
-            {visibleRows(data, showAll).map(({ row, idx }) => {
-              const showDurationHint = idx > 0 && isDurationTakenInFirstHour;
-              return (
-                <div key={row.hour} className="quenching-mobile-card">
-                  <div className="quenching-mobile-card__header">
-                    <span className="quenching-mobile-card__time">{hourLabels[idx]}</span>
-                    <label className="quenching-mobile-checkbox-label">
+              {visibleRows(data, showAll).map(({ row, idx }) => (
+                <React.Fragment key={row.hour}>
+                  {/* Row 1: First sample */}
+                  <tr className="quenching-row">
+                    <td rowSpan="4" className="quenching-td quenching-td--time">
+                      <strong>{hourLabels[idx]}</strong>
+                    </td>
+                    <td rowSpan="4" className="quenching-td quenching-td--checkbox">
                       <input
                         type="checkbox"
                         checked={row.noProduction}
                         onChange={e => updateData(idx, 'noProduction', e.target.checked)}
                         className="quenching-checkbox"
                       />
-                      <span>No Prod</span>
-                    </label>
+                    </td>
+                    <td rowSpan="2" className="quenching-td quenching-td--lot">
+                      <select
+                        className="form-control quenching-select"
+                        value={row.lotNo}
+                        onChange={e => updateData(idx, 'lotNo', e.target.value)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select Lot No.</option>
+                        {availableLotNumbers.map(lot => (
+                          <option key={lot} value={lot}>{lot}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="quenching-td quenching-td--temp-input">
+                      <input
+                        type="number"
+                        className="form-control quenching-input"
+                        placeholder="Float"
+                        value={row.quenchingTemperature[0] || ''}
+                        onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="quenching-td quenching-td--duration-input">
+                      <input
+                        type="number"
+                        className="form-control quenching-input"
+                        placeholder="Float"
+                        value={row.quenchingDuration[0] || ''}
+                        onChange={e => updateData(idx, 'quenchingDuration', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="quenching-td quenching-td--hardness-input">
+                      <input
+                        type="number"
+                        className="form-control quenching-input"
+                        placeholder="Integer"
+                        value={row.quenchingHardness[0] || ''}
+                        onChange={e => updateData(idx, 'quenchingHardness', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="quenching-td quenching-td--box-gauge-input">
+                      <select
+                        className="form-control quenching-select"
+                        value={row.boxGauge[0] || ''}
+                        onChange={e => updateData(idx, 'boxGauge', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="quenching-td quenching-td--flat-bearing-input">
+                      <select
+                        className="form-control quenching-select"
+                        value={row.flatBearingArea[0] || ''}
+                        onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="quenching-td quenching-td--falling-gauge-input">
+                      <select
+                        className="form-control quenching-select"
+                        value={row.fallingGauge[0] || ''}
+                        onChange={e => updateData(idx, 'fallingGauge', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                  </tr>
+                  {/* Row 2: Second sample */}
+                  <tr className="quenching-row">
+                    <td className="quenching-td quenching-td--temp-input">
+                      <input
+                        type="number"
+                        className="form-control quenching-input"
+                        placeholder="Float"
+                        value={row.quenchingTemperature[1] || ''}
+                        onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="quenching-td quenching-td--duration-input">
+                      <input
+                        type="number"
+                        className="form-control quenching-input"
+                        placeholder="Float"
+                        value={row.quenchingDuration[1] || ''}
+                        onChange={e => updateData(idx, 'quenchingDuration', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="quenching-td quenching-td--hardness-input">
+                      <input
+                        type="number"
+                        className="form-control quenching-input"
+                        placeholder="Integer"
+                        value={row.quenchingHardness[1] || ''}
+                        onChange={e => updateData(idx, 'quenchingHardness', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="quenching-td quenching-td--box-gauge-input">
+                      <select
+                        className="form-control quenching-select"
+                        value={row.boxGauge[1] || ''}
+                        onChange={e => updateData(idx, 'boxGauge', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="quenching-td quenching-td--flat-bearing-input">
+                      <select
+                        className="form-control quenching-select"
+                        value={row.flatBearingArea[1] || ''}
+                        onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                    <td className="quenching-td quenching-td--falling-gauge-input">
+                      <select
+                        className="form-control quenching-select"
+                        value={row.fallingGauge[1] || ''}
+                        onChange={e => updateData(idx, 'fallingGauge', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">NOT OK</option>
+                      </select>
+                    </td>
+                  </tr>
+                  {/* Row 3: Rejected No. - 6 separate inputs */}
+                  <tr className="quenching-row quenching-row--rejected">
+                    <td className="quenching-td quenching-td--lot">
+                      <span className="quenching-rejected-label">Rejected No.</span>
+                    </td>
+                    <td className="quenching-td quenching-td--rejected-input">
+                      <input type="number" value={row.quenchingTemperatureRejected || ''} onChange={e => updateData(idx, 'quenchingTemperatureRejected', e.target.value)} disabled />
+                    </td>
+                    <td className="quenching-td quenching-td--rejected-input">
+                      <input type="number" value={row.quenchingDurationRejected || ''} onChange={e => updateData(idx, 'quenchingDurationRejected', e.target.value)} disabled />
+                    </td>
+                    <td className="quenching-td quenching-td--rejected-input">
+                      <input type="number" value={row.quenchingHardnessRejected || ''} onChange={e => updateData(idx, 'quenchingHardnessRejected', e.target.value)} />
+                    </td>
+                    <td className="quenching-td quenching-td--rejected-input">
+                      <input type="number" value={row.boxGaugeRejected || ''} onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)} />
+                    </td>
+                    <td className="quenching-td quenching-td--rejected-input">
+                      <input type="number" value={row.flatBearingAreaRejected || ''} onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)} />
+                    </td>
+                    <td className="quenching-td quenching-td--rejected-input">
+                      <input type="number" value={row.fallingGaugeRejected || ''} onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)} />
+                    </td>
+                  </tr>
+                  {/* Row 4: Remarks */}
+                  <tr className="quenching-row quenching-row--remarks">
+                    <td className="quenching-td quenching-td--remarks-label">
+                      <span className="quenching-remarks-label">Remarks</span>
+                    </td>
+                    <td colSpan="7" className="quenching-td quenching-td--remarks-input">
+                      <input
+                        type="text"
+                        className="form-control quenching-input"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
+                      />
+                    </td>
+                  </tr>
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Mobile Card Layout */}
+          <div className="quenching-mobile-cards">
+            {visibleRows(data, showAll).map(({ row, idx }) => (
+              <div key={row.hour} className="quenching-mobile-card">
+                <div className="quenching-mobile-card__header">
+                  <span className="quenching-mobile-card__time">{hourLabels[idx]}</span>
+                  <input
+                    type="checkbox"
+                    checked={row.noProduction}
+                    onChange={e => updateData(idx, 'noProduction', e.target.checked)}
+                    className="quenching-checkbox"
+                  />
+                </div>
+                <div className="quenching-mobile-card__body">
+                  <div className="quenching-mobile-field">
+                    <span className="quenching-mobile-field__label">Lot No.</span>
+                    <div className="quenching-mobile-field__value">
+                      <select
+                        value={row.lotNo}
+                        onChange={e => updateData(idx, 'lotNo', e.target.value)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">Select Lot No.</option>
+                        {availableLotNumbers.map(lot => (
+                          <option key={lot} value={lot}>{lot}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div className="quenching-mobile-card__body">
-                    <div className="quenching-mobile-field">
-                      <span className="quenching-mobile-field__label">Lot No.</span>
-                      <div className="quenching-mobile-field__value">
-                        <select
-                          value={row.lotNo}
-                          onChange={e => updateData(idx, 'lotNo', e.target.value)}
-                          disabled={row.noProduction}
-                        >
-                          <option value="">Select Lot No.</option>
-                          {availableLotNumbers.map(lot => (
-                            <option key={lot} value={lot}>{lot}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="quenching-mobile-field">
-                      <span className="quenching-mobile-field__label">Quenching Temp.</span>
-                      <div className="quenching-mobile-field__value">
-                        <input
-                          type="number"
-                          placeholder="°C"
-                          value={row.quenchingTemperature}
-                          onChange={e => updateData(idx, 'quenchingTemperature', e.target.value)}
-                          disabled={row.noProduction}
-                        />
-                      </div>
-                    </div>
-                    <div className="quenching-mobile-field">
-                      <span className="quenching-mobile-field__label">Duration</span>
-                      <div className="quenching-mobile-field__value">
-                        {showDurationHint ? (
-                          <span className="quenching-hint">Taken in Hr 1</span>
-                        ) : (
+                  {[0, 1].map(sampleIdx => (
+                    <div key={sampleIdx}>
+                      <div className="quenching-mobile-field">
+                        <span className="quenching-mobile-field__label">Quenching Temp. (S{sampleIdx + 1})</span>
+                        <div className="quenching-mobile-field__value">
                           <input
                             type="number"
-                            placeholder="min"
-                            value={row.quenchingDuration}
-                            onChange={e => updateData(idx, 'quenchingDuration', e.target.value)}
+                            placeholder="Float"
+                            value={row.quenchingTemperature[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           />
-                        )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="quenching-mobile-field">
-                      <span className="quenching-mobile-field__label">Hardness</span>
-                      <div className="quenching-mobile-field__value quenching-mobile-field__value--multi">
-                        {[0, 1].map(sampleIdx => (
+                      <div className="quenching-mobile-field">
+                        <span className="quenching-mobile-field__label">Quenching Duration (S{sampleIdx + 1})</span>
+                        <div className="quenching-mobile-field__value">
                           <input
-                            key={sampleIdx}
                             type="number"
-                            placeholder={`S${sampleIdx + 1}`}
-                            value={row.quenchingHardness[sampleIdx]}
+                            placeholder="Float"
+                            value={row.quenchingDuration[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'quenchingDuration', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          />
+                        </div>
+                      </div>
+                      <div className="quenching-mobile-field">
+                        <span className="quenching-mobile-field__label">Quenching Hardness (S{sampleIdx + 1})</span>
+                        <div className="quenching-mobile-field__value">
+                          <input
+                            type="number"
+                            placeholder="Integer"
+                            value={row.quenchingHardness[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'quenchingHardness', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           />
-                        ))}
+                        </div>
+                      </div>
+                      <div className="quenching-mobile-field">
+                        <span className="quenching-mobile-field__label">Box Gauge (S{sampleIdx + 1})</span>
+                        <div className="quenching-mobile-field__value">
+                          <select
+                            value={row.boxGauge[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'boxGauge', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          >
+                            <option value="">OK / Not OK</option>
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="quenching-mobile-field">
+                        <span className="quenching-mobile-field__label">Flat Bearing Area (S{sampleIdx + 1})</span>
+                        <div className="quenching-mobile-field__value">
+                          <select
+                            value={row.flatBearingArea[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'flatBearingArea', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          >
+                            <option value="">OK / Not OK</option>
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="quenching-mobile-field">
+                        <span className="quenching-mobile-field__label">Falling Gauge (S{sampleIdx + 1})</span>
+                        <div className="quenching-mobile-field__value">
+                          <select
+                            value={row.fallingGauge[sampleIdx] || ''}
+                            onChange={e => updateData(idx, 'fallingGauge', e.target.value, sampleIdx)}
+                            disabled={row.noProduction}
+                          >
+                            <option value="">OK / Not OK</option>
+                            <option value="OK">OK</option>
+                            <option value="NOT OK">NOT OK</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                    <div className="quenching-mobile-field">
-                      <span className="quenching-mobile-field__label">Remarks</span>
-                      <div className="quenching-mobile-field__value">
-                        <input
-                          type="text"
-                          value={row.remarks}
-                          onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        />
-                      </div>
+                  ))}
+                  <div className="quenching-mobile-field quenching-mobile-field--rejected">
+                    <span className="quenching-mobile-field__label">Rejected No.</span>
+                    <div className="quenching-mobile-field__value">
+                      <input
+                        type="number"
+                        value={row.rejectedQty || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
+                        disabled={row.noProduction}
+                      />
                     </div>
-                    <div className="quenching-mobile-field quenching-mobile-field--rejected">
-                      <span className="quenching-mobile-field__label">Rejected No.</span>
-                      <div className="quenching-mobile-field__value">
-                        <input
-                          type="number"
-                          value={row.rejectedQty}
-                          onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                          disabled={row.noProduction}
-                        />
-                      </div>
+                  </div>
+                  <div className="quenching-mobile-field">
+                    <span className="quenching-mobile-field__label">Remarks</span>
+                    <div className="quenching-mobile-field__value">
+                      <input
+                        type="text"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

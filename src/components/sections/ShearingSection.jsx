@@ -14,11 +14,17 @@ const ShearingSection = ({
 
   const updateData = (index, field, value, sampleIndex = null) => {
     const updated = [...data];
-    if (sampleIndex !== null && Array.isArray(updated[index][field])) {
+
+    // Handle array fields (lengthCutBar, qualityDia, sharpEdges, crackedEdges, rejectedQty)
+    if (sampleIndex !== null) {
+      if (!Array.isArray(updated[index][field])) {
+        updated[index][field] = [];
+      }
       const fieldArray = [...updated[index][field]];
       fieldArray[sampleIndex] = value;
       updated[index][field] = fieldArray;
     } else {
+      // Handle non-array fields (remarks, lotNo, noProduction)
       updated[index][field] = value;
     }
     onDataChange(updated);
@@ -53,14 +59,15 @@ const ShearingSection = ({
                 <th className="shearing-th shearing-th--checkbox">No Production</th>
                 <th className="shearing-th shearing-th--lot">Lot No.</th>
                 <th className="shearing-th shearing-th--length">Length of Cut Bar</th>
-                <th className="shearing-th shearing-th--edges">No Sharp Edges</th>
-                <th className="shearing-th shearing-th--remarks">Remarks</th>
+                <th className="shearing-th shearing-th--quality">Quality / Improper Dia at end</th>
+                <th className="shearing-th shearing-th--edges">Sharp Edges</th>
+                <th className="shearing-th shearing-th--cracked">Cracked Edges</th>
               </tr>
             </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <>
-                  {/* Row 1: First input + First checkbox */}
+                  {/* Row 1: First sample */}
                   <tr key={`${row.hour}-r1`} className="shearing-row">
                     <td rowSpan="4" className="shearing-td shearing-td--time">
                       <strong>{hourLabels[idx]}</strong>
@@ -88,77 +95,156 @@ const ShearingSection = ({
                     </td>
                     <td className="shearing-td shearing-td--length-input">
                       <input
-                        type="text"
+                        type="number"
+                        step="0.01"
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[0] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 0)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
-                    <td className="shearing-td shearing-td--edge-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={row.sharpEdges[0] || false}
-                        onChange={e => updateData(idx, 'sharpEdges', e.target.checked, 0)}
+                    <td className="shearing-td shearing-td--quality-input">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.qualityDia[0] || ''}
+                        onChange={e => updateData(idx, 'qualityDia', e.target.value, 0)}
                         disabled={row.noProduction}
-                        className="shearing-edge-checkbox"
-                      />
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
                     </td>
-                    <td rowSpan="4" className="shearing-td shearing-td--remarks">
-                      <input
-                        type="text"
-                        className="form-control shearing-input"
-                        value={row.remarks}
-                        onChange={e => updateData(idx, 'remarks', e.target.value)}
-                      />
+                    <td className="shearing-td shearing-td--edge-dropdown">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.sharpEdges[0] || ''}
+                        onChange={e => updateData(idx, 'sharpEdges', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
+                    </td>
+                    <td className="shearing-td shearing-td--cracked-dropdown">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.crackedEdges[0] || ''}
+                        onChange={e => updateData(idx, 'crackedEdges', e.target.value, 0)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
                     </td>
                   </tr>
-                  {/* Row 2: Second input + Second checkbox */}
+                  {/* Row 2: Second sample */}
                   <tr key={`${row.hour}-r2`} className="shearing-row">
                     <td className="shearing-td shearing-td--length-input">
                       <input
-                        type="text"
+                        type="number"
+                        step="0.01"
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[1] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 1)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
-                    <td className="shearing-td shearing-td--edge-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={row.sharpEdges[1] || false}
-                        onChange={e => updateData(idx, 'sharpEdges', e.target.checked, 1)}
+                    <td className="shearing-td shearing-td--quality-input">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.qualityDia[1] || ''}
+                        onChange={e => updateData(idx, 'qualityDia', e.target.value, 1)}
                         disabled={row.noProduction}
-                        className="shearing-edge-checkbox"
-                      />
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
+                    </td>
+                    <td className="shearing-td shearing-td--edge-dropdown">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.sharpEdges[1] || ''}
+                        onChange={e => updateData(idx, 'sharpEdges', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
+                    </td>
+                    <td className="shearing-td shearing-td--cracked-dropdown">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.crackedEdges[1] || ''}
+                        onChange={e => updateData(idx, 'crackedEdges', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
                     </td>
                   </tr>
-                  {/* Row 3: Third input + Third checkbox */}
+                  {/* Row 3: Third sample */}
                   <tr key={`${row.hour}-r3`} className="shearing-row">
                     <td className="shearing-td shearing-td--length-input">
                       <input
-                        type="text"
+                        type="number"
+                        step="0.01"
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[2] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 2)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
-                    <td className="shearing-td shearing-td--edge-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={row.sharpEdges[2] || false}
-                        onChange={e => updateData(idx, 'sharpEdges', e.target.checked, 2)}
+                    <td className="shearing-td shearing-td--quality-input">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.qualityDia[2] || ''}
+                        onChange={e => updateData(idx, 'qualityDia', e.target.value, 2)}
                         disabled={row.noProduction}
-                        className="shearing-edge-checkbox"
-                      />
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
+                    </td>
+                    <td className="shearing-td shearing-td--edge-dropdown">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.sharpEdges[2] || ''}
+                        onChange={e => updateData(idx, 'sharpEdges', e.target.value, 2)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
+                    </td>
+                    <td className="shearing-td shearing-td--cracked-dropdown">
+                      <select
+                        className="form-control shearing-select"
+                        value={row.crackedEdges[2] || ''}
+                        onChange={e => updateData(idx, 'crackedEdges', e.target.value, 2)}
+                        disabled={row.noProduction}
+                      >
+                        <option value="">OK / Not OK</option>
+                        <option value="OK">OK</option>
+                        <option value="NOT OK">Not OK</option>
+                      </select>
                     </td>
                   </tr>
-                  {/* Row 4: Rejected No. label + 2 input columns */}
+                  {/* Row 4: Rejected No. of ERC */}
                   <tr key={`${row.hour}-r4`} className="shearing-row shearing-row--rejected">
                     <td className="shearing-td shearing-td--rejected-label">
-                      <span className="shearing-rejected-label">Rejected No.</span>
+                      <span className="shearing-rejected-label">No. of ERC Rejected</span>
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
                       <input
@@ -176,6 +262,38 @@ const ShearingSection = ({
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
                         disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="shearing-td shearing-td--rejected-input">
+                      <input
+                        type="number"
+                        className="form-control shearing-input shearing-input--rejected"
+                        value={row.rejectedQty[2] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="shearing-td shearing-td--rejected-input">
+                      <input
+                        type="number"
+                        className="form-control shearing-input shearing-input--rejected"
+                        value={row.rejectedQty[3] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 3)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                  </tr>
+                  {/* Row 5: Remarks */}
+                  <tr key={`${row.hour}-r5`} className="shearing-row shearing-row--remarks">
+                    <td className="shearing-td shearing-td--remarks-label">
+                      <span className="shearing-remarks-label">Remarks</span>
+                    </td>
+                    <td colSpan="6" className="shearing-td shearing-td--remarks-input">
+                      <input
+                        type="text"
+                        className="form-control shearing-input"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
                       />
                     </td>
                   </tr>

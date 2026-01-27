@@ -50,15 +50,15 @@ const TurningSection = ({
                 <th className="turning-th turning-th--time">Time Range</th>
                 <th className="turning-th turning-th--checkbox">No Production</th>
                 <th className="turning-th turning-th--lot">Lot No.</th>
-                <th className="turning-th turning-th--length">Turning Length</th>
-                <th className="turning-th turning-th--dia">Turned Bar Dia</th>
-                <th className="turning-th turning-th--remarks">Remarks</th>
+                <th className="turning-th turning-th--parallel">Parallel Length</th>
+                <th className="turning-th turning-th--full">Full Turning Length</th>
+                <th className="turning-th turning-th--dia">Turning Dia</th>
               </tr>
             </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <>
-                  {/* Row 1: First input row */}
+                  {/* Row 1: First sample */}
                   <tr key={`${row.hour}-r1`} className="turning-row">
                     <td rowSpan="4" className="turning-td turning-td--time">
                       <strong>{hourLabels[idx]}</strong>
@@ -84,76 +84,113 @@ const TurningSection = ({
                         ))}
                       </select>
                     </td>
-                    <td className="turning-td turning-td--length-input">
+                    <td className="turning-td turning-td--parallel-input">
                       <input
-                        type="text"
-                        className="form-control turning-length-input"
-                        value={row.straightLength[0] || ''}
-                        onChange={e => updateData(idx, 'straightLength', e.target.value, 0)}
+                        type="number"
+                        step="0.01"
+                        className="form-control turning-parallel-input"
+                        value={row.parallelLength[0] || ''}
+                        onChange={e => updateData(idx, 'parallelLength', e.target.value, 0)}
                         disabled={row.noProduction}
+                        placeholder="float"
+                      />
+                    </td>
+                    <td className="turning-td turning-td--full-input">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control turning-full-input"
+                        value={row.fullTurningLength[0] || ''}
+                        onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 0)}
+                        disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
                     <td className="turning-td turning-td--dia-input">
                       <input
-                        type="text"
+                        type="number"
+                        step="0.01"
                         className="form-control turning-dia-input"
-                        value={row.dia[0] || ''}
-                        onChange={e => updateData(idx, 'dia', e.target.value, 0)}
+                        value={row.turningDia[0] || ''}
+                        onChange={e => updateData(idx, 'turningDia', e.target.value, 0)}
                         disabled={row.noProduction}
-                      />
-                    </td>
-                    <td rowSpan="4" className="turning-td turning-td--remarks">
-                      <input
-                        type="text"
-                        className="form-control turning-input"
-                        value={row.remarks}
-                        onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        placeholder="float"
                       />
                     </td>
                   </tr>
-                  {/* Row 2: Second input row */}
+                  {/* Row 2: Second sample */}
                   <tr key={`${row.hour}-r2`} className="turning-row">
-                    <td className="turning-td turning-td--length-input">
+                    <td className="turning-td turning-td--parallel-input">
                       <input
-                        type="text"
-                        className="form-control turning-length-input"
-                        value={row.straightLength[1] || ''}
-                        onChange={e => updateData(idx, 'straightLength', e.target.value, 1)}
+                        type="number"
+                        step="0.01"
+                        className="form-control turning-parallel-input"
+                        value={row.parallelLength[1] || ''}
+                        onChange={e => updateData(idx, 'parallelLength', e.target.value, 1)}
                         disabled={row.noProduction}
+                        placeholder="float"
+                      />
+                    </td>
+                    <td className="turning-td turning-td--full-input">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control turning-full-input"
+                        value={row.fullTurningLength[1] || ''}
+                        onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 1)}
+                        disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
                     <td className="turning-td turning-td--dia-input">
                       <input
-                        type="text"
+                        type="number"
+                        step="0.01"
                         className="form-control turning-dia-input"
-                        value={row.dia[1] || ''}
-                        onChange={e => updateData(idx, 'dia', e.target.value, 1)}
+                        value={row.turningDia[1] || ''}
+                        onChange={e => updateData(idx, 'turningDia', e.target.value, 1)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
                   </tr>
-                  {/* Row 3: Third input row */}
+                  {/* Row 3: Third sample */}
                   <tr key={`${row.hour}-r3`} className="turning-row">
-                    <td className="turning-td turning-td--length-input">
+                    <td className="turning-td turning-td--parallel-input">
                       <input
-                        type="text"
-                        className="form-control turning-length-input"
-                        value={row.straightLength[2] || ''}
-                        onChange={e => updateData(idx, 'straightLength', e.target.value, 2)}
+                        type="number"
+                        step="0.01"
+                        className="form-control turning-parallel-input"
+                        value={row.parallelLength[2] || ''}
+                        onChange={e => updateData(idx, 'parallelLength', e.target.value, 2)}
                         disabled={row.noProduction}
+                        placeholder="float"
+                      />
+                    </td>
+                    <td className="turning-td turning-td--full-input">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-control turning-full-input"
+                        value={row.fullTurningLength[2] || ''}
+                        onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 2)}
+                        disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
                     <td className="turning-td turning-td--dia-input">
                       <input
-                        type="text"
+                        type="number"
+                        step="0.01"
                         className="form-control turning-dia-input"
-                        value={row.dia[2] || ''}
-                        onChange={e => updateData(idx, 'dia', e.target.value, 2)}
+                        value={row.turningDia[2] || ''}
+                        onChange={e => updateData(idx, 'turningDia', e.target.value, 2)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </td>
                   </tr>
-                  {/* Row 4: Rejected No. row */}
+                  {/* Row 4: Rejected No. */}
                   <tr key={`${row.hour}-r4`} className="turning-row turning-row--rejected">
                     <td className="turning-td turning-td--rejected-label">
                       <span className="turning-rejected-label">Rejected No.</span>
@@ -174,6 +211,29 @@ const TurningSection = ({
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
                         disabled={row.noProduction}
+                      />
+                    </td>
+                    <td className="turning-td turning-td--rejected-input">
+                      <input
+                        type="number"
+                        className="form-control turning-input turning-input--rejected"
+                        value={row.rejectedQty[2] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
+                        disabled={row.noProduction}
+                      />
+                    </td>
+                  </tr>
+                  {/* Row 5: Remarks */}
+                  <tr key={`${row.hour}-r5`} className="turning-row turning-row--remarks">
+                    <td className="turning-td turning-td--remarks-label">
+                      <span className="turning-remarks-label">Remarks</span>
+                    </td>
+                    <td colSpan="5" className="turning-td turning-td--remarks-input">
+                      <input
+                        type="text"
+                        className="form-control turning-input"
+                        value={row.remarks}
+                        onChange={e => updateData(idx, 'remarks', e.target.value)}
                       />
                     </td>
                   </tr>
@@ -212,68 +272,119 @@ const TurningSection = ({
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turning Length (S1)</span>
+                    <span className="turning-mobile-field__label">Parallel Length (S1)</span>
                     <div className="turning-mobile-field__value">
                       <input
-                        type="text"
-                        value={row.straightLength[0] || ''}
-                        onChange={e => updateData(idx, 'straightLength', e.target.value, 0)}
+                        type="number"
+                        step="0.01"
+                        value={row.parallelLength[0] || ''}
+                        onChange={e => updateData(idx, 'parallelLength', e.target.value, 0)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turning Length (S2)</span>
+                    <span className="turning-mobile-field__label">Parallel Length (S2)</span>
                     <div className="turning-mobile-field__value">
                       <input
-                        type="text"
-                        value={row.straightLength[1] || ''}
-                        onChange={e => updateData(idx, 'straightLength', e.target.value, 1)}
+                        type="number"
+                        step="0.01"
+                        value={row.parallelLength[1] || ''}
+                        onChange={e => updateData(idx, 'parallelLength', e.target.value, 1)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turning Length (S3)</span>
+                    <span className="turning-mobile-field__label">Parallel Length (S3)</span>
                     <div className="turning-mobile-field__value">
                       <input
-                        type="text"
-                        value={row.straightLength[2] || ''}
-                        onChange={e => updateData(idx, 'straightLength', e.target.value, 2)}
+                        type="number"
+                        step="0.01"
+                        value={row.parallelLength[2] || ''}
+                        onChange={e => updateData(idx, 'parallelLength', e.target.value, 2)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turned Bar Dia (S1)</span>
+                    <span className="turning-mobile-field__label">Full Turning Length (S1)</span>
                     <div className="turning-mobile-field__value">
                       <input
-                        type="text"
-                        value={row.dia[0] || ''}
-                        onChange={e => updateData(idx, 'dia', e.target.value, 0)}
+                        type="number"
+                        step="0.01"
+                        value={row.fullTurningLength[0] || ''}
+                        onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 0)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turned Bar Dia (S2)</span>
+                    <span className="turning-mobile-field__label">Full Turning Length (S2)</span>
                     <div className="turning-mobile-field__value">
                       <input
-                        type="text"
-                        value={row.dia[1] || ''}
-                        onChange={e => updateData(idx, 'dia', e.target.value, 1)}
+                        type="number"
+                        step="0.01"
+                        value={row.fullTurningLength[1] || ''}
+                        onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 1)}
                         disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turned Bar Dia (S3)</span>
+                    <span className="turning-mobile-field__label">Full Turning Length (S3)</span>
                     <div className="turning-mobile-field__value">
                       <input
-                        type="text"
-                        value={row.dia[2] || ''}
-                        onChange={e => updateData(idx, 'dia', e.target.value, 2)}
+                        type="number"
+                        step="0.01"
+                        value={row.fullTurningLength[2] || ''}
+                        onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 2)}
                         disabled={row.noProduction}
+                        placeholder="float"
+                      />
+                    </div>
+                  </div>
+                  <div className="turning-mobile-field">
+                    <span className="turning-mobile-field__label">Turning Dia (S1)</span>
+                    <div className="turning-mobile-field__value">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.turningDia[0] || ''}
+                        onChange={e => updateData(idx, 'turningDia', e.target.value, 0)}
+                        disabled={row.noProduction}
+                        placeholder="float"
+                      />
+                    </div>
+                  </div>
+                  <div className="turning-mobile-field">
+                    <span className="turning-mobile-field__label">Turning Dia (S2)</span>
+                    <div className="turning-mobile-field__value">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.turningDia[1] || ''}
+                        onChange={e => updateData(idx, 'turningDia', e.target.value, 1)}
+                        disabled={row.noProduction}
+                        placeholder="float"
+                      />
+                    </div>
+                  </div>
+                  <div className="turning-mobile-field">
+                    <span className="turning-mobile-field__label">Turning Dia (S3)</span>
+                    <div className="turning-mobile-field__value">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={row.turningDia[2] || ''}
+                        onChange={e => updateData(idx, 'turningDia', e.target.value, 2)}
+                        disabled={row.noProduction}
+                        placeholder="float"
                       />
                     </div>
                   </div>
@@ -305,6 +416,17 @@ const TurningSection = ({
                         type="number"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
+                        disabled={row.noProduction}
+                      />
+                    </div>
+                  </div>
+                  <div className="turning-mobile-field turning-mobile-field--rejected">
+                    <span className="turning-mobile-field__label">Rejected No. 3</span>
+                    <div className="turning-mobile-field__value">
+                      <input
+                        type="number"
+                        value={row.rejectedQty[2] || ''}
+                        onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
                         disabled={row.noProduction}
                       />
                     </div>

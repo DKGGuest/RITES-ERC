@@ -8,6 +8,7 @@ import ForgingSection from '../components/sections/ForgingSection';
 import QuenchingSection from '../components/sections/QuenchingSection';
 import FinalCheckSection from '../components/sections/FinalCheckSection';
 import TemperingSection from '../components/sections/TemperingSection';
+import TestingFinishingSection from '../components/sections/TestingFinishingSection';
 import {
   shearingDataService,
   turningDataService,
@@ -144,12 +145,16 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       hour: i + 1,
       noProduction: false,
       lotNo: '',
-      // 3 inputs for Length of Cut Bar
+      // 3 inputs for Length of Cut Bar (float values)
       lengthCutBar: ['', '', ''],
-      // 3 checkboxes for Sharp Edges (stacked vertically)
-      sharpEdges: [false, false, false],
-      // 2 inputs for Rejected Quantity (one under Length of Cut Bar, one under No Sharp Edges)
-      rejectedQty: ['', ''],
+      // 3 dropdowns for Quality / Improper Dia at end (OK / Not OK)
+      qualityDia: ['', '', ''],
+      // 3 dropdowns for Sharp Edges (OK / Not OK)
+      sharpEdges: ['', '', ''],
+      // 3 dropdowns for Cracked Edges (OK / Not OK)
+      crackedEdges: ['', '', ''],
+      // 4 inputs for Rejected Quantity (one below each column: Length, Quality, Sharp Edges, Cracked Edges)
+      rejectedQty: ['', '', '', ''],
       remarks: ''
     }))
   );
@@ -159,11 +164,14 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       hour: i + 1,
       noProduction: false,
       lotNo: '',
-      straightLength: ['', '', ''],
-      taperLength: ['', '', ''],
-      dia: ['', '', ''],
-      acceptedQty: '',
-      rejectedQty: ['', ''],
+      // 3 inputs for Parallel Length (float values)
+      parallelLength: ['', '', ''],
+      // 3 inputs for Full Turning Length (float values)
+      fullTurningLength: ['', '', ''],
+      // 3 inputs for Turning Dia (float values)
+      turningDia: ['', '', ''],
+      // 3 inputs for Rejected Quantity (one below each column: Parallel Length, Full Turning Length, Turning Dia)
+      rejectedQty: ['', '', ''],
       remarks: ''
     }))
   );
@@ -174,8 +182,10 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       hour: i + 1,
       noProduction: false,
       lotNo: '',
+      // 3 dropdowns for MPI Results (OK / Not OK)
       testResults: ['', '', ''],
-      rejectedQty: ['', ''],
+      // 1 input for Rejected Quantity
+      rejectedQty: '',
       remarks: ''
     }))
   );
@@ -186,9 +196,22 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       hour: i + 1,
       noProduction: false,
       lotNo: '',
-      forgingTemperature: ['', '', ''],
-      acceptedQty: '',
-      rejectedQty: '',
+      // 2 inputs for Forging Temp. (float values)
+      forgingTemperature: ['', ''],
+      // 2 dropdowns for Forging Stabilisation Rejection (OK / Not OK)
+      forgingStabilisation: ['', ''],
+      // 2 dropdowns for Improper Forging (OK / Not OK)
+      improperForging: ['', ''],
+      // 2 dropdowns for Forging Defect (Marks/Notches) (OK / Not OK)
+      forgingDefect: ['', ''],
+      // 2 dropdowns for Embossing Defect (OK / Not OK)
+      embossingDefect: ['', ''],
+      // 5 separate rejection fields
+      forgingTemperatureRejected: '',
+      forgingStabilisationRejected: '',
+      improperForgingRejected: '',
+      forgingDefectRejected: '',
+      embossingDefectRejected: '',
       remarks: ''
     }))
   );
@@ -199,10 +222,25 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       hour: i + 1,
       noProduction: false,
       lotNo: '',
-      quenchingTemperature: '',
-      quenchingDuration: '',
+      // 2 float inputs for Quenching Temp.
+      quenchingTemperature: ['', ''],
+      // 2 float inputs for Quenching Duration
+      quenchingDuration: ['', ''],
+      // 2 integer inputs for Quenching Hardness
       quenchingHardness: ['', ''],
-      rejectedQty: '',
+      // 2 dropdowns for Box Gauge (OK / Not OK)
+      boxGauge: ['', ''],
+      // 2 dropdowns for Flat Bearing Area (OK / Not OK)
+      flatBearingArea: ['', ''],
+      // 2 dropdowns for Falling Gauge (OK / Not OK)
+      fallingGauge: ['', ''],
+      // 6 separate rejection fields
+      quenchingTemperatureRejected: '',
+      quenchingDurationRejected: '',
+      quenchingHardnessRejected: '',
+      boxGaugeRejected: '',
+      flatBearingAreaRejected: '',
+      fallingGaugeRejected: '',
       remarks: ''
     }))
   );
@@ -213,24 +251,65 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       hour: i + 1,
       noProduction: false,
       lotNo: '',
-      temperingTemperature: '',
-      temperingDuration: '',
-      acceptedQty: '',
-      rejectedQty: '',
+      temperingTemperature: ['', ''],
+      temperingTemperatureRejected: '',
+      temperingDuration: ['', ''],
+      temperingDurationRejected: '',
       remarks: ''
     }))
   );
 
-  // Final Check Section - 8 Hour Grid (renamed from Dimension section)
+  // Final Check Section - 8 Hour Grid
   const [finalCheckData, setFinalCheckData] = useState(
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1,
       noProduction: false,
       lotNo: '',
-      visualCheck: ['', ''],
-      dimensionCheck: ['', ''],
-      hardnessCheck: ['', ''],
-      rejectedNo: ['', '', ''],
+      // 2 dropdowns for Box Gauge (OK / Not OK)
+      boxGauge: ['', ''],
+      // 2 dropdowns for Flat Bearing Area (OK / Not OK)
+      flatBearingArea: ['', ''],
+      // 2 dropdowns for Falling Gauge (OK / Not OK)
+      fallingGauge: ['', ''],
+      // 2 dropdowns for Surface Defect (OK / Not OK)
+      surfaceDefect: ['', ''],
+      // 2 dropdowns for Embossing Defect (OK / Not OK)
+      embossingDefect: ['', ''],
+      // 2 dropdowns for Marking (OK / Not OK)
+      marking: ['', ''],
+      // 2 integer inputs for Tempering Hardness
+      temperingHardness: ['', ''],
+      // Rejection inputs for each measurement
+      boxGaugeRejected: '',
+      flatBearingAreaRejected: '',
+      fallingGaugeRejected: '',
+      surfaceDefectRejected: '',
+      embossingDefectRejected: '',
+      markingRejected: '',
+      temperingHardnessRejected: '',
+      remarks: ''
+    }))
+  );
+
+  // Testing & Finishing Section - 8 Hour Grid
+  const [testingFinishingData, setTestingFinishingData] = useState(
+    Array(8).fill(null).map((_, i) => ({
+      hour: i + 1,
+      noProduction: false,
+      lotNo: '',
+      // 2 float inputs for Toe Load
+      toeLoad: ['', ''],
+      // 2 float inputs for Weight
+      weight: ['', ''],
+      // 2 dropdowns for Paint Identification (OK / not ok)
+      paintIdentification: ['', ''],
+      // 2 dropdowns for ERC Coating (Linseed Oil) (OK / not ok)
+      ercCoating: ['', ''],
+      // Rejection inputs for each measurement
+      toeLoadRejected: '',
+      weightRejected: '',
+      paintIdentificationRejected: '',
+      ercCoatingRejected: '',
       remarks: ''
     }))
   );
@@ -280,9 +359,10 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       forging: forgingData,
       quenching: quenchingData,
       tempering: temperingData,
-      finalCheck: finalCheckData
+      finalCheck: finalCheckData,
+      testingFinishing: testingFinishingData
     });
-  }, [inspectionCallNo, poNo, activeLine, shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData]);
+  }, [inspectionCallNo, poNo, activeLine, shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, testingFinishingData]);
 
 
 
@@ -294,7 +374,8 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     forging: forgingData,
     quenching: quenchingData,
     tempering: temperingData,
-    finalCheck: finalCheckData
+    finalCheck: finalCheckData,
+    testingFinishing: testingFinishingData
   });
 
   const currentContextRef = useRef({
@@ -312,9 +393,10 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       forging: forgingData,
       quenching: quenchingData,
       tempering: temperingData,
-      finalCheck: finalCheckData
+      finalCheck: finalCheckData,
+      testingFinishing: testingFinishingData
     };
-  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData]);
+  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, testingFinishingData]);
 
   // Keep context ref updated
   useEffect(() => {
@@ -332,7 +414,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, saveCurrentDataToLocalStorage]);
+  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, testingFinishingData, saveCurrentDataToLocalStorage]);
 
   // Save to localStorage on browser refresh/close and visibility change (uses refs to avoid stale closures)
   useEffect(() => {
@@ -346,6 +428,15 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       const { inspectionCallNo: callNo, poNo: po, activeLine: line } = currentContextRef.current;
       if (callNo && po && line) {
         console.log('Saving data on beforeunload/visibilitychange:', { callNo, po, line });
+        saveGridDataForLine(callNo, po, line, currentDataRef.current);
+      }
+    };
+
+    const saveOnUnmount = () => {
+      // Save immediately on unmount without checks - always save if we have context
+      const { inspectionCallNo: callNo, poNo: po, activeLine: line } = currentContextRef.current;
+      if (callNo && po && line && hasDataBeenModified.current) {
+        console.log('Saving data on component unmount:', { callNo, po, line });
         saveGridDataForLine(callNo, po, line, currentDataRef.current);
       }
     };
@@ -367,56 +458,246 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       // Save on unmount using refs
-      saveCurrentData();
+      saveOnUnmount();
     };
   }, []); // Empty dependency - uses refs which always have latest values
+
+  // Migrate old shearing data structure to new structure
+  const migrateShearingData = useCallback((oldData) => {
+    if (!oldData || oldData.length === 0) return oldData;
+
+    return oldData.map(row => ({
+      hour: row.hour,
+      noProduction: row.noProduction || false,
+      lotNo: row.lotNo || '',
+      lengthCutBar: row.lengthCutBar || ['', '', ''],
+      qualityDia: row.qualityDia || ['', '', ''], // New field
+      sharpEdges: Array.isArray(row.sharpEdges) ?
+        (typeof row.sharpEdges[0] === 'boolean' ? ['', '', ''] : row.sharpEdges) :
+        ['', '', ''],
+      crackedEdges: Array.isArray(row.crackedEdges) ?
+        (typeof row.crackedEdges[0] === 'boolean' ? ['', '', ''] : row.crackedEdges) :
+        ['', '', ''], // New field
+      // Convert old rejectedQty to 4-element array
+      rejectedQty: Array.isArray(row.rejectedQty) ?
+        (row.rejectedQty.length === 4 ? row.rejectedQty : [...row.rejectedQty, '', '', ''].slice(0, 4)) :
+        ['', '', '', ''],
+      remarks: row.remarks || ''
+    }));
+  }, []);
+
+  // Migrate old forging data structure to new structure
+  const migrateForgingData = useCallback((oldData) => {
+    if (!oldData || oldData.length === 0) return oldData;
+
+    return oldData.map(row => ({
+      hour: row.hour,
+      noProduction: row.noProduction || false,
+      lotNo: row.lotNo || '',
+      // Convert old forgingTemperature (3 elements) to new structure (2 elements)
+      forgingTemperature: Array.isArray(row.forgingTemperature) ?
+        row.forgingTemperature.slice(0, 2) :
+        ['', ''],
+      // New fields
+      forgingStabilisation: row.forgingStabilisation || ['', ''],
+      improperForging: row.improperForging || ['', ''],
+      forgingDefect: row.forgingDefect || ['', ''],
+      embossingDefect: row.embossingDefect || ['', ''],
+      // 5 separate rejection fields
+      forgingTemperatureRejected: row.forgingTemperatureRejected || '',
+      forgingStabilisationRejected: row.forgingStabilisationRejected || '',
+      improperForgingRejected: row.improperForgingRejected || '',
+      forgingDefectRejected: row.forgingDefectRejected || '',
+      embossingDefectRejected: row.embossingDefectRejected || '',
+      remarks: row.remarks || ''
+    }));
+  }, []);
+
+  // Migrate old quenching data structure to new structure
+  const migrateQuenchingData = useCallback((oldData) => {
+    if (!oldData || oldData.length === 0) return oldData;
+
+    return oldData.map(row => ({
+      hour: row.hour,
+      noProduction: row.noProduction || false,
+      lotNo: row.lotNo || '',
+      // Convert old quenchingTemperature (string) to new structure (2-element array)
+      quenchingTemperature: typeof row.quenchingTemperature === 'string' ?
+        [row.quenchingTemperature, ''] :
+        (Array.isArray(row.quenchingTemperature) ? row.quenchingTemperature : ['', '']),
+      // Convert old quenchingDuration (string) to new structure (2-element array)
+      quenchingDuration: typeof row.quenchingDuration === 'string' ?
+        [row.quenchingDuration, ''] :
+        (Array.isArray(row.quenchingDuration) ? row.quenchingDuration : ['', '']),
+      // Keep quenchingHardness as is (already 2-element array)
+      quenchingHardness: Array.isArray(row.quenchingHardness) ? row.quenchingHardness : ['', ''],
+      // New fields
+      boxGauge: row.boxGauge || ['', ''],
+      flatBearingArea: row.flatBearingArea || ['', ''],
+      fallingGauge: row.fallingGauge || ['', ''],
+      // 6 separate rejection fields
+      quenchingTemperatureRejected: row.quenchingTemperatureRejected || '',
+      quenchingDurationRejected: row.quenchingDurationRejected || '',
+      quenchingHardnessRejected: row.quenchingHardnessRejected || '',
+      boxGaugeRejected: row.boxGaugeRejected || '',
+      flatBearingAreaRejected: row.flatBearingAreaRejected || '',
+      fallingGaugeRejected: row.fallingGaugeRejected || '',
+      remarks: row.remarks || ''
+    }));
+  }, []);
+
+  // Migrate old tempering data structure to new structure
+  const migrateTemperingData = useCallback((oldData) => {
+    if (!oldData || oldData.length === 0) return oldData;
+
+    return oldData.map(row => ({
+      hour: row.hour,
+      noProduction: row.noProduction || false,
+      lotNo: row.lotNo || '',
+      // Convert old single values to 2-element arrays
+      temperingTemperature: typeof row.temperingTemperature === 'string' ?
+        [row.temperingTemperature, ''] :
+        (Array.isArray(row.temperingTemperature) ? row.temperingTemperature : ['', '']),
+      temperingTemperatureRejected: row.temperingTemperatureRejected || '',
+      temperingDuration: typeof row.temperingDuration === 'string' ?
+        [row.temperingDuration, ''] :
+        (Array.isArray(row.temperingDuration) ? row.temperingDuration : ['', '']),
+      temperingDurationRejected: row.temperingDurationRejected || '',
+      remarks: row.remarks || ''
+    }));
+  }, []);
+
+  // Migrate old final check data structure to new structure
+  const migrateFinalCheckData = useCallback((oldData) => {
+    if (!oldData || oldData.length === 0) return oldData;
+
+    return oldData.map(row => ({
+      hour: row.hour,
+      noProduction: row.noProduction || false,
+      lotNo: row.lotNo || '',
+      // New fields with default values
+      boxGauge: row.boxGauge || ['', ''],
+      flatBearingArea: row.flatBearingArea || ['', ''],
+      fallingGauge: row.fallingGauge || ['', ''],
+      surfaceDefect: row.surfaceDefect || ['', ''],
+      embossingDefect: row.embossingDefect || ['', ''],
+      marking: row.marking || ['', ''],
+      temperingHardness: row.temperingHardness || ['', ''],
+      // Rejection inputs for each measurement
+      boxGaugeRejected: row.boxGaugeRejected || '',
+      flatBearingAreaRejected: row.flatBearingAreaRejected || '',
+      fallingGaugeRejected: row.fallingGaugeRejected || '',
+      surfaceDefectRejected: row.surfaceDefectRejected || '',
+      embossingDefectRejected: row.embossingDefectRejected || '',
+      markingRejected: row.markingRejected || '',
+      temperingHardnessRejected: row.temperingHardnessRejected || '',
+      remarks: row.remarks || ''
+    }));
+  }, []);
+
+  // Migrate old testing & finishing data structure to new structure
+  const migrateTestingFinishingData = useCallback((oldData) => {
+    if (!oldData || oldData.length === 0) return oldData;
+
+    return oldData.map(row => ({
+      hour: row.hour,
+      noProduction: row.noProduction || false,
+      lotNo: row.lotNo || '',
+      // New fields with default values
+      toeLoad: row.toeLoad || ['', ''],
+      weight: row.weight || ['', ''],
+      paintIdentification: row.paintIdentification || ['', ''],
+      ercCoating: row.ercCoating || ['', ''],
+      // 4 separate rejection fields
+      toeLoadRejected: row.toeLoadRejected || '',
+      weightRejected: row.weightRejected || '',
+      paintIdentificationRejected: row.paintIdentificationRejected || '',
+      ercCoatingRejected: row.ercCoatingRejected || '',
+      remarks: row.remarks || ''
+    }));
+  }, []);
 
   // Default empty data generators for each section
   const getDefaultShearingData = useCallback(() =>
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1, noProduction: false, lotNo: '',
-      lengthCutBar: ['', '', ''], sharpEdges: [false, false, false],
-      rejectedQty: ['', ''], remarks: ''
+      lengthCutBar: ['', '', ''], qualityDia: ['', '', ''], sharpEdges: ['', '', ''],
+      crackedEdges: ['', '', ''], rejectedQty: ['', '', '', ''], remarks: ''
     })), []);
 
   const getDefaultTurningData = useCallback(() =>
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1, noProduction: false, lotNo: '',
-      straightLength: ['', '', ''], taperLength: ['', '', ''],
-      dia: ['', '', ''], acceptedQty: '', rejectedQty: ['', ''], remarks: ''
+      parallelLength: ['', '', ''], fullTurningLength: ['', '', ''],
+      turningDia: ['', '', ''], rejectedQty: ['', '', ''], remarks: ''
     })), []);
 
   const getDefaultMpiData = useCallback(() =>
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1, noProduction: false, lotNo: '',
-      testResults: ['', '', ''], rejectedQty: ['', ''], remarks: ''
+      testResults: ['', '', ''], rejectedQty: '', remarks: ''
     })), []);
 
   const getDefaultForgingData = useCallback(() =>
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1, noProduction: false, lotNo: '',
-      forgingTemperature: ['', '', ''], acceptedQty: '', rejectedQty: '', remarks: ''
+      forgingTemperature: ['', ''], forgingStabilisation: ['', ''], improperForging: ['', ''],
+      forgingDefect: ['', ''], embossingDefect: ['', ''],
+      // 5 separate rejection fields
+      forgingTemperatureRejected: '',
+      forgingStabilisationRejected: '',
+      improperForgingRejected: '',
+      forgingDefectRejected: '',
+      embossingDefectRejected: '',
+      remarks: ''
     })), []);
 
   const getDefaultQuenchingData = useCallback(() =>
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1, noProduction: false, lotNo: '',
-      quenchingTemperature: '', quenchingDuration: '',
-      quenchingHardness: ['', ''], rejectedQty: '', remarks: ''
+      quenchingTemperature: ['', ''], quenchingDuration: ['', ''],
+      quenchingHardness: ['', ''], boxGauge: ['', ''], flatBearingArea: ['', ''],
+      fallingGauge: ['', ''],
+      // 6 separate rejection fields
+      quenchingTemperatureRejected: '',
+      quenchingDurationRejected: '',
+      quenchingHardnessRejected: '',
+      boxGaugeRejected: '',
+      flatBearingAreaRejected: '',
+      fallingGaugeRejected: '',
+      remarks: ''
     })), []);
 
   const getDefaultTemperingData = useCallback(() =>
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1, noProduction: false, lotNo: '',
-      temperingTemperature: '', temperingDuration: '',
-      acceptedQty: '', rejectedQty: '', remarks: ''
+      temperingTemperature: ['', ''], temperingTemperatureRejected: '',
+      temperingDuration: ['', ''], temperingDurationRejected: '',
+      remarks: ''
     })), []);
 
   const getDefaultFinalCheckData = useCallback(() =>
     Array(8).fill(null).map((_, i) => ({
       hour: i + 1, noProduction: false, lotNo: '',
-      visualCheck: ['', ''], dimensionCheck: ['', ''],
-      hardnessCheck: ['', ''], rejectedNo: ['', '', ''], remarks: ''
+      boxGauge: ['', ''], flatBearingArea: ['', ''], fallingGauge: ['', ''],
+      surfaceDefect: ['', ''], embossingDefect: ['', ''], marking: ['', ''],
+      temperingHardness: ['', ''],
+      boxGaugeRejected: '', flatBearingAreaRejected: '', fallingGaugeRejected: '',
+      surfaceDefectRejected: '', embossingDefectRejected: '', markingRejected: '',
+      temperingHardnessRejected: '', remarks: ''
+    })), []);
+
+  const getDefaultTestingFinishingData = useCallback(() =>
+    Array(8).fill(null).map((_, i) => ({
+      hour: i + 1, noProduction: false, lotNo: '',
+      toeLoad: ['', ''], weight: ['', ''], paintIdentification: ['', ''],
+      ercCoating: ['', ''],
+      // 4 separate rejection fields
+      toeLoadRejected: '',
+      weightRejected: '',
+      paintIdentificationRejected: '',
+      ercCoatingRejected: '',
+      remarks: ''
     })), []);
 
   /**
@@ -468,7 +749,9 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     // Set data from localStorage if exists, otherwise reset to empty defaults
     if (hasShearing) {
       console.log('Setting shearing data from localStorage:', storedData.shearing);
-      setShearingData(storedData.shearing);
+      // Migrate old data structure to new structure
+      const migratedData = migrateShearingData(storedData.shearing);
+      setShearingData(migratedData);
     } else {
       setShearingData(getDefaultShearingData());
     }
@@ -487,30 +770,52 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     }
 
     if (hasForging) {
-      setForgingData(storedData.forging);
+      console.log('Setting forging data from localStorage:', storedData.forging);
+      // Migrate old data structure to new structure
+      const migratedData = migrateForgingData(storedData.forging);
+      setForgingData(migratedData);
     } else {
       setForgingData(getDefaultForgingData());
     }
 
     if (hasQuenching) {
-      setQuenchingData(storedData.quenching);
+      console.log('Setting quenching data from localStorage:', storedData.quenching);
+      // Migrate old data structure to new structure
+      const migratedData = migrateQuenchingData(storedData.quenching);
+      setQuenchingData(migratedData);
     } else {
       setQuenchingData(getDefaultQuenchingData());
     }
 
     if (hasTempering) {
-      setTemperingData(storedData.tempering);
+      console.log('Setting tempering data from localStorage:', storedData.tempering);
+      // Migrate old data structure to new structure
+      const migratedData = migrateTemperingData(storedData.tempering);
+      setTemperingData(migratedData);
     } else {
       setTemperingData(getDefaultTemperingData());
     }
 
     if (hasFinalCheck) {
-      setFinalCheckData(storedData.finalCheck);
+      console.log('Setting final check data from localStorage:', storedData.finalCheck);
+      // Migrate old data structure to new structure
+      const migratedData = migrateFinalCheckData(storedData.finalCheck);
+      setFinalCheckData(migratedData);
     } else {
       setFinalCheckData(getDefaultFinalCheckData());
     }
 
-    const hasLocalData = hasShearing || hasTurning || hasMpi || hasForging || hasQuenching || hasTempering || hasFinalCheck;
+    const hasTestingFinishing = storedData && storedData.testingFinishing;
+    if (hasTestingFinishing) {
+      console.log('Setting testing & finishing data from localStorage:', storedData.testingFinishing);
+      // Migrate old data structure to new structure
+      const migratedData = migrateTestingFinishingData(storedData.testingFinishing);
+      setTestingFinishingData(migratedData);
+    } else {
+      setTestingFinishingData(getDefaultTestingFinishingData());
+    }
+
+    const hasLocalData = hasShearing || hasTurning || hasMpi || hasForging || hasQuenching || hasTempering || hasFinalCheck || hasTestingFinishing;
 
     // Mark initial load as complete after setting state from localStorage
     // Use setTimeout to ensure this runs after React state updates
@@ -564,7 +869,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     } finally {
       setIsLoading(false);
     }
-  }, [inspectionCallNo, poNo, activeLine, getDefaultShearingData, getDefaultTurningData, getDefaultMpiData, getDefaultForgingData, getDefaultQuenchingData, getDefaultTemperingData, getDefaultFinalCheckData]);
+  }, [inspectionCallNo, poNo, activeLine, getDefaultShearingData, getDefaultTurningData, getDefaultMpiData, getDefaultForgingData, getDefaultQuenchingData, getDefaultTemperingData, getDefaultFinalCheckData, getDefaultTestingFinishingData, migrateShearingData, migrateForgingData, migrateQuenchingData, migrateTemperingData, migrateFinalCheckData, migrateTestingFinishingData]);
 
   // Load data on mount and when line/PO changes
   useEffect(() => {
@@ -620,6 +925,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
   const [showAllQuenching, setShowAllQuenching] = useState(false);
   const [showAllTempering, setShowAllTempering] = useState(false);
   const [showAllDimension, setShowAllDimension] = useState(false);
+  const [showAllTestingFinishing, setShowAllTestingFinishing] = useState(false);
 
   // Helper to select rows to render: all 8 hours or only the current hour (per-section)
   const visibleRows = (arr, showAll) => (
@@ -661,6 +967,11 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
   const handleFinalCheckChange = useCallback((newData) => {
     hasDataBeenModified.current = true;
     setFinalCheckData(newData);
+  }, []);
+
+  const handleTestingFinishingChange = useCallback((newData) => {
+    hasDataBeenModified.current = true;
+    setTestingFinishingData(newData);
   }, []);
 
   return (
@@ -775,6 +1086,17 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         visibleRows={visibleRows}
         showAll={showAllDimension}
         onToggleShowAll={() => setShowAllDimension(v => !v)}
+      />
+
+      {/* Testing & Finishing Section - 8 Hour Grid */}
+      <TestingFinishingSection
+        data={testingFinishingData}
+        onDataChange={handleTestingFinishingChange}
+        availableLotNumbers={availableLotNumbers}
+        hourLabels={hourLabels}
+        visibleRows={visibleRows}
+        showAll={showAllTestingFinishing}
+        onToggleShowAll={() => setShowAllTestingFinishing(v => !v)}
       />
 
       {isLoading && (

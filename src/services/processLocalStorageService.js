@@ -7,17 +7,22 @@ const STORAGE_PREFIX = 'process_inspection_';
 
 /**
  * Generate storage key for a specific submodule and line
+ * Optional lotNo parameter for lot-specific data (e.g., lineFinalResult per lot)
  */
-const getStorageKey = (submodule, inspectionCallNo, poNo, lineNo) => {
+const getStorageKey = (submodule, inspectionCallNo, poNo, lineNo, lotNo = null) => {
+  if (lotNo) {
+    return `${STORAGE_PREFIX}${submodule}_${inspectionCallNo}_${poNo}_${lineNo}_${lotNo}`;
+  }
   return `${STORAGE_PREFIX}${submodule}_${inspectionCallNo}_${poNo}_${lineNo}`;
 };
 
 /**
  * Save data to localStorage (persists across page refresh)
+ * Optional lotNo parameter for lot-specific data
  */
-export const saveToLocalStorage = (submodule, inspectionCallNo, poNo, lineNo, data) => {
+export const saveToLocalStorage = (submodule, inspectionCallNo, poNo, lineNo, data, lotNo = null) => {
   try {
-    const key = getStorageKey(submodule, inspectionCallNo, poNo, lineNo);
+    const key = getStorageKey(submodule, inspectionCallNo, poNo, lineNo, lotNo);
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
@@ -28,10 +33,11 @@ export const saveToLocalStorage = (submodule, inspectionCallNo, poNo, lineNo, da
 
 /**
  * Load data from localStorage
+ * Optional lotNo parameter for lot-specific data
  */
-export const loadFromLocalStorage = (submodule, inspectionCallNo, poNo, lineNo) => {
+export const loadFromLocalStorage = (submodule, inspectionCallNo, poNo, lineNo, lotNo = null) => {
   try {
-    const key = getStorageKey(submodule, inspectionCallNo, poNo, lineNo);
+    const key = getStorageKey(submodule, inspectionCallNo, poNo, lineNo, lotNo);
     const stored = localStorage.getItem(key);
     return stored ? JSON.parse(stored) : null;
   } catch (error) {
@@ -42,10 +48,11 @@ export const loadFromLocalStorage = (submodule, inspectionCallNo, poNo, lineNo) 
 
 /**
  * Clear data from localStorage for a specific submodule
+ * Optional lotNo parameter for lot-specific data
  */
-export const clearFromLocalStorage = (submodule, inspectionCallNo, poNo, lineNo) => {
+export const clearFromLocalStorage = (submodule, inspectionCallNo, poNo, lineNo, lotNo = null) => {
   try {
-    const key = getStorageKey(submodule, inspectionCallNo, poNo, lineNo);
+    const key = getStorageKey(submodule, inspectionCallNo, poNo, lineNo, lotNo);
     localStorage.removeItem(key);
     return true;
   } catch (error) {
@@ -67,13 +74,13 @@ const transformToBackendFormat = (data, submodule) => {
     shearing: {
       lengthCutBar: ['lengthCutBar1', 'lengthCutBar2', 'lengthCutBar3'],
       sharpEdges: ['sharpEdges1', 'sharpEdges2', 'sharpEdges3'],
-      rejectedQty: ['rejectedQty1', 'rejectedQty2']
+      rejectedQty: ['rejectedQty1', 'rejectedQty2', 'rejectedQty3', 'rejectedQty4']
     },
     turning: {
       straightLength: ['straightLength1', 'straightLength2', 'straightLength3'],
       taperLength: ['taperLength1', 'taperLength2', 'taperLength3'],
       dia: ['dia1', 'dia2', 'dia3'],
-      rejectedQty: ['rejectedQty1', 'rejectedQty2']
+      rejectedQty: ['rejectedQty1', 'rejectedQty2', 'rejectedQty3']
     },
     mpi: {
       testResults: ['testResult1', 'testResult2', 'testResult3'],
@@ -89,10 +96,19 @@ const transformToBackendFormat = (data, submodule) => {
       // temperingTemperature and temperingDuration are already single values
     },
     finalCheck: {
-      visualCheck: ['visualCheck1', 'visualCheck2'],
-      dimensionCheck: ['dimensionCheck1', 'dimensionCheck2'],
-      hardnessCheck: ['hardnessCheck1', 'hardnessCheck2'],
-      rejectedNo: ['rejectedNo1', 'rejectedNo2', 'rejectedNo3']
+      boxGauge: ['boxGauge1', 'boxGauge2'],
+      flatBearingArea: ['flatBearingArea1', 'flatBearingArea2'],
+      fallingGauge: ['fallingGauge1', 'fallingGauge2'],
+      surfaceDefect: ['surfaceDefect1', 'surfaceDefect2'],
+      embossingDefect: ['embossingDefect1', 'embossingDefect2'],
+      marking: ['marking1', 'marking2'],
+      temperingHardness: ['temperingHardness1', 'temperingHardness2']
+    },
+    testingFinishing: {
+      toeLoad: ['toeLoad1', 'toeLoad2'],
+      weight: ['weight1', 'weight2'],
+      paintIdentification: ['paintIdentification1', 'paintIdentification2'],
+      ercCoating: ['ercCoating1', 'ercCoating2']
     }
   };
 
@@ -149,11 +165,12 @@ export const getAllProcessData = (inspectionCallNo, poNo, lineNo) => {
     'quenching': 'quenchingData',
     'tempering': 'temperingData',
     'finalCheck': 'finalCheckData',
+    'testingFinishing': 'testingFinishingData',
     'lineFinalResult': 'lineFinalResult'
   };
 
   // Submodules that need array-to-numbered-field transformation
-  const gridSubmodules = ['shearing', 'turning', 'mpi', 'forging', 'quenching', 'tempering', 'finalCheck'];
+  const gridSubmodules = ['shearing', 'turning', 'mpi', 'forging', 'quenching', 'tempering', 'finalCheck', 'testingFinishing'];
 
   const allData = {};
   Object.entries(submoduleMapping).forEach(([storageKey, dtoKey]) => {
@@ -206,6 +223,7 @@ export const clearAllProcessData = (inspectionCallNo, poNo, lineNo) => {
     'quenching',
     'tempering',
     'finalCheck',
+    'testingFinishing',
     'lineFinalResult'
   ];
 
@@ -218,8 +236,8 @@ export const clearAllProcessData = (inspectionCallNo, poNo, lineNo) => {
  * Save all 8-hour grid data for a line
  */
 export const saveGridDataForLine = (inspectionCallNo, poNo, lineNo, gridData) => {
-  const { shearing, turning, mpi, forging, quenching, tempering, finalCheck } = gridData;
-  
+  const { shearing, turning, mpi, forging, quenching, tempering, finalCheck, testingFinishing } = gridData;
+
   if (shearing) saveToLocalStorage('shearing', inspectionCallNo, poNo, lineNo, shearing);
   if (turning) saveToLocalStorage('turning', inspectionCallNo, poNo, lineNo, turning);
   if (mpi) saveToLocalStorage('mpi', inspectionCallNo, poNo, lineNo, mpi);
@@ -227,6 +245,7 @@ export const saveGridDataForLine = (inspectionCallNo, poNo, lineNo, gridData) =>
   if (quenching) saveToLocalStorage('quenching', inspectionCallNo, poNo, lineNo, quenching);
   if (tempering) saveToLocalStorage('tempering', inspectionCallNo, poNo, lineNo, tempering);
   if (finalCheck) saveToLocalStorage('finalCheck', inspectionCallNo, poNo, lineNo, finalCheck);
+  if (testingFinishing) saveToLocalStorage('testingFinishing', inspectionCallNo, poNo, lineNo, testingFinishing);
 };
 
 /**
@@ -240,7 +259,8 @@ export const loadGridDataForLine = (inspectionCallNo, poNo, lineNo) => {
     forging: loadFromLocalStorage('forging', inspectionCallNo, poNo, lineNo),
     quenching: loadFromLocalStorage('quenching', inspectionCallNo, poNo, lineNo),
     tempering: loadFromLocalStorage('tempering', inspectionCallNo, poNo, lineNo),
-    finalCheck: loadFromLocalStorage('finalCheck', inspectionCallNo, poNo, lineNo)
+    finalCheck: loadFromLocalStorage('finalCheck', inspectionCallNo, poNo, lineNo),
+    testingFinishing: loadFromLocalStorage('testingFinishing', inspectionCallNo, poNo, lineNo)
   };
 };
 
