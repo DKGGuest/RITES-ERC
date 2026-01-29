@@ -987,10 +987,10 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         <ProcessLineToggle selectedLines={selectedLines} activeLine={activeLine} onChange={setActiveLine} />
       )}
 
-      {/* 3. Heading with PO */}
+      {/* 3. Heading with Inspection Call Number */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-24)', gap: 'var(--space-16)', flexWrap: 'wrap' }}>
         <div>
-          <h1 className="page-title">Process Parameters - 8 Hour Grid {poNo && <span style={{ color: '#0d9488', fontSize: 'var(--font-size-lg)' }}>- PO: {poNo}</span>}</h1>
+          <h1 className="page-title">Process Parameters - 8 Hour Grid {inspectionCallNo && <span style={{ color: '#0d9488', fontSize: 'var(--font-size-lg)' }}>- IC: {inspectionCallNo}</span>}</h1>
           <p className="page-subtitle">Process Material Inspection - Hourly production data entry</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)', flexWrap: 'wrap' }}>

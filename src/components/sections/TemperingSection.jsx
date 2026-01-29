@@ -75,22 +75,21 @@ const TemperingSection = ({
         <div className="tempering-table-wrapper">
           {/* Desktop Table Layout */}
           <table className="tempering-table">
-            <thead>
-              <tr>
-                <th className="tempering-th tempering-th--time">Time Range</th>
-                <th className="tempering-th tempering-th--checkbox">No Production</th>
-                <th className="tempering-th tempering-th--lot">Lot No.</th>
-                <th className="tempering-th tempering-th--temp">Tempering Temp.</th>
-                <th className="tempering-th tempering-th--duration">Tempering Duration</th>
-                <th className="tempering-th tempering-th--total-rejection">Total Rejection at Tempering Section</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => {
                 const totalRejection = getTotalRejection(idx);
 
                 return (
                   <React.Fragment key={row.hour}>
+                    {/* Header row for this hour block */}
+                    <tr className="tempering-header-row">
+                      <th className="tempering-th tempering-th--time">Time Range</th>
+                      <th className="tempering-th tempering-th--checkbox">No Production</th>
+                      <th className="tempering-th tempering-th--lot">Lot No.</th>
+                      <th className="tempering-th tempering-th--temp">Tempering Temp.</th>
+                      <th className="tempering-th tempering-th--duration">Tempering Duration</th>
+                      <th className="tempering-th tempering-th--total-rejection">Total Rejection at Tempering Section</th>
+                    </tr>
                     {/* Row 1: First sample */}
                     <tr className="tempering-row">
                       <td rowSpan="4" className="tempering-td tempering-td--time">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import './ShearingSection.css';
 
 const ShearingSection = ({ 
@@ -53,20 +53,19 @@ const ShearingSection = ({
         <div className="shearing-table-wrapper">
           {/* Desktop Table Layout - 4 rows per time slot */}
           <table className="shearing-table">
-            <thead>
-              <tr>
-                <th className="shearing-th shearing-th--time">Time Range</th>
-                <th className="shearing-th shearing-th--checkbox">No Production</th>
-                <th className="shearing-th shearing-th--lot">Lot No.</th>
-                <th className="shearing-th shearing-th--length">Length of Cut Bar</th>
-                <th className="shearing-th shearing-th--quality">Quality / Improper Dia at end</th>
-                <th className="shearing-th shearing-th--edges">Sharp Edges</th>
-                <th className="shearing-th shearing-th--cracked">Cracked Edges</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
-                <>
+                <React.Fragment key={`${row.hour}-group`}>
+                  {/* Header row for this hour block */}
+                  <tr className="shearing-header-row">
+                    <th className="shearing-th shearing-th--time">Time Range</th>
+                    <th className="shearing-th shearing-th--checkbox">No Production</th>
+                    <th className="shearing-th shearing-th--lot">Lot No.</th>
+                    <th className="shearing-th shearing-th--length">Length of Cut Bar</th>
+                    <th className="shearing-th shearing-th--quality">Quality / Improper Dia at end</th>
+                    <th className="shearing-th shearing-th--edges">Sharp Edges</th>
+                    <th className="shearing-th shearing-th--cracked">Cracked Edges</th>
+                  </tr>
                   {/* Row 1: First sample */}
                   <tr key={`${row.hour}-r1`} className="shearing-row">
                     <td rowSpan="4" className="shearing-td shearing-td--time">
@@ -111,7 +110,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -123,7 +122,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -135,7 +134,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -161,7 +160,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -173,7 +172,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -185,7 +184,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -211,7 +210,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 2)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -223,7 +222,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 2)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -235,7 +234,7 @@ const ShearingSection = ({
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 2)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">Not OK</option>
                       </select>
@@ -297,7 +296,7 @@ const ShearingSection = ({
                       />
                     </td>
                   </tr>
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

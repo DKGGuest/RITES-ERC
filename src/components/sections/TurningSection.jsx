@@ -45,21 +45,20 @@ const TurningSection = ({
         <div className="turning-table-wrapper">
           {/* Desktop Table Layout */}
           <table className="turning-table">
-            <thead>
-              <tr>
-                <th className="turning-th turning-th--time">Time Range</th>
-                <th className="turning-th turning-th--checkbox">No Production</th>
-                <th className="turning-th turning-th--lot">Lot No.</th>
-                <th className="turning-th turning-th--parallel">Parallel Length</th>
-                <th className="turning-th turning-th--full">Full Turning Length</th>
-                <th className="turning-th turning-th--dia">Turning Dia</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
-                <>
+                <React.Fragment key={`${row.hour}-group`}>
+                  {/* Header row for this hour block */}
+                  <tr className="turning-header-row">
+                    <th className="turning-th turning-th--time">Time Range</th>
+                    <th className="turning-th turning-th--checkbox">No Production</th>
+                    <th className="turning-th turning-th--lot">Lot No.</th>
+                    <th className="turning-th turning-th--parallel">Parallel Length</th>
+                    <th className="turning-th turning-th--full">Full Turning Length</th>
+                    <th className="turning-th turning-th--dia">Turning Dia</th>
+                  </tr>
                   {/* Row 1: First sample */}
-                  <tr key={`${row.hour}-r1`} className="turning-row">
+                  <tr className="turning-row">
                     <td rowSpan="4" className="turning-td turning-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -237,7 +236,7 @@ const TurningSection = ({
                       />
                     </td>
                   </tr>
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

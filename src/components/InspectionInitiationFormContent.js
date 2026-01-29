@@ -639,7 +639,10 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         console.error('❌ [Section A] save/approve failed:', e);
       }
 
+      console.log('🔔 [Section A] About to call onFormDataChange with sectionAVerified: true');
+      console.log('🔔 [Section A] onFormDataChange function:', onFormDataChange);
       onFormDataChange({ sectionAVerified: true, sectionAStatus: 'approved' });
+      console.log('🔔 [Section A] onFormDataChange called successfully');
       if (showSectionB) {
         setSectionBExpanded(true);
       }
@@ -731,7 +734,10 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
         console.error('❌ [Section B] save/approve failed:', e);
       }
 
+      console.log('🔔 [Section B] About to call onFormDataChange with sectionBVerified: true');
+      console.log('🔔 [Section B] onFormDataChange function:', onFormDataChange);
       onFormDataChange({ sectionBVerified: true, sectionBStatus: 'approved' });
+      console.log('🔔 [Section B] onFormDataChange called successfully');
 
       // Auto-expand Section C when Section B is approved (for Raw Material only)
       const productType = call?.product_type || '';

@@ -45,20 +45,19 @@ const TestingFinishingSection = ({
         <div className="testing-finishing-table-wrapper">
           {/* Desktop Table Layout */}
           <table className="testing-finishing-table">
-            <thead>
-              <tr>
-                <th className="testing-finishing-th testing-finishing-th--time">Time Range</th>
-                <th className="testing-finishing-th testing-finishing-th--checkbox">No Production</th>
-                <th className="testing-finishing-th testing-finishing-th--lot">Lot No.</th>
-                <th className="testing-finishing-th testing-finishing-th--toe-load">Toe Load</th>
-                <th className="testing-finishing-th testing-finishing-th--weight">Weight</th>
-                <th className="testing-finishing-th testing-finishing-th--paint">Paint Identification</th>
-                <th className="testing-finishing-th testing-finishing-th--erc-coating">ERC Coating (Linseed Oil)</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={row.hour}>
+                  {/* Header row for this hour block */}
+                  <tr className="testing-finishing-header-row">
+                    <th className="testing-finishing-th testing-finishing-th--time">Time Range</th>
+                    <th className="testing-finishing-th testing-finishing-th--checkbox">No Production</th>
+                    <th className="testing-finishing-th testing-finishing-th--lot">Lot No.</th>
+                    <th className="testing-finishing-th testing-finishing-th--toe-load">Toe Load</th>
+                    <th className="testing-finishing-th testing-finishing-th--weight">Weight</th>
+                    <th className="testing-finishing-th testing-finishing-th--paint">Paint Identification</th>
+                    <th className="testing-finishing-th testing-finishing-th--erc-coating">ERC Coating (Linseed Oil)</th>
+                  </tr>
                   {/* Row 1: First sample */}
                   <tr className="testing-finishing-row">
                     <td rowSpan="4" className="testing-finishing-td testing-finishing-td--time">
@@ -114,7 +113,7 @@ const TestingFinishingSection = ({
                         onChange={e => updateData(idx, 'paintIdentification', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ not ok</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="not ok">not ok</option>
                       </select>
@@ -126,7 +125,7 @@ const TestingFinishingSection = ({
                         onChange={e => updateData(idx, 'ercCoating', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ not ok</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="not ok">not ok</option>
                       </select>
@@ -163,7 +162,7 @@ const TestingFinishingSection = ({
                         onChange={e => updateData(idx, 'paintIdentification', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ not ok</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="not ok">not ok</option>
                       </select>
@@ -175,7 +174,7 @@ const TestingFinishingSection = ({
                         onChange={e => updateData(idx, 'ercCoating', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ not ok</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="not ok">not ok</option>
                       </select>

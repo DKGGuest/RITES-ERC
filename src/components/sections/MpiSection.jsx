@@ -45,17 +45,16 @@ const MpiSection = ({
         <div className="mpi-table-wrapper">
           {/* Desktop Table Layout */}
           <table className="mpi-table">
-            <thead>
-              <tr>
-                <th className="mpi-th mpi-th--time">Time Range</th>
-                <th className="mpi-th mpi-th--checkbox">No Production</th>
-                <th className="mpi-th mpi-th--lot">Lot No.</th>
-                <th className="mpi-th mpi-th--results">MPI Results</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
-                <>
+                <React.Fragment key={`${row.hour}-group`}>
+                  {/* Header row for this hour block */}
+                  <tr className="mpi-header-row">
+                    <th className="mpi-th mpi-th--time">Time Range</th>
+                    <th className="mpi-th mpi-th--checkbox">No Production</th>
+                    <th className="mpi-th mpi-th--lot">Lot No.</th>
+                    <th className="mpi-th mpi-th--results">MPI Results</th>
+                  </tr>
                   {/* Row 1: First sample */}
                   <tr key={`${row.hour}-r1`} className="mpi-row">
                     <td rowSpan="4" className="mpi-td mpi-td--time">
@@ -89,7 +88,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'testResults', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -104,7 +103,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'testResults', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -119,7 +118,7 @@ const MpiSection = ({
                         onChange={e => updateData(idx, 'testResults', e.target.value, 2)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -154,7 +153,7 @@ const MpiSection = ({
                       />
                     </td>
                   </tr>
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

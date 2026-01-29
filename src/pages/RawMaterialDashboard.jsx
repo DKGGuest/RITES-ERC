@@ -1259,9 +1259,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
           // Weights (MT)
           weightOfferedMt: weight,
-          weightAcceptedMt: wtAcceptedNumbers,
+          weightAcceptedMt: acceptedQtyMt,
           weightRejectedMt: totalRejectedWeight,
-          acceptedQtyMt: acceptedQtyMt,
+          acceptedQtyMt: Math.floor(wtAcceptedNumbers),
 
           // Per-Submodule Status
           calibrationStatus: heatStatuses.calibration,
@@ -2387,7 +2387,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
                     {/* Accepted Qty */}
                     <div>
-                      <span style={{ fontSize: '11px', color: '#0369a1', display: 'block', marginBottom: '4px' }}>Accepted Qty (Tons)</span>
+                      <span style={{ fontSize: '11px', color: '#0369a1', display: 'block', marginBottom: '4px' }}>Wt.Accepted Qty (Tons)</span>
                       <strong style={{ fontSize: '14px', color: '#0369a1' }}>
                         {(() => {
                           // Get rejected weight
@@ -2425,7 +2425,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
                     {/* Weight Accepted */}
                     <div>
-                      <span style={{ fontSize: '11px', color: '#16a34a', display: 'block', marginBottom: '4px' }}>Wt. Accepted (Numbers)</span>
+                      <span style={{ fontSize: '11px', color: '#16a34a', display: 'block', marginBottom: '4px' }}>Accepted Qty In Numbers</span>
                       <strong style={{ fontSize: '14px', color: '#16a34a' }}>
                         {(() => {
                           // Get rejected weight

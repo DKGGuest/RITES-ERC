@@ -45,21 +45,20 @@ const ForgingSection = ({
         <div className="forging-table-wrapper">
           {/* Desktop Table Layout */}
           <table className="forging-table">
-            <thead>
-              <tr>
-                <th className="forging-th forging-th--time">Time Range</th>
-                <th className="forging-th forging-th--checkbox">No Production</th>
-                <th className="forging-th forging-th--lot">Lot No.</th>
-                <th className="forging-th forging-th--temp">Forging Temp.</th>
-                <th className="forging-th forging-th--stabilisation">Forging Stabilisation Rejection</th>
-                <th className="forging-th forging-th--improper">Improper Forging</th>
-                <th className="forging-th forging-th--defect">Forging Defect (Marks / Notches)</th>
-                <th className="forging-th forging-th--embossing">Embossing Defect</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
-                <>
+                <React.Fragment key={`${row.hour}-group`}>
+                  {/* Header row for this hour block */}
+                  <tr className="forging-header-row">
+                    <th className="forging-th forging-th--time">Time Range</th>
+                    <th className="forging-th forging-th--checkbox">No Production</th>
+                    <th className="forging-th forging-th--lot">Lot No.</th>
+                    <th className="forging-th forging-th--temp">Forging Temp.</th>
+                    <th className="forging-th forging-th--stabilisation">Forging Stabilisation Rejection</th>
+                    <th className="forging-th forging-th--improper">Improper Forging</th>
+                    <th className="forging-th forging-th--defect">Forging Defect (Marks / Notches)</th>
+                    <th className="forging-th forging-th--embossing">Embossing Defect</th>
+                  </tr>
                   {/* Row 1: First sample */}
                   <tr key={`${row.hour}-r1`} className="forging-row">
                     <td rowSpan="3" className="forging-td forging-td--time">
@@ -103,7 +102,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'forgingStabilisation', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -115,7 +114,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'improperForging', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -127,7 +126,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'forgingDefect', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -139,7 +138,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'embossingDefect', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -164,7 +163,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'forgingStabilisation', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -176,7 +175,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'improperForging', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -188,7 +187,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'forgingDefect', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -200,7 +199,7 @@ const ForgingSection = ({
                         onChange={e => updateData(idx, 'embossingDefect', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -241,12 +240,12 @@ const ForgingSection = ({
                       />
                     </td>
                   </tr>
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
 
-          {/* Mobile Card Layout - will be added next */}
+          {/* Mobile Card Layout */}
           <div className="forging-mobile-cards">
             {visibleRows(data, showAll).map(({ row, idx }) => (
               <div key={row.hour} className="forging-mobile-card">
@@ -297,7 +296,7 @@ const ForgingSection = ({
                             onChange={e => updateData(idx, 'forgingStabilisation', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           >
-                            <option value="">OK / Not OK</option>
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>
@@ -311,7 +310,7 @@ const ForgingSection = ({
                             onChange={e => updateData(idx, 'improperForging', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           >
-                            <option value="">OK / Not OK</option>
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>
@@ -325,7 +324,7 @@ const ForgingSection = ({
                             onChange={e => updateData(idx, 'forgingDefect', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           >
-                            <option value="">OK / Not OK</option>
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>
@@ -339,7 +338,7 @@ const ForgingSection = ({
                             onChange={e => updateData(idx, 'embossingDefect', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           >
-                            <option value="">OK / Not OK</option>
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>

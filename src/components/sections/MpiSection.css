@@ -137,13 +137,12 @@
 .mpi-td--remarks-input {
   background-color: #fff;
   padding: 2px 6px;
-  text-align: center;
+  text-align: left;
 }
 
 .mpi-td--remarks-input .form-control {
-  text-align: center;
-  max-width: 300px;
-  margin: 0 auto;
+  width: 100%;
+  text-align: left;
 }
 
 /* Mobile Cards - Hidden by default */
@@ -151,106 +150,41 @@
   display: none;
 }
 
-/* Mobile Responsive */
+/* Mobile Responsive - Horizontal Scrolling Table */
 @media (max-width: 768px) {
+  .mpi-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px;
+    position: relative;
+  }
+
+  /* Keep table visible on mobile with horizontal scroll */
   .mpi-table {
+    display: table;
+    min-width: 800px; /* Ensure table is wide enough to require scrolling */
+  }
+
+  /* Hide mobile card layout */
+  .mpi-mobile-cards {
     display: none;
   }
 
-  .mpi-mobile-cards {
+  /* Add scroll hint */
+  .mpi-table-wrapper::after {
+    content: '← Scroll horizontally to see all columns →';
     display: block;
-  }
-
-  .mpi-mobile-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    overflow: hidden;
-  }
-
-  .mpi-mobile-card__header {
-    background: #fef7f0;
-    padding: 10px 12px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .mpi-mobile-card__time {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .mpi-mobile-card__body {
-    padding: 12px;
-  }
-
-  .mpi-mobile-field {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid #f3f4f6;
-  }
-
-  .mpi-mobile-field:last-child {
-    border-bottom: none;
-  }
-
-  .mpi-mobile-field__label {
-    background: #dc2626;
-    color: #fff;
-    padding: 6px 12px;
-    border-radius: 4px;
+    text-align: center;
+    padding: 8px;
     font-size: 12px;
-    font-weight: 500;
-    min-width: 120px;
-  }
-
-  .mpi-mobile-field__value {
-    flex: 1;
-    margin-left: 12px;
-  }
-
-  .mpi-mobile-field__value input,
-  .mpi-mobile-field__value select {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-
-  .mpi-mobile-field--rejected {
-    background: #e0f2fe;
-    margin: 0 -12px;
-    padding: 8px 12px;
-  }
-
-  .mpi-mobile-field--rejected .mpi-mobile-field__label {
-    background: #0284c7;
+    color: #6b7280;
+    font-style: italic;
   }
 }
 
 @media (max-width: 480px) {
   .mpi-section {
     padding: 12px;
-  }
-
-  .mpi-mobile-field {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .mpi-mobile-field__label {
-    margin-bottom: 6px;
-    text-align: center;
-  }
-
-  .mpi-mobile-field__value {
-    margin-left: 0;
   }
 
   .mpi-section__title {

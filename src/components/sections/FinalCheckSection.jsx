@@ -45,23 +45,22 @@ const FinalCheckSection = ({
         <div className="final-check-table-wrapper">
           {/* Desktop Table Layout */}
           <table className="final-check-table">
-            <thead>
-              <tr>
-                <th className="final-check-th final-check-th--time">Time Range</th>
-                <th className="final-check-th final-check-th--checkbox">No Production</th>
-                <th className="final-check-th final-check-th--lot">Lot No.</th>
-                <th className="final-check-th final-check-th--box-gauge">Box Gauge</th>
-                <th className="final-check-th final-check-th--flat-bearing">Flat Bearing Area</th>
-                <th className="final-check-th final-check-th--falling-gauge">Falling Gauge</th>
-                <th className="final-check-th final-check-th--surface-defect">Surface Defect</th>
-                <th className="final-check-th final-check-th--embossing-defect">Embossing Defect</th>
-                <th className="final-check-th final-check-th--marking">Marking</th>
-                <th className="final-check-th final-check-th--tempering-hardness">Tempering Hardness</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={row.hour}>
+                  {/* Header row for this hour block */}
+                  <tr className="final-check-header-row">
+                    <th className="final-check-th final-check-th--time">Time Range</th>
+                    <th className="final-check-th final-check-th--checkbox">No Production</th>
+                    <th className="final-check-th final-check-th--lot">Lot No.</th>
+                    <th className="final-check-th final-check-th--box-gauge">Box Gauge</th>
+                    <th className="final-check-th final-check-th--flat-bearing">Flat Bearing Area</th>
+                    <th className="final-check-th final-check-th--falling-gauge">Falling Gauge</th>
+                    <th className="final-check-th final-check-th--surface-defect">Surface Defect</th>
+                    <th className="final-check-th final-check-th--embossing-defect">Embossing Defect</th>
+                    <th className="final-check-th final-check-th--marking">Marking</th>
+                    <th className="final-check-th final-check-th--tempering-hardness">Tempering Hardness</th>
+                  </tr>
                   {/* Row 1: First sample */}
                   <tr className="final-check-row">
                     <td rowSpan="4" className="final-check-td final-check-td--time">
@@ -95,7 +94,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'boxGauge', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -107,7 +106,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -119,7 +118,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'fallingGauge', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -131,7 +130,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'surfaceDefect', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -143,7 +142,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'embossingDefect', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -155,7 +154,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'marking', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -180,7 +179,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'boxGauge', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -192,7 +191,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -204,7 +203,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'fallingGauge', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -216,7 +215,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'surfaceDefect', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -228,7 +227,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'embossingDefect', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>
@@ -240,7 +239,7 @@ const FinalCheckSection = ({
                         onChange={e => updateData(idx, 'marking', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK/ Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="Not OK">Not OK</option>
                       </select>

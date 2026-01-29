@@ -162,13 +162,12 @@
 .final-check-td--remarks-input {
   background-color: #fff;
   padding: 2px 6px;
-  text-align: center;
+  text-align: left;
 }
 
 .final-check-td--remarks-input .form-control {
-  text-align: center;
-  max-width: 300px;
-  margin: 0 auto;
+  width: 100%;
+  text-align: left;
 }
 
 /* Mobile Cards - hidden on desktop */
@@ -176,94 +175,35 @@
   display: none;
 }
 
-/* Mobile Responsive */
+/* Mobile Responsive - Horizontal Scrolling Table */
 @media (max-width: 768px) {
+  .final-check-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px;
+    position: relative;
+  }
+
+  /* Keep table visible on mobile with horizontal scroll */
   .final-check-table {
+    display: table;
+    min-width: 800px; /* Ensure table is wide enough to require scrolling */
+  }
+
+  /* Hide mobile card layout */
+  .final-check-mobile-cards {
     display: none;
   }
 
-  .final-check-mobile-cards {
+  /* Add scroll hint */
+  .final-check-table-wrapper::after {
+    content: '← Scroll horizontally to see all columns →';
     display: block;
-  }
-
-  .final-check-mobile-card {
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    overflow: hidden;
-  }
-
-  .final-check-mobile-card__header {
-    background-color: #fef7f0;
-    padding: 10px 12px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .final-check-mobile-card__time {
-    font-weight: 600;
-    font-size: 14px;
-    color: #1f2937;
-  }
-
-  .final-check-mobile-checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    text-align: center;
+    padding: 8px;
     font-size: 12px;
     color: #6b7280;
-  }
-
-  .final-check-mobile-card__body {
-    padding: 12px;
-  }
-
-  .final-check-mobile-field {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid #f3f4f6;
-  }
-
-  .final-check-mobile-field:last-child {
-    border-bottom: none;
-  }
-
-  .final-check-mobile-field__label {
-    background-color: #dc2626;
-    color: #fff;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    min-width: 100px;
-  }
-
-  .final-check-mobile-field__value {
-    flex: 1;
-    margin-left: 12px;
-  }
-
-  .final-check-mobile-field__value input,
-  .final-check-mobile-field__value select {
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-
-  .final-check-mobile-field__value--multi {
-    display: flex;
-    gap: 8px;
-  }
-
-  .final-check-mobile-field__value--multi select {
-    flex: 1;
+    font-style: italic;
   }
 }
 

@@ -250,6 +250,70 @@ export const getQuantitySummary = async (inspectionCallNo) => {
   }
 };
 
+// ==================== Heat Wise Accountal - Two Step API Calls ====================
+
+/**
+ * Step 1: Fetch PO Serial Number by Call ID
+ * GET /api/processIe/getPoNumnerByCallId/{callNo}
+ * @param {string} callNo - Inspection call number (e.g., "EP-01270001")
+ * @returns {Promise<string>} PO serial number (e.g., "001")
+ */
+export const getPoSerialNumberByCallId = async (callNo) => {
+  try {
+    const baseUrl = API_BASE_URL.replace('/api/process-material', '');
+    const url = `${baseUrl}/api/processIe/getPoNumnerByCallId/${callNo}`;
+    console.log(`📡 [Heat Wise Accountal] Fetching PO serial number for call: ${callNo}`);
+    console.log(`📍 URL: ${url}`);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    const data = await handleResponse(response);
+    const poSerialNumber = data.responseData || '';
+    console.log(`✅ [Heat Wise Accountal] PO serial number received: ${poSerialNumber}`);
+    return poSerialNumber;
+  } catch (error) {
+    console.error('❌ [Heat Wise Accountal] Error fetching PO serial number:', error);
+    throw error;
+  }
+};
+
+/**
+ * Step 2: Fetch Manufactured Quantity Summary by Heat and PO Serial Number
+ * GET /api/processIe/getManufaturedQtyOfPo/{heatNo}/{poSerialNo}
+ * @param {string} heatNo - Heat number (e.g., "11")
+ * @param {string} poSerialNo - PO serial number from Step 1 (e.g., "001")
+ * @returns {Promise<Object>} Quantity summary with fields:
+ *   - manufaturedQty: Manufactured ERC quantity
+ *   - rejectedQty: Rejected ERC quantity
+ *   - rmAcceptedQty: Accepted RM quantity (MT)
+ *   - acceptedQty: Accepted ERC quantity
+ *   - heatNo: Heat number
+ */
+export const getManufacturedQtyOfPo = async (heatNo, poSerialNo) => {
+  try {
+    const baseUrl = API_BASE_URL.replace('/api/process-material', '');
+    const url = `${baseUrl}/api/processIe/getManufaturedQtyOfPo/${heatNo}/${poSerialNo}`;
+    console.log(`📡 [Heat Wise Accountal] Fetching manufactured qty for heat: ${heatNo}, PO serial: ${poSerialNo}`);
+    console.log(`📍 URL: ${url}`);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    const data = await handleResponse(response);
+    const quantityData = data.responseData || {};
+    console.log(`✅ [Heat Wise Accountal] Quantity data received:`, quantityData);
+    return quantityData;
+  } catch (error) {
+    console.error('❌ [Heat Wise Accountal] Error fetching manufactured quantity:', error);
+    throw error;
+  }
+};
+
 // ==================== Finish Inspection (Save All Submodule Data) ====================
 
 /**

@@ -45,22 +45,21 @@ const QuenchingSection = ({
         <div className="quenching-table-wrapper">
           {/* Desktop Table Layout */}
           <table className="quenching-table">
-            <thead>
-              <tr>
-                <th className="quenching-th quenching-th--time">Time Range</th>
-                <th className="quenching-th quenching-th--checkbox">No Production</th>
-                <th className="quenching-th quenching-th--lot">Lot No.</th>
-                <th className="quenching-th quenching-th--temp">Quenching Temp.</th>
-                <th className="quenching-th quenching-th--duration">Quenching Duration</th>
-                <th className="quenching-th quenching-th--hardness">Quenching Hardness</th>
-                <th className="quenching-th quenching-th--box-gauge">Box Gauge</th>
-                <th className="quenching-th quenching-th--flat-bearing">Flat Bearing Area</th>
-                <th className="quenching-th quenching-th--falling-gauge">Falling Gauge</th>
-              </tr>
-            </thead>
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={row.hour}>
+                  {/* Header row for this hour block */}
+                  <tr className="quenching-header-row">
+                    <th className="quenching-th quenching-th--time">Time Range</th>
+                    <th className="quenching-th quenching-th--checkbox">No Production</th>
+                    <th className="quenching-th quenching-th--lot">Lot No.</th>
+                    <th className="quenching-th quenching-th--temp">Quenching Temp.</th>
+                    <th className="quenching-th quenching-th--duration">Quenching Duration</th>
+                    <th className="quenching-th quenching-th--hardness">Quenching Hardness</th>
+                    <th className="quenching-th quenching-th--box-gauge">Box Gauge</th>
+                    <th className="quenching-th quenching-th--flat-bearing">Flat Bearing Area</th>
+                    <th className="quenching-th quenching-th--falling-gauge">Falling Gauge</th>
+                  </tr>
                   {/* Row 1: First sample */}
                   <tr className="quenching-row">
                     <td rowSpan="4" className="quenching-td quenching-td--time">
@@ -124,7 +123,7 @@ const QuenchingSection = ({
                         onChange={e => updateData(idx, 'boxGauge', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -136,7 +135,7 @@ const QuenchingSection = ({
                         onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -148,7 +147,7 @@ const QuenchingSection = ({
                         onChange={e => updateData(idx, 'fallingGauge', e.target.value, 0)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -193,7 +192,7 @@ const QuenchingSection = ({
                         onChange={e => updateData(idx, 'boxGauge', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -205,7 +204,7 @@ const QuenchingSection = ({
                         onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -217,7 +216,7 @@ const QuenchingSection = ({
                         onChange={e => updateData(idx, 'fallingGauge', e.target.value, 1)}
                         disabled={row.noProduction}
                       >
-                        <option value="">OK / Not OK</option>
+                        <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="NOT OK">NOT OK</option>
                       </select>
@@ -341,7 +340,7 @@ const QuenchingSection = ({
                             onChange={e => updateData(idx, 'boxGauge', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           >
-                            <option value="">OK / Not OK</option>
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>
@@ -355,7 +354,7 @@ const QuenchingSection = ({
                             onChange={e => updateData(idx, 'flatBearingArea', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           >
-                            <option value="">OK / Not OK</option>
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>
@@ -369,7 +368,7 @@ const QuenchingSection = ({
                             onChange={e => updateData(idx, 'fallingGauge', e.target.value, sampleIdx)}
                             disabled={row.noProduction}
                           >
-                            <option value="">OK / Not OK</option>
+                            <option value="">Select</option>
                             <option value="OK">OK</option>
                             <option value="NOT OK">NOT OK</option>
                           </select>
