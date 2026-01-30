@@ -92,6 +92,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   // Structure: { heatNo: { calibration: 'OK', visual: 'Pending', ... }, ... }
   const [heatSubmoduleStatuses, setHeatSubmoduleStatuses] = useState({});
 
+  // Track whether finish button should be enabled
+  const [canFinishInspectionState, setCanFinishInspectionState] = useState({ canFinish: false, reason: '' });
+
   // Ref to prevent duplicate API calls in React StrictMode
   const hasFetchedRef = useRef(false);
   const currentCallRef = useRef(null);
@@ -998,12 +1001,108 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   }, [call?.call_no, activeHeats, productModel, validateCalibrationHeat, validateVisualHeat, validateDimensionalHeat, validateMaterialTestHeat, validatePackingStorage]);
 
   /**
+   * Check if inspection can be finished based on module statuses
+   * Returns { canFinish: boolean, reason: string }
+   */
+  const canFinishInspection = useCallback(() => {
+    // Check if all heats have been evaluated
+    if (!consolidatedHeats || consolidatedHeats.length === 0) {
+      return { canFinish: false, reason: 'No heats available for inspection' };
+    }
+
+    // Check each heat's module statuses
+    for (const heat of consolidatedHeats) {
+      const heatNo = heat.heatNo || heat.heat_no;
+      const heatStatuses = heatSubmoduleStatuses[heatNo] || {
+        calibration: 'Pending',
+        visual: 'Pending',
+        dimensional: 'Pending',
+        materialTest: 'Pending',
+        packing: 'Pending'
+      };
+
+      const allPending = Object.values(heatStatuses).every(s => s === 'Pending');
+      const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
+      const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
+      const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
+      const visualNotOk = heatStatuses.visual === 'NOT OK';
+
+      // Rule 1: If all modules are pending, can't finish
+      if (allPending) {
+        return { canFinish: false, reason: `Heat ${heatNo}: All modules are pending` };
+      }
+
+      // Rule 2: If Dimension or Material Testing is NOT OK, complete heat is rejected
+      // This is allowed to finish
+      if (dimensionalNotOk || materialTestNotOk) {
+        // Can finish if this is the only condition
+        continue;
+      }
+
+      // Rule 3: If Visual is NOT OK and complete amount rejected, can finish
+      // Rule 4: If Visual is NOT OK with partial rejection and other modules pending, can't finish
+      if (visualNotOk) {
+        // Load visual data to check if complete rejection
+        const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${call?.call_no}`;
+        const visualRaw = localStorage.getItem(visualKey);
+        const visualData = visualRaw ? JSON.parse(visualRaw) : [];
+
+        // Find this heat's visual data
+        const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNo);
+        const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+        const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
+        const offeredWeight = heat.weight;
+
+        const isCompleteRejection = rejectedWeight >= offeredWeight;
+
+        if (!isCompleteRejection && anyPending) {
+          return { canFinish: false, reason: `Heat ${heatNo}: Visual has partial rejection and other modules are pending` };
+        }
+      }
+
+      // Rule 5: If any module is OK and others are pending, can't finish
+      const anyOk = Object.values(heatStatuses).some(s => s === 'OK');
+      if (anyOk && anyPending) {
+        return { canFinish: false, reason: `Heat ${heatNo}: Some modules are OK but others are still pending` };
+      }
+    }
+
+    // All heats have valid completion status
+    return { canFinish: true, reason: '' };
+  }, [consolidatedHeats, heatSubmoduleStatuses, activeHeats, call?.call_no, calculateVisualRejectedWeight]);
+
+  // Update canFinishInspectionState whenever dependencies change
+  useEffect(() => {
+    const result = canFinishInspection();
+    setCanFinishInspectionState(result);
+  }, [canFinishInspection]);
+
+  /**
    * Handle Finish Inspection - collect all submodule data from localStorage and save to backend
    */
   const handleFinishInspection = useCallback(async () => {
     const inspectionCallNo = call?.call_no;
     if (!inspectionCallNo) {
-      alert('No inspection call number found');
+      setResultModalConfig({
+        actionType: 'error',
+        callNumber: call?.call_no || '',
+        message: 'No inspection call number found',
+        additionalInfo: 'Please ensure the inspection call is properly loaded.'
+      });
+      setShowResultModal(true);
+      return;
+    }
+
+    // Check if inspection can be finished
+    const { canFinish, reason } = canFinishInspection();
+    if (!canFinish) {
+      setResultModalConfig({
+        actionType: 'error',
+        callNumber: call?.call_no || '',
+        message: 'Cannot Finish Inspection',
+        additionalInfo: reason
+      });
+      setShowResultModal(true);
       return;
     }
 
@@ -1212,45 +1311,67 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         };
         const hasNotOk = Object.values(heatStatuses).some(s => s === 'NOT OK');
         const allOk = Object.values(heatStatuses).every(s => s === 'OK');
-        const isAccepted = allOk && !hasNotOk;
-        const isRejected = hasNotOk;
+        const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
+        const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
         const weight = heat.weight; // Already aggregated in consolidatedHeats
 
-        // Determine overall status for this heat
-        let overallStatus = 'PENDING';
-        if (isAccepted) {
-          overallStatus = 'ACCEPTED';
-        } else if (isRejected) {
-          overallStatus = 'REJECTED';
-        } else if (isAccepted && isRejected) {
-          overallStatus = 'PARTIALLY_ACCEPTED';
-        }
-
-        // Calculate rejected weight from visual inspection data
-        const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${inspectionCallNo}`;
-        const visualRaw = localStorage.getItem(visualKey);
-        const visualData = visualRaw ? JSON.parse(visualRaw) : [];
-
+        // NEW LOGIC: If Dimension or Material Testing is NOT OK, complete heat is rejected
         let totalRejectedWeight = 0;
-        const processedHeatNumbers = new Set();
-        if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
-          heat.originalHeats.forEach((originalHeat) => {
-            const originalHeatNumber = originalHeat.heatNo || originalHeat.heat_no;
-            if (!processedHeatNumbers.has(originalHeatNumber)) {
-              const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === originalHeatNumber);
-              const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
-              const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
-              totalRejectedWeight += rejectedWeight;
-              processedHeatNumbers.add(originalHeatNumber);
+        let acceptedQtyMt = 0;
+        let wtAcceptedNumbers = 0;
+        let overallStatus = 'PENDING';
+
+        if (dimensionalNotOk || materialTestNotOk) {
+          // Complete heat rejection
+          totalRejectedWeight = weight;
+          acceptedQtyMt = 0;
+          wtAcceptedNumbers = 0;
+          overallStatus = 'REJECTED';
+        } else {
+          // Calculate rejected weight from visual inspection data
+          const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${inspectionCallNo}`;
+          const visualRaw = localStorage.getItem(visualKey);
+          const visualData = visualRaw ? JSON.parse(visualRaw) : [];
+
+          const processedHeatNumbers = new Set();
+          if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
+            heat.originalHeats.forEach((originalHeat) => {
+              const originalHeatNumber = originalHeat.heatNo || originalHeat.heat_no;
+              if (!processedHeatNumbers.has(originalHeatNumber)) {
+                const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === originalHeatNumber);
+                const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+                const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
+                totalRejectedWeight += rejectedWeight;
+                processedHeatNumbers.add(originalHeatNumber);
+              }
+            });
+          }
+
+          // Check if any modules are still pending
+          const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
+
+          if (anyPending) {
+            // If any module is pending, accepted material is 0
+            acceptedQtyMt = 0;
+            wtAcceptedNumbers = 0;
+            overallStatus = 'PENDING';
+          } else {
+            // All modules are complete (OK or NOT OK)
+            // Calculate accepted qty: Offered Qty - Rejected Weight (in Tons)
+            acceptedQtyMt = weight - totalRejectedWeight;
+            // Calculate Wt. Accepted (Numbers) = Accepted Qty (Tons) * 1000 / 1.15
+            wtAcceptedNumbers = (acceptedQtyMt * 1000) / 1.15;
+
+            // Determine overall status
+            if (allOk && !hasNotOk) {
+              overallStatus = 'ACCEPTED';
+            } else if (hasNotOk) {
+              overallStatus = 'REJECTED';
+            } else {
+              overallStatus = 'PARTIALLY_ACCEPTED';
             }
-          });
+          }
         }
-
-        // Calculate accepted qty: Offered Qty - Rejected Weight (in Tons)
-        const acceptedQtyMt = weight - totalRejectedWeight;
-
-        // Calculate Wt. Accepted (Numbers) = Accepted Qty (Tons) * 1000 / 1.15
-        const wtAcceptedNumbers = (acceptedQtyMt * 1000) / 1.15;
 
         return {
           // Identification
@@ -1270,8 +1391,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           materialTestStatus: heatStatuses.materialTest,
           packingStatus: heatStatuses.packing,
 
-          // Final Status
-          status: isRejected ? 'REJECTED' : isAccepted ? 'ACCEPTED' : 'PENDING',
+          // Final Status - use the calculated overallStatus
+          status: overallStatus,
           overallStatus: overallStatus,
 
           // Cumulative Summary (same for all heats in this call)
@@ -1395,11 +1516,17 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       }, 2000);
     } catch (error) {
       console.error('Error finishing inspection:', error);
-      alert(`Failed to save inspection data: ${error.message}`);
+      setResultModalConfig({
+        actionType: 'error',
+        callNumber: call?.call_no || '',
+        message: 'Failed to Save Inspection Data',
+        additionalInfo: error.message || 'An unexpected error occurred. Please try again.'
+      });
+      setShowResultModal(true);
     } finally {
       setIsSaving(false);
     }
-  }, [call?.call_no, call?.id, call?.pincode, call?.workflowTransitionId, activeHeats, onBack, numberOfBundles, numberOfERC, sourceOfRawMaterial, poData, productModel, heatSubmoduleStatuses, heatRemarks, calculateVisualRejectedWeight, consolidatedHeats]);
+  }, [call?.call_no, call?.id, call?.pincode, call?.workflowTransitionId, activeHeats, onBack, numberOfBundles, numberOfERC, sourceOfRawMaterial, poData, productModel, heatSubmoduleStatuses, heatRemarks, calculateVisualRejectedWeight, consolidatedHeats, canFinishInspection]);
 
   // Withheld modal handlers
   const handleOpenWithheldModal = () => {
@@ -1463,9 +1590,17 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         localStorage.removeItem(mainKey);
       }
 
-      alert('✅ Inspection has been withheld successfully');
+      setResultModalConfig({
+        actionType: 'withheld',
+        callNumber: call?.call_no || '',
+        message: 'Inspection Withheld Successfully',
+        additionalInfo: `Reason: ${withheldReason === 'ANY_OTHER' ? withheldRemarks : WITHHELD_REASONS.find(r => r.value === withheldReason)?.label || withheldReason}`
+      });
+      setShowResultModal(true);
       handleCloseWithheldModal();
-      onBack();
+      setTimeout(() => {
+        onBack();
+      }, 2000);
     } catch (error) {
       console.error('Error withholding inspection:', error);
       setWithheldError('Failed to save. Please try again.');
@@ -1514,7 +1649,13 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   const handlePauseInspectionConfirmed = useCallback(async () => {
     const inspectionCallNo = call?.call_no;
     if (!inspectionCallNo) {
-      alert('No inspection call number found');
+      setResultModalConfig({
+        actionType: 'error',
+        callNumber: call?.call_no || '',
+        message: 'No inspection call number found',
+        additionalInfo: 'Please ensure the inspection call is properly loaded.'
+      });
+      setShowResultModal(true);
       return;
     }
 
@@ -2213,7 +2354,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             </button> */}
 
             {/* Overall Status Badge */}
-            {(() => {
+            {/* {(() => {
               // Use consolidatedHeats to count unique heat numbers
               const acceptedCount = consolidatedHeats.filter(heat => {
                 const heatNo = heat.heatNo || heat.heat_no;
@@ -2266,7 +2407,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                   Overall Status: {overallStatus} ({acceptedCount} Accepted, {rejectedCount} Rejected)
                 </div>
               );
-            })()}
+            })()} */}
           </div>
 
           {/* Heat Blocks - Each unique heat has its own section with status tags (consolidated) */}
@@ -2302,13 +2443,15 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                     padding: '16px'
                   }}
                 >
-                  {/* Submodule Status Tags Row */}
+                  {/* Submodule Status Tags Row with Overall Status */}
                   <div style={{
                     display: 'flex',
                     gap: '8px',
                     flexWrap: 'wrap',
-                    marginBottom: '16px'
+                    marginBottom: '16px',
+                    alignItems: 'center'
                   }}>
+                    {/* Submodule Status Tags */}
                     {[
                       { key: 'calibration', label: 'Calibration', tooltip: 'Fill all chemical composition fields (C, Si, Mn, P, S)' },
                       { key: 'visual', label: 'Visual', tooltip: 'Select defect option and fill counts/lengths for selected defects' },
@@ -2341,6 +2484,22 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                         </span>
                       );
                     })}
+
+                    {/* Overall Status Tag - at the end */}
+                    <span
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        background: isRejected ? '#fee2e2' : isAccepted ? '#dcfce7' : '#fef3c7',
+                        color: isRejected ? '#991b1b' : isAccepted ? '#166534' : '#92400e',
+                        border: `1px solid ${isRejected ? '#fca5a5' : isAccepted ? '#86efac' : '#fcd34d'}`,
+                        marginLeft: 'auto'
+                      }}
+                    >
+                      Overall Status: {isRejected ? 'REJECTED' : isAccepted ? 'ACCEPTED' : 'PENDING'}
+                    </span>
                   </div>
 
                   {/* Heat Details Row - Single Row Layout */}
@@ -2390,21 +2549,42 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                       <span style={{ fontSize: '11px', color: '#0369a1', display: 'block', marginBottom: '4px' }}>Wt.Accepted Qty (Tons)</span>
                       <strong style={{ fontSize: '14px', color: '#0369a1' }}>
                         {(() => {
-                          // Get rejected weight
                           const callNo = call?.call_no;
                           if (!callNo) return '—';
 
+                          const heatNo = heat.heatNo || heat.heat_no;
+                          const heatStatuses = heatSubmoduleStatuses[heatNo] || {
+                            calibration: 'Pending',
+                            visual: 'Pending',
+                            dimensional: 'Pending',
+                            materialTest: 'Pending',
+                            packing: 'Pending'
+                          };
+
+                          const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
+                          const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
+                          const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
+
+                          // If Dimension or Material Testing is NOT OK, complete heat is rejected
+                          if (dimensionalNotOk || materialTestNotOk) {
+                            return '0';
+                          }
+
+                          // If any module is pending, accepted material is 0
+                          if (anyPending) {
+                            return '0';
+                          }
+
+                          // Calculate rejected weight from visual inspection
                           const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${callNo}`;
                           const visualRaw = localStorage.getItem(visualKey);
                           const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-                          // For different heat numbers, sum rejected weight; for same heat number, calculate once
                           let totalRejectedWeight = 0;
                           const processedHeatNumbers = new Set();
                           if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
                             heat.originalHeats.forEach((originalHeat) => {
                               const heatNumber = originalHeat.heatNo || originalHeat.heat_no;
-                              // Only process each unique heat number once
                               if (!processedHeatNumbers.has(heatNumber)) {
                                 const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNumber);
                                 const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
@@ -2428,21 +2608,42 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                       <span style={{ fontSize: '11px', color: '#16a34a', display: 'block', marginBottom: '4px' }}>Accepted Qty In Numbers</span>
                       <strong style={{ fontSize: '14px', color: '#16a34a' }}>
                         {(() => {
-                          // Get rejected weight
                           const callNo = call?.call_no;
                           if (!callNo) return '—';
 
+                          const heatNo = heat.heatNo || heat.heat_no;
+                          const heatStatuses = heatSubmoduleStatuses[heatNo] || {
+                            calibration: 'Pending',
+                            visual: 'Pending',
+                            dimensional: 'Pending',
+                            materialTest: 'Pending',
+                            packing: 'Pending'
+                          };
+
+                          const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
+                          const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
+                          const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
+
+                          // If Dimension or Material Testing is NOT OK, complete heat is rejected
+                          if (dimensionalNotOk || materialTestNotOk) {
+                            return '0';
+                          }
+
+                          // If any module is pending, accepted material is 0
+                          if (anyPending) {
+                            return '0';
+                          }
+
+                          // Calculate rejected weight from visual inspection
                           const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${callNo}`;
                           const visualRaw = localStorage.getItem(visualKey);
                           const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-                          // For different heat numbers, sum rejected weight; for same heat number, calculate once
                           let totalRejectedWeight = 0;
                           const processedHeatNumbers = new Set();
                           if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
                             heat.originalHeats.forEach((originalHeat) => {
                               const heatNumber = originalHeat.heatNo || originalHeat.heat_no;
-                              // Only process each unique heat number once
                               if (!processedHeatNumbers.has(heatNumber)) {
                                 const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNumber);
                                 const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
@@ -2471,21 +2672,37 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                       <span style={{ fontSize: '11px', color: '#dc2626', display: 'block', marginBottom: '4px' }}>Wt. Rejected (Tons)</span>
                       <strong style={{ fontSize: '14px', color: '#dc2626' }}>
                         {(() => {
-                          // Load visual inspection data from localStorage
                           const callNo = call?.call_no;
                           if (!callNo) return '0';
 
+                          const heatNo = heat.heatNo || heat.heat_no;
+                          const heatStatuses = heatSubmoduleStatuses[heatNo] || {
+                            calibration: 'Pending',
+                            visual: 'Pending',
+                            dimensional: 'Pending',
+                            materialTest: 'Pending',
+                            packing: 'Pending'
+                          };
+
+                          const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
+                          const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
+
+                          // If Dimension or Material Testing is NOT OK, complete heat is rejected
+                          if (dimensionalNotOk || materialTestNotOk) {
+                            const offeredTons = parseFloat(heat.weight) || 0;
+                            return offeredTons.toFixed(6);
+                          }
+
+                          // Otherwise, calculate rejected weight from visual inspection
                           const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${callNo}`;
                           const visualRaw = localStorage.getItem(visualKey);
                           const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-                          // For different heat numbers, sum rejected weight; for same heat number, calculate once
                           let totalRejectedWeight = 0;
                           const processedHeatNumbers = new Set();
                           if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
                             heat.originalHeats.forEach((originalHeat) => {
                               const heatNumber = originalHeat.heatNo || originalHeat.heat_no;
-                              // Only process each unique heat number once
                               if (!processedHeatNumbers.has(heatNumber)) {
                                 const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNumber);
                                 const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
@@ -2497,7 +2714,6 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                           }
 
                           // Show calculated rejected weight from visual defects
-                          // If no defects, show 0
                           if (totalRejectedWeight > 0) {
                             return totalRejectedWeight.toFixed(6);
                           }
@@ -2571,14 +2787,55 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             {isSaving ? 'Pausing...' : 'Pause Inspection'}
           </button>
           <button className="btn btn-outline" onClick={handleOpenWithheldModal}>Withheld Inspection</button>
-          <button
-            className="btn btn-primary"
-            onClick={handleFinishClick}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Finish Inspection'}
-          </button>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleFinishClick}
+              disabled={isSaving || !canFinishInspectionState.canFinish}
+              style={{
+                opacity: (!canFinishInspectionState.canFinish && !isSaving) ? 0.6 : 1,
+                cursor: (!canFinishInspectionState.canFinish && !isSaving) ? 'not-allowed' : 'pointer'
+              }}
+              title={!canFinishInspectionState.canFinish ? canFinishInspectionState.reason : ''}
+            >
+              {isSaving ? 'Saving...' : 'Finish Inspection'}
+            </button>
+            {!canFinishInspectionState.canFinish && !isSaving && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: '8px',
+                padding: '8px 12px',
+                backgroundColor: '#1e293b',
+                color: '#fff',
+                borderRadius: '6px',
+                fontSize: '12px',
+                maxWidth: '300px',
+                whiteSpace: 'normal',
+                textAlign: 'center',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                zIndex: 1000,
+                pointerEvents: 'none',
+                opacity: 0,
+                transition: 'opacity 0.2s',
+                display: 'none'
+              }}
+              className="finish-button-tooltip"
+              >
+                {canFinishInspectionState.reason}
+              </div>
+            )}
+          </div>
         </div>
+        <style>{`
+          .btn-primary:disabled:hover + .finish-button-tooltip,
+          .btn-primary:disabled:focus + .finish-button-tooltip {
+            opacity: 1 !important;
+            display: block !important;
+          }
+        `}</style>
       </div>
 
       <div className="rm-action-buttons" style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
