@@ -82,7 +82,7 @@ const TemperingSection = ({
                 return (
                   <React.Fragment key={row.hour}>
                     {/* Header row for this hour block */}
-                    <tr className="tempering-header-row">
+                    <tr className={`tempering-header-row${row.noProduction ? ' no-production' : ''}`}>
                       <th className="tempering-th tempering-th--time">Time Range</th>
                       <th className="tempering-th tempering-th--checkbox">No Production</th>
                       <th className="tempering-th tempering-th--lot">Lot No.</th>
@@ -91,7 +91,7 @@ const TemperingSection = ({
                       <th className="tempering-th tempering-th--total-rejection">Total Rejection at Tempering Section</th>
                     </tr>
                     {/* Row 1: First sample */}
-                    <tr className="tempering-row">
+                    <tr className={`tempering-row${row.noProduction ? ' no-production' : ''}`}>
                       <td rowSpan="4" className="tempering-td tempering-td--time">
                         <strong>{hourLabels[idx]}</strong>
                       </td>
@@ -143,7 +143,7 @@ const TemperingSection = ({
                       </td>
                     </tr>
                     {/* Row 2: Second sample */}
-                    <tr className="tempering-row">
+                    <tr className={`tempering-row${row.noProduction ? ' no-production' : ''}`}>
                       <td className="tempering-td tempering-td--temp-input">
                         <input
                           type="number"
@@ -168,7 +168,7 @@ const TemperingSection = ({
                       </td>
                     </tr>
                     {/* Row 3: Rejected No. for Tempering Temp and Duration */}
-                    <tr className="tempering-row tempering-row--rejected">
+                    <tr className={`tempering-row tempering-row--rejected${row.noProduction ? ' no-production' : ''}`}>
                       <td className="tempering-td tempering-td--rejected-label">
                         <span className="tempering-rejected-label">Rejected No.</span>
                       </td>
@@ -194,7 +194,7 @@ const TemperingSection = ({
                       </td>
                     </tr>
                     {/* Row 4: Remarks */}
-                    <tr className="tempering-row tempering-row--remarks">
+                    <tr className={`tempering-row tempering-row--remarks${row.noProduction ? ' no-production' : ''}`}>
                       <td className="tempering-td tempering-td--remarks-label">
                         <span className="tempering-remarks-label">Remarks</span>
                       </td>
@@ -219,7 +219,7 @@ const TemperingSection = ({
               const totalRejection = getTotalRejection(idx);
 
               return (
-                <div key={row.hour} className="tempering-mobile-card">
+                <div key={row.hour} className={`tempering-mobile-card${row.noProduction ? ' no-production' : ''}`}>
                   <div className="tempering-mobile-card__header">
                     <span className="tempering-mobile-card__time">{hourLabels[idx]}</span>
                     <label className="tempering-mobile-checkbox-label">

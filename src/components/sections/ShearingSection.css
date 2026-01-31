@@ -6,6 +6,17 @@
   margin-bottom: 20px;
 }
 
+/* No Production highlight */
+.shearing-table .no-production td,
+.shearing-table .no-production th,
+.shearing-mobile-card.no-production {
+  background-color: #f9cf99; /* light orange */
+}
+
+.shearing-table .no-production td {
+  color: #7a3e00;
+}
+
 .shearing-section__header {
   display: flex;
   justify-content: space-between;

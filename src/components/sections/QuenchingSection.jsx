@@ -12,8 +12,40 @@ const QuenchingSection = ({
 }) => {
   const [expanded] = useState(true);
 
+  const clearHour = (newData, idx) => {
+    newData[idx] = {
+      ...newData[idx],
+      lotNo: '',
+      quenchingTemperature: ['', ''],
+      quenchingDuration: ['', ''],
+      quenchingHardness: ['', ''],
+      boxGauge: ['', ''],
+      flatBearingArea: ['', ''],
+      fallingGauge: ['', ''],
+      quenchingTemperatureRejected: '',
+      quenchingDurationRejected: '',
+      quenchingHardnessRejected: '',
+      boxGaugeRejected: '',
+      flatBearingAreaRejected: '',
+      fallingGaugeRejected: '',
+      rejectedQty: '',
+      remarks: ''
+    };
+  };
+
   const updateData = (idx, field, value, sampleIndex = null) => {
     const newData = [...data];
+    // handle noProduction specially: if set true, clear the hour
+    if (field === 'noProduction') {
+      newData[idx].noProduction = !!value;
+      if (value) {
+        clearHour(newData, idx);
+      }
+      onDataChange(newData);
+      return;
+    }
+
+    // normal updates
     if (sampleIndex !== null && Array.isArray(newData[idx][field])) {
       const fieldArray = [...newData[idx][field]];
       fieldArray[sampleIndex] = value;
@@ -49,7 +81,7 @@ const QuenchingSection = ({
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={row.hour}>
                   {/* Header row for this hour block */}
-                  <tr className="quenching-header-row">
+                  <tr className={`quenching-header-row ${row.noProduction ? 'no-production' : ''}`}>
                     <th className="quenching-th quenching-th--time">Time Range</th>
                     <th className="quenching-th quenching-th--checkbox">No Production</th>
                     <th className="quenching-th quenching-th--lot">Lot No.</th>
@@ -61,7 +93,7 @@ const QuenchingSection = ({
                     <th className="quenching-th quenching-th--falling-gauge">Falling Gauge</th>
                   </tr>
                   {/* Row 1: First sample */}
-                  <tr className="quenching-row">
+                  <tr className={`quenching-row ${row.noProduction ? 'no-production' : ''}`}>
                     <td rowSpan="4" className="quenching-td quenching-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -93,7 +125,7 @@ const QuenchingSection = ({
                         placeholder="Float"
                         value={row.quenchingTemperature[0] || ''}
                         onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="quenching-td quenching-td--duration-input">
@@ -103,7 +135,7 @@ const QuenchingSection = ({
                         placeholder="Float"
                         value={row.quenchingDuration[0] || ''}
                         onChange={e => updateData(idx, 'quenchingDuration', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="quenching-td quenching-td--hardness-input">
@@ -113,7 +145,7 @@ const QuenchingSection = ({
                         placeholder="Integer"
                         value={row.quenchingHardness[0] || ''}
                         onChange={e => updateData(idx, 'quenchingHardness', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="quenching-td quenching-td--box-gauge-input">
@@ -121,7 +153,7 @@ const QuenchingSection = ({
                         className="form-control quenching-select"
                         value={row.boxGauge[0] || ''}
                         onChange={e => updateData(idx, 'boxGauge', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -133,7 +165,7 @@ const QuenchingSection = ({
                         className="form-control quenching-select"
                         value={row.flatBearingArea[0] || ''}
                         onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -145,7 +177,7 @@ const QuenchingSection = ({
                         className="form-control quenching-select"
                         value={row.fallingGauge[0] || ''}
                         onChange={e => updateData(idx, 'fallingGauge', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -154,7 +186,7 @@ const QuenchingSection = ({
                     </td>
                   </tr>
                   {/* Row 2: Second sample */}
-                  <tr className="quenching-row">
+                  <tr className={`quenching-row ${row.noProduction ? 'no-production' : ''}`}>
                     <td className="quenching-td quenching-td--temp-input">
                       <input
                         type="number"
@@ -162,7 +194,7 @@ const QuenchingSection = ({
                         placeholder="Float"
                         value={row.quenchingTemperature[1] || ''}
                         onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="quenching-td quenching-td--duration-input">
@@ -172,7 +204,7 @@ const QuenchingSection = ({
                         placeholder="Float"
                         value={row.quenchingDuration[1] || ''}
                         onChange={e => updateData(idx, 'quenchingDuration', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="quenching-td quenching-td--hardness-input">
@@ -182,7 +214,7 @@ const QuenchingSection = ({
                         placeholder="Integer"
                         value={row.quenchingHardness[1] || ''}
                         onChange={e => updateData(idx, 'quenchingHardness', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="quenching-td quenching-td--box-gauge-input">
@@ -190,7 +222,7 @@ const QuenchingSection = ({
                         className="form-control quenching-select"
                         value={row.boxGauge[1] || ''}
                         onChange={e => updateData(idx, 'boxGauge', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -202,7 +234,7 @@ const QuenchingSection = ({
                         className="form-control quenching-select"
                         value={row.flatBearingArea[1] || ''}
                         onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -214,7 +246,7 @@ const QuenchingSection = ({
                         className="form-control quenching-select"
                         value={row.fallingGauge[1] || ''}
                         onChange={e => updateData(idx, 'fallingGauge', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -223,7 +255,7 @@ const QuenchingSection = ({
                     </td>
                   </tr>
                   {/* Row 3: Rejected No. - 6 separate inputs */}
-                  <tr className="quenching-row quenching-row--rejected">
+                  <tr className={`quenching-row quenching-row--rejected ${row.noProduction ? 'no-production' : ''}`}>
                     <td className="quenching-td quenching-td--lot">
                       <span className="quenching-rejected-label">Rejected No.</span>
                     </td>
@@ -234,20 +266,20 @@ const QuenchingSection = ({
                       <input type="number" value={row.quenchingDurationRejected || ''} onChange={e => updateData(idx, 'quenchingDurationRejected', e.target.value)} disabled />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.quenchingHardnessRejected || ''} onChange={e => updateData(idx, 'quenchingHardnessRejected', e.target.value)} />
+                      <input type="number" value={row.quenchingHardnessRejected || ''} onChange={e => updateData(idx, 'quenchingHardnessRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.boxGaugeRejected || ''} onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)} />
+                      <input type="number" value={row.boxGaugeRejected || ''} onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.flatBearingAreaRejected || ''} onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)} />
+                      <input type="number" value={row.flatBearingAreaRejected || ''} onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.fallingGaugeRejected || ''} onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)} />
+                      <input type="number" value={row.fallingGaugeRejected || ''} onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                   </tr>
                   {/* Row 4: Remarks */}
-                  <tr className="quenching-row quenching-row--remarks">
+                  <tr className={`quenching-row quenching-row--remarks ${row.noProduction ? 'no-production' : ''}`}>
                     <td className="quenching-td quenching-td--remarks-label">
                       <span className="quenching-remarks-label">Remarks</span>
                     </td>
@@ -257,6 +289,7 @@ const QuenchingSection = ({
                         className="form-control quenching-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
@@ -268,7 +301,7 @@ const QuenchingSection = ({
           {/* Mobile Card Layout */}
           <div className="quenching-mobile-cards">
             {visibleRows(data, showAll).map(({ row, idx }) => (
-              <div key={row.hour} className="quenching-mobile-card">
+              <div key={row.hour} className={`quenching-mobile-card ${row.noProduction ? 'no-production' : ''}`}>
                 <div className="quenching-mobile-card__header">
                   <span className="quenching-mobile-card__time">{hourLabels[idx]}</span>
                   <input
@@ -304,7 +337,7 @@ const QuenchingSection = ({
                             placeholder="Float"
                             value={row.quenchingTemperature[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           />
                         </div>
                       </div>
@@ -316,7 +349,7 @@ const QuenchingSection = ({
                             placeholder="Float"
                             value={row.quenchingDuration[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'quenchingDuration', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           />
                         </div>
                       </div>
@@ -328,7 +361,7 @@ const QuenchingSection = ({
                             placeholder="Integer"
                             value={row.quenchingHardness[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'quenchingHardness', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           />
                         </div>
                       </div>
@@ -338,7 +371,7 @@ const QuenchingSection = ({
                           <select
                             value={row.boxGauge[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'boxGauge', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           >
                             <option value="">Select</option>
                             <option value="OK">OK</option>
@@ -352,7 +385,7 @@ const QuenchingSection = ({
                           <select
                             value={row.flatBearingArea[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'flatBearingArea', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           >
                             <option value="">Select</option>
                             <option value="OK">OK</option>
@@ -366,7 +399,7 @@ const QuenchingSection = ({
                           <select
                             value={row.fallingGauge[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'fallingGauge', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           >
                             <option value="">Select</option>
                             <option value="OK">OK</option>
@@ -383,7 +416,7 @@ const QuenchingSection = ({
                         type="number"
                         value={row.rejectedQty || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -394,6 +427,7 @@ const QuenchingSection = ({
                         type="text"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>

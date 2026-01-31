@@ -12,7 +12,7 @@ import {
   loadFromLocalStorage
 } from '../services/processLocalStorageService';
 
-const ProcessCalibrationDocumentsPage = ({ call, onBack, selectedLines = [], onNavigateSubmodule, lineData, productionLines: propProductionLines = [], allCallOptions = [] }) => {
+const ProcessCalibrationDocumentsPage = ({ call, onBack, selectedLines = [], onNavigateSubmodule, lineData, productionLines: propProductionLines = [], allCallOptions = [], mapping = null }) => {
   // Get available lines from props or lineData (stabilized)
   const stableProductionLines = useMemo(() => {
     return (propProductionLines && propProductionLines.length > 0) ? propProductionLines : (lineData?.productionLines || []);
@@ -213,6 +213,7 @@ const ProcessCalibrationDocumentsPage = ({ call, onBack, selectedLines = [], onN
           selectedLines={availableLines}
           activeLine={activeLine}
           onChange={setActiveLine}
+          mapping={mapping}
         />
       )}
 

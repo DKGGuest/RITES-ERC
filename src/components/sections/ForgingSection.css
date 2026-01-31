@@ -257,3 +257,21 @@
   }
 }
 
+/* No-production visual state: highlight hour and mobile card */
+.no-production {
+  background-color: #f9cf99; /* light orange */
+  color: #7c2d12; /* darker orange/brown text */
+}
+
+.no-production td,
+.no-production .forging-td {
+  background-color: #f9cf99;
+  color: #7c2d12;
+}
+
+.forging-mobile-card.no-production {
+ background-color: #f9cf99;
+  color: #7c2d12;
+}
+
+

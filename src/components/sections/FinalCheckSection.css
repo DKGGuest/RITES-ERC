@@ -43,6 +43,17 @@
   overflow-x: auto;
 }
 
+/* No Production highlight */
+.final-check-table .no-production td,
+.final-check-table .no-production th,
+.final-check-mobile-card.no-production {
+  background-color: #f9cf99; /* light orange */
+}
+
+.final-check-table .no-production td {
+  color: #7a3e00;
+}
+
 .final-check-table {
   width: 100%;
   border-collapse: collapse;

@@ -7,6 +7,17 @@
   overflow: hidden;
 }
 
+/* No Production highlight */
+.turning-table .no-production td,
+.turning-table .no-production th,
+.turning-mobile-card.no-production {
+  background-color: #f9cf99; /* light orange */
+}
+
+.turning-table .no-production td {
+  color: #7a3e00;
+}
+
 .turning-section__header {
   display: flex;
   justify-content: space-between;

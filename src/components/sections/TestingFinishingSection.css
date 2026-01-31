@@ -229,3 +229,14 @@
   }
 }
 
+/* No Production highlight */
+.testing-finishing-table .no-production td,
+.testing-finishing-table .no-production th,
+.testing-finishing-mobile-card.no-production {
+  background-color: #f9cf99; /* light orange */
+}
+
+.testing-finishing-table .no-production td {
+  color: #7a3e00;
+}
+

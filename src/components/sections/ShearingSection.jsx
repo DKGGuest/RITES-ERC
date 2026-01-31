@@ -12,8 +12,36 @@ const ShearingSection = ({
 }) => {
   const [expanded] = useState(true);
 
+  const clearHour = (updated, idx) => {
+    const base = updated[idx] || {};
+    updated[idx] = {
+      ...base,
+      lotNo: '',
+      lengthCutBar: [],
+      qualityDia: [],
+      sharpEdges: [],
+      crackedEdges: [],
+      rejectedQty: [],
+      remarks: '',
+      noProduction: true
+    };
+  };
+
   const updateData = (index, field, value, sampleIndex = null) => {
     const updated = [...data];
+
+    // When marking No Production = true, clear the entire hour
+    if (field === 'noProduction') {
+      if (value === true) {
+        clearHour(updated, index);
+        onDataChange(updated);
+        return;
+      }
+      // If unchecking No Production, just set the flag to false
+      updated[index] = { ...(updated[index] || {}), noProduction: false };
+      onDataChange(updated);
+      return;
+    }
 
     // Handle array fields (lengthCutBar, qualityDia, sharpEdges, crackedEdges, rejectedQty)
     if (sampleIndex !== null) {
@@ -24,7 +52,7 @@ const ShearingSection = ({
       fieldArray[sampleIndex] = value;
       updated[index][field] = fieldArray;
     } else {
-      // Handle non-array fields (remarks, lotNo, noProduction)
+      // Handle non-array fields (remarks, lotNo)
       updated[index][field] = value;
     }
     onDataChange(updated);
@@ -57,7 +85,7 @@ const ShearingSection = ({
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={`${row.hour}-group`}>
                   {/* Header row for this hour block */}
-                  <tr className="shearing-header-row">
+                  <tr className={`shearing-header-row${row.noProduction ? ' no-production' : ''}`}>
                     <th className="shearing-th shearing-th--time">Time Range</th>
                     <th className="shearing-th shearing-th--checkbox">No Production</th>
                     <th className="shearing-th shearing-th--lot">Lot No.</th>
@@ -67,7 +95,7 @@ const ShearingSection = ({
                     <th className="shearing-th shearing-th--cracked">Cracked Edges</th>
                   </tr>
                   {/* Row 1: First sample */}
-                  <tr key={`${row.hour}-r1`} className="shearing-row">
+                  <tr key={`${row.hour}-r1`} className={`shearing-row${row.noProduction ? ' no-production' : ''}`}>
                     <td rowSpan="4" className="shearing-td shearing-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -99,7 +127,7 @@ const ShearingSection = ({
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[0] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -108,7 +136,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.qualityDia[0] || ''}
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -120,7 +148,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.sharpEdges[0] || ''}
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -132,7 +160,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.crackedEdges[0] || ''}
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -141,7 +169,8 @@ const ShearingSection = ({
                     </td>
                   </tr>
                   {/* Row 2: Second sample */}
-                  <tr key={`${row.hour}-r2`} className="shearing-row">
+                  
+                  <tr key={`${row.hour}-r2`} className={`shearing-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="shearing-td shearing-td--length-input">
                       <input
                         type="number"
@@ -149,7 +178,7 @@ const ShearingSection = ({
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[1] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -158,7 +187,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.qualityDia[1] || ''}
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -170,7 +199,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.sharpEdges[1] || ''}
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -182,7 +211,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.crackedEdges[1] || ''}
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -191,7 +220,7 @@ const ShearingSection = ({
                     </td>
                   </tr>
                   {/* Row 3: Third sample */}
-                  <tr key={`${row.hour}-r3`} className="shearing-row">
+                  <tr key={`${row.hour}-r3`} className={`shearing-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="shearing-td shearing-td--length-input">
                       <input
                         type="number"
@@ -199,7 +228,7 @@ const ShearingSection = ({
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[2] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -208,7 +237,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.qualityDia[2] || ''}
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -220,7 +249,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.sharpEdges[2] || ''}
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -232,7 +261,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.crackedEdges[2] || ''}
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -241,7 +270,7 @@ const ShearingSection = ({
                     </td>
                   </tr>
                   {/* Row 4: Rejected No. of ERC */}
-                  <tr key={`${row.hour}-r4`} className="shearing-row shearing-row--rejected">
+                  <tr key={`${row.hour}-r4`} className={`shearing-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="shearing-td shearing-td--rejected-label">
                       <span className="shearing-rejected-label">No. of ERC Rejected</span>
                     </td>
@@ -251,7 +280,7 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[0] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -260,7 +289,7 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -269,7 +298,7 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[2] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -278,12 +307,12 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[3] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 3)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
                   {/* Row 5: Remarks */}
-                  <tr key={`${row.hour}-r5`} className="shearing-row shearing-row--remarks">
+                  <tr key={`${row.hour}-r5`} className={`shearing-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="shearing-td shearing-td--remarks-label">
                       <span className="shearing-remarks-label">Remarks</span>
                     </td>
@@ -293,6 +322,7 @@ const ShearingSection = ({
                         className="form-control shearing-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>

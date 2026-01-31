@@ -23,6 +23,54 @@ const FinalCheckSection = ({
     }
     onDataChange(newData);
   };
+  
+  const clearHour = (updated, idx) => {
+    const base = updated[idx] || {};
+    updated[idx] = {
+      ...base,
+      lotNo: '',
+      boxGauge: [],
+      flatBearingArea: [],
+      fallingGauge: [],
+      surfaceDefect: [],
+      embossingDefect: [],
+      marking: [],
+      temperingHardness: [],
+      boxGaugeRejected: '',
+      flatBearingAreaRejected: '',
+      fallingGaugeRejected: '',
+      surfaceDefectRejected: '',
+      embossingDefectRejected: '',
+      markingRejected: '',
+      temperingHardnessRejected: '',
+      remarks: '',
+      noProduction: true
+    };
+  };
+
+  const wrappedUpdateData = (idx, field, value, sampleIndex = null) => {
+    const newData = [...data];
+    if (field === 'noProduction') {
+      if (value === true) {
+        clearHour(newData, idx);
+        onDataChange(newData);
+        return;
+      }
+      newData[idx] = { ...(newData[idx] || {}), noProduction: false };
+      onDataChange(newData);
+      return;
+    }
+
+    if (sampleIndex !== null) {
+      if (!Array.isArray(newData[idx][field])) newData[idx][field] = [];
+      const fieldArray = [...newData[idx][field]];
+      fieldArray[sampleIndex] = value;
+      newData[idx][field] = fieldArray;
+    } else {
+      newData[idx][field] = value;
+    }
+    onDataChange(newData);
+  };
 
   return (
     <div className="final-check-section">
@@ -62,7 +110,9 @@ const FinalCheckSection = ({
                     <th className="final-check-th final-check-th--tempering-hardness">Tempering Hardness</th>
                   </tr>
                   {/* Row 1: First sample */}
-                  <tr className="final-check-row">
+                  
+                  <tr className={`final-check-row${row.noProduction ? ' no-production' : ''}`}>
+  
                     <td rowSpan="4" className="final-check-td final-check-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -70,7 +120,7 @@ const FinalCheckSection = ({
                       <input
                         type="checkbox"
                         checked={row.noProduction}
-                        onChange={e => updateData(idx, 'noProduction', e.target.checked)}
+                        onChange={e => wrappedUpdateData(idx, 'noProduction', e.target.checked)}
                         className="final-check-checkbox"
                       />
                     </td>
@@ -78,7 +128,7 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.lotNo}
-                        onChange={e => updateData(idx, 'lotNo', e.target.value)}
+                        onChange={e => wrappedUpdateData(idx, 'lotNo', e.target.value)}
                         disabled={row.noProduction}
                       >
                         <option value="">Select Lot No.</option>
@@ -91,8 +141,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.boxGauge[0] || ''}
-                        onChange={e => updateData(idx, 'boxGauge', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'boxGauge', e.target.value, 0)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -103,8 +153,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.flatBearingArea[0] || ''}
-                        onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'flatBearingArea', e.target.value, 0)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -115,8 +165,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.fallingGauge[0] || ''}
-                        onChange={e => updateData(idx, 'fallingGauge', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'fallingGauge', e.target.value, 0)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -127,8 +177,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.surfaceDefect[0] || ''}
-                        onChange={e => updateData(idx, 'surfaceDefect', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'surfaceDefect', e.target.value, 0)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -139,8 +189,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.embossingDefect[0] || ''}
-                        onChange={e => updateData(idx, 'embossingDefect', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'embossingDefect', e.target.value, 0)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -151,8 +201,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.marking[0] || ''}
-                        onChange={e => updateData(idx, 'marking', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'marking', e.target.value, 0)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -165,19 +215,19 @@ const FinalCheckSection = ({
                         className="form-control final-check-input"
                         placeholder="Integer"
                         value={row.temperingHardness[0] || ''}
-                        onChange={e => updateData(idx, 'temperingHardness', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'temperingHardness', e.target.value, 0)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
                   {/* Row 2: Second sample */}
-                  <tr className="final-check-row">
+                  <tr className={`final-check-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="final-check-td final-check-td--box-gauge-input">
                       <select
                         className="form-control final-check-select"
                         value={row.boxGauge[1] || ''}
-                        onChange={e => updateData(idx, 'boxGauge', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'boxGauge', e.target.value, 1)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -188,8 +238,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.flatBearingArea[1] || ''}
-                        onChange={e => updateData(idx, 'flatBearingArea', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'flatBearingArea', e.target.value, 1)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -200,8 +250,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.fallingGauge[1] || ''}
-                        onChange={e => updateData(idx, 'fallingGauge', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'fallingGauge', e.target.value, 1)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -212,8 +262,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.surfaceDefect[1] || ''}
-                        onChange={e => updateData(idx, 'surfaceDefect', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'surfaceDefect', e.target.value, 1)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -224,8 +274,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.embossingDefect[1] || ''}
-                        onChange={e => updateData(idx, 'embossingDefect', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'embossingDefect', e.target.value, 1)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -236,8 +286,8 @@ const FinalCheckSection = ({
                       <select
                         className="form-control final-check-select"
                         value={row.marking[1] || ''}
-                        onChange={e => updateData(idx, 'marking', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'marking', e.target.value, 1)}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -250,13 +300,13 @@ const FinalCheckSection = ({
                         className="form-control final-check-input"
                         placeholder="Integer"
                         value={row.temperingHardness[1] || ''}
-                        onChange={e => updateData(idx, 'temperingHardness', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'temperingHardness', e.target.value, 1)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
                   {/* Row 3: Rejected No. - 7 separate inputs */}
-                  <tr className="final-check-row final-check-row--rejected">
+                  <tr className={`final-check-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="final-check-td final-check-td--lot">
                       <span className="final-check-rejected-label">Rejected No.</span>
                     </td>
@@ -266,8 +316,8 @@ const FinalCheckSection = ({
                         className="form-control final-check-input"
                         placeholder="0"
                         value={row.boxGaugeRejected || ''}
-                        onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        onChange={e => wrappedUpdateData(idx, 'boxGaugeRejected', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="final-check-td final-check-td--rejected-input">
@@ -332,7 +382,7 @@ const FinalCheckSection = ({
                     </td>
                   </tr>
                   {/* Row 4: Remarks */}
-                  <tr className="final-check-row final-check-row--remarks">
+                  <tr className={`final-check-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="final-check-td final-check-td--remarks-label">
                       <span className="final-check-remarks-label">Remarks</span>
                     </td>

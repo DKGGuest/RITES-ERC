@@ -118,7 +118,22 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // with the Issuance tab active (e.g. on browser refresh).
   useEffect(() => {
     if (activeTab === 'pending') {
-      fetchPendingData();
+      // Check if a caller requested a forced refresh (e.g., returned from a dashboard)
+      const forceRefresh = (() => {
+        try {
+          return sessionStorage.getItem('ie_landing_force_refresh') === '1';
+        } catch (e) {
+          return false;
+        }
+      })();
+
+      if (forceRefresh) {
+        // Remove the flag and force-fetch pending data
+        try { sessionStorage.removeItem('ie_landing_force_refresh'); } catch (e) { /* ignore */ }
+        fetchPendingData(true);
+      } else {
+        fetchPendingData();
+      }
     }
     // We depend on activeTab and fetchPendingData
   }, [activeTab, fetchPendingData]);

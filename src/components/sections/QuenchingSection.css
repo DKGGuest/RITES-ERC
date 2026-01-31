@@ -279,3 +279,14 @@
   }
 }
 
+/* No Production highlight */
+.quenching-table .no-production td,
+.quenching-table .no-production th,
+.quenching-mobile-card.no-production {
+  background-color: #f9cf99; /* light orange */
+}
+
+.quenching-table .no-production td {
+  color: #7a3e00;
+}
+

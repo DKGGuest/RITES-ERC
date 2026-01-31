@@ -22,9 +22,10 @@ import {
   saveGridDataForLine,
   loadGridDataForLine
 } from '../services/processLocalStorageService';
+import { isSessionEnded } from '../utils/inspectionSessionControl';
 import './ProcessParametersGridPage.css';
 
-const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selectedShift = 'A', selectedLines = [], onNavigateSubmodule, productionLines = [], allCallOptions = [], callInitiationDataCache = {} }) => {
+const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selectedShift = 'A', selectedLines = [], onNavigateSubmodule, productionLines = [], allCallOptions = [], callInitiationDataCache = {}, mapping = null }) => {
   const [activeLine, setActiveLine] = useState((selectedLines && selectedLines[0]) || 'Line-1');
 
   // Get line index for active line
@@ -83,14 +84,14 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     // Try multiple field names where ERC type might be stored
     // Priority order: production line data > call data > initiation data > call prop
     const ercType = currentProductionLine?.productType ||
-                    currentCallData?.productType ||
-                    currentCallData?.ercType ||
-                    currentLineInitiationData?.typeOfErc ||
-                    currentLineInitiationData?.ercType ||
-                    call?.erc_type ||
-                    call?.ercType ||
-                    call?.product_type ||
-                    '';
+      currentCallData?.productType ||
+      currentCallData?.ercType ||
+      currentLineInitiationData?.typeOfErc ||
+      currentLineInitiationData?.ercType ||
+      call?.erc_type ||
+      call?.ercType ||
+      call?.product_type ||
+      '';
 
     const ercTypeLower = String(ercType).toLowerCase().trim();
     console.log('🔍 [Turning Section] ERC Type found:', ercType, '| Normalized:', ercTypeLower);
@@ -98,9 +99,9 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     // Hide turning section ONLY for Mk-III (exact match, case-insensitive)
     // Match patterns: "mk-iii", "mk-3", "mkiii", "mk3" (but NOT "mk-v" or other variants)
     const isMkIII = ercTypeLower === 'mk-iii' ||
-                    ercTypeLower === 'mk-3' ||
-                    ercTypeLower === 'mkiii' ||
-                    ercTypeLower === 'mk3';
+      ercTypeLower === 'mk-3' ||
+      ercTypeLower === 'mkiii' ||
+      ercTypeLower === 'mk3';
 
     console.log('🔍 [Turning Section] Should hide turning section:', isMkIII);
     console.log('🔍 [Turning Section] Rendering TurningSection:', !isMkIII);
@@ -334,6 +335,12 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
    * Only saves if initial load is complete and data has been modified
    */
   const saveCurrentDataToLocalStorage = useCallback(() => {
+    // Check if session has ended (finish/shift complete/withhold)
+    if (isSessionEnded()) {
+      console.log('🛑 Session ended - blocking autosave');
+      return;
+    }
+
     if (!inspectionCallNo || !poNo) {
       console.log('Cannot save - missing inspectionCallNo or poNo:', { inspectionCallNo, poNo });
       return;
@@ -433,6 +440,12 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     };
 
     const saveOnUnmount = () => {
+      // Check if session has ended (finish/shift complete/withhold)
+      if (isSessionEnded()) {
+        console.log('🛑 Session ended - blocking unmount save');
+        return;
+      }
+
       // Save immediately on unmount without checks - always save if we have context
       const { inspectionCallNo: callNo, poNo: po, activeLine: line } = currentContextRef.current;
       if (callNo && po && line && hasDataBeenModified.current) {
@@ -716,7 +729,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
 
     // Save previous line's data before loading new line (only if data was modified)
     if (prevLineRef.current && prevPoNoRef.current &&
-        (prevLineRef.current !== activeLine || prevPoNoRef.current !== poNo)) {
+      (prevLineRef.current !== activeLine || prevPoNoRef.current !== poNo)) {
       console.log('Saving previous line data before loading new line:', prevLineRef.current);
       // Force save when switching lines (bypass the modification check)
       saveGridDataForLine(inspectionCallNo, prevPoNoRef.current, prevLineRef.current, currentDataRef.current);
@@ -930,7 +943,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
   // Helper to select rows to render: all 8 hours or only the current hour (per-section)
   const visibleRows = (arr, showAll) => (
     (showAll ? arr.map((row, idx) => ({ row, idx }))
-             : arr.map((row, idx) => ({ row, idx })).filter(({ idx }) => idx === currentHourIndex))
+      : arr.map((row, idx) => ({ row, idx })).filter(({ idx }) => idx === currentHourIndex))
   );
 
   // Wrapper functions to mark data as modified when user changes data
@@ -984,7 +997,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
 
       {/* 2. Line Toggle */}
       {selectedLines && selectedLines.length > 0 && (
-        <ProcessLineToggle selectedLines={selectedLines} activeLine={activeLine} onChange={setActiveLine} />
+        <ProcessLineToggle selectedLines={selectedLines} activeLine={activeLine} onChange={setActiveLine} mapping={mapping} />
       )}
 
       {/* 3. Heading with Inspection Call Number */}

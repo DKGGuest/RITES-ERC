@@ -228,3 +228,14 @@
   }
 }
 
+
+/* No Production highlight */
+.tempering-table .no-production td,
+.tempering-table .no-production th,
+.tempering-mobile-card.no-production {
+  background-color: #f9cf99; /* light orange */
+}
+
+.tempering-table .no-production td {
+  color: #7a3e00;
+}

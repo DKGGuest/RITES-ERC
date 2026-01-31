@@ -16,7 +16,9 @@ export const ProcessDashboardWrapper = () => {
   const { selectedCall, selectedCalls, processProductionLines, setLandingActiveTab } = useInspection();
 
   const handleBack = () => {
+    // Ensure landing page shows Pending tab and forces a refresh of pending calls
     setLandingActiveTab('pending');
+    try { sessionStorage.setItem('ie_landing_force_refresh', '1'); } catch (e) { /* ignore */ }
     navigate(ROUTES.LANDING);
   };
 
@@ -96,6 +98,7 @@ export const ProcessCalibrationWrapper = () => {
       lineData={lineData}
       productionLines={productionLines}
       allCallOptions={allCallOptions}
+      mapping={lineData?.mapping}
     />
   );
 };
@@ -136,6 +139,7 @@ export const ProcessStaticCheckWrapper = () => {
       lineData={lineData}
       productionLines={productionLines}
       allCallOptions={allCallOptions}
+      mapping={lineData?.mapping}
     />
   );
 };
@@ -176,6 +180,7 @@ export const ProcessOilTankWrapper = () => {
       lineData={lineData}
       productionLines={productionLines}
       allCallOptions={allCallOptions}
+      mapping={lineData?.mapping}
     />
   );
 };
@@ -223,6 +228,7 @@ export const ProcessParametersWrapper = () => {
       productionLines={productionLines}
       allCallOptions={allCallOptions}
       callInitiationDataCache={callInitiationDataCache}
+      mapping={lineData?.mapping}
     />
   );
 };
@@ -263,6 +269,7 @@ export const ProcessSummaryWrapper = () => {
       lineData={lineData}
       productionLines={productionLines}
       allCallOptions={allCallOptions}
+      mapping={lineData?.mapping}
     />
   );
 };

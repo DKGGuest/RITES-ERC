@@ -12,8 +12,31 @@ const TestingFinishingSection = ({
 }) => {
   const [expanded] = useState(true);
 
+  const clearHour = (newData, idx) => {
+    newData[idx] = {
+      ...newData[idx],
+      lotNo: '',
+      toeLoad: ['', ''],
+      weight: ['', ''],
+      paintIdentification: ['', ''],
+      ercCoating: ['', ''],
+      toeLoadRejected: '',
+      weightRejected: '',
+      paintIdentificationRejected: '',
+      ercCoatingRejected: '',
+      remarks: ''
+    };
+  };
+
   const updateData = (idx, field, value, sampleIndex = null) => {
     const newData = [...data];
+    if (field === 'noProduction') {
+      newData[idx].noProduction = !!value;
+      if (value) clearHour(newData, idx);
+      onDataChange(newData);
+      return;
+    }
+
     if (sampleIndex !== null && Array.isArray(newData[idx][field])) {
       const fieldArray = [...newData[idx][field]];
       fieldArray[sampleIndex] = value;
@@ -43,13 +66,11 @@ const TestingFinishingSection = ({
 
       {expanded && (
         <div className="testing-finishing-table-wrapper">
-          {/* Desktop Table Layout */}
           <table className="testing-finishing-table">
             <tbody>
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={row.hour}>
-                  {/* Header row for this hour block */}
-                  <tr className="testing-finishing-header-row">
+                  <tr className={`testing-finishing-header-row ${row.noProduction ? 'no-production' : ''}`}>
                     <th className="testing-finishing-th testing-finishing-th--time">Time Range</th>
                     <th className="testing-finishing-th testing-finishing-th--checkbox">No Production</th>
                     <th className="testing-finishing-th testing-finishing-th--lot">Lot No.</th>
@@ -58,8 +79,8 @@ const TestingFinishingSection = ({
                     <th className="testing-finishing-th testing-finishing-th--paint">Paint Identification</th>
                     <th className="testing-finishing-th testing-finishing-th--erc-coating">ERC Coating (Linseed Oil)</th>
                   </tr>
-                  {/* Row 1: First sample */}
-                  <tr className="testing-finishing-row">
+
+                  <tr className={`testing-finishing-row ${row.noProduction ? 'no-production' : ''}`}>
                     <td rowSpan="4" className="testing-finishing-td testing-finishing-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -84,6 +105,7 @@ const TestingFinishingSection = ({
                         ))}
                       </select>
                     </td>
+
                     <td className="testing-finishing-td testing-finishing-td--toe-load-input">
                       <input
                         type="number"
@@ -92,9 +114,10 @@ const TestingFinishingSection = ({
                         placeholder="Float"
                         value={row.toeLoad[0] || ''}
                         onChange={e => updateData(idx, 'toeLoad', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
+
                     <td className="testing-finishing-td testing-finishing-td--weight-input">
                       <input
                         type="number"
@@ -103,27 +126,29 @@ const TestingFinishingSection = ({
                         placeholder="Float"
                         value={row.weight[0] || ''}
                         onChange={e => updateData(idx, 'weight', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
+
                     <td className="testing-finishing-td testing-finishing-td--paint-input">
                       <select
                         className="form-control testing-finishing-select"
                         value={row.paintIdentification[0] || ''}
                         onChange={e => updateData(idx, 'paintIdentification', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="not ok">not ok</option>
                       </select>
                     </td>
+
                     <td className="testing-finishing-td testing-finishing-td--erc-coating-input">
                       <select
                         className="form-control testing-finishing-select"
                         value={row.ercCoating[0] || ''}
                         onChange={e => updateData(idx, 'ercCoating', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -131,8 +156,8 @@ const TestingFinishingSection = ({
                       </select>
                     </td>
                   </tr>
-                  {/* Row 2: Second sample */}
-                  <tr className="testing-finishing-row">
+
+                  <tr className={`testing-finishing-row ${row.noProduction ? 'no-production' : ''}`}>
                     <td className="testing-finishing-td testing-finishing-td--toe-load-input">
                       <input
                         type="number"
@@ -141,9 +166,10 @@ const TestingFinishingSection = ({
                         placeholder="Float"
                         value={row.toeLoad[1] || ''}
                         onChange={e => updateData(idx, 'toeLoad', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
+
                     <td className="testing-finishing-td testing-finishing-td--weight-input">
                       <input
                         type="number"
@@ -152,27 +178,29 @@ const TestingFinishingSection = ({
                         placeholder="Float"
                         value={row.weight[1] || ''}
                         onChange={e => updateData(idx, 'weight', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
+
                     <td className="testing-finishing-td testing-finishing-td--paint-input">
                       <select
                         className="form-control testing-finishing-select"
                         value={row.paintIdentification[1] || ''}
                         onChange={e => updateData(idx, 'paintIdentification', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
                         <option value="not ok">not ok</option>
                       </select>
                     </td>
+
                     <td className="testing-finishing-td testing-finishing-td--erc-coating-input">
                       <select
                         className="form-control testing-finishing-select"
                         value={row.ercCoating[1] || ''}
                         onChange={e => updateData(idx, 'ercCoating', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -180,26 +208,26 @@ const TestingFinishingSection = ({
                       </select>
                     </td>
                   </tr>
-                  {/* Row 3: Rejected No. - 4 separate inputs */}
-                  <tr className="testing-finishing-row testing-finishing-row--rejected">
+
+                  <tr className={`testing-finishing-row testing-finishing-row--rejected ${row.noProduction ? 'no-production' : ''}`}>
                     <td className="testing-finishing-td testing-finishing-td--rejected-label">
                       <span className="testing-finishing-rejected-label">Rejected No.</span>
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.toeLoadRejected || ''} onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)} />
+                      <input type="number" value={row.toeLoadRejected || ''} onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.weightRejected || ''} onChange={e => updateData(idx, 'weightRejected', e.target.value)} />
+                      <input type="number" value={row.weightRejected || ''} onChange={e => updateData(idx, 'weightRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.paintIdentificationRejected || ''} onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)} />
+                      <input type="number" value={row.paintIdentificationRejected || ''} onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.ercCoatingRejected || ''} onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)} />
+                      <input type="number" value={row.ercCoatingRejected || ''} onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </td>
                   </tr>
-                  {/* Row 5: Remarks */}
-                  <tr className="testing-finishing-row testing-finishing-row--remarks">
+
+                  <tr className={`testing-finishing-row testing-finishing-row--remarks ${row.noProduction ? 'no-production' : ''}`}>
                     <td className="testing-finishing-td testing-finishing-td--remarks-label">
                       <span className="testing-finishing-remarks-label">Remarks</span>
                     </td>
@@ -209,6 +237,7 @@ const TestingFinishingSection = ({
                         className="form-control testing-finishing-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
@@ -220,7 +249,7 @@ const TestingFinishingSection = ({
           {/* Mobile Card Layout */}
           <div className="testing-finishing-mobile-cards">
             {visibleRows(data, showAll).map(({ row, idx }) => (
-              <div key={row.hour} className="testing-finishing-mobile-card">
+              <div key={row.hour} className={`testing-finishing-mobile-card ${row.noProduction ? 'no-production' : ''}`}>
                 <div className="testing-finishing-mobile-card__header">
                   <span className="testing-finishing-mobile-card__time">{hourLabels[idx]}</span>
                   <label className="testing-finishing-mobile-checkbox-label">
@@ -249,6 +278,7 @@ const TestingFinishingSection = ({
                       </select>
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Toe Load</span>
                     <div className="testing-finishing-mobile-field__value testing-finishing-mobile-field__value--multi">
@@ -260,11 +290,12 @@ const TestingFinishingSection = ({
                           placeholder={`S${sampleIdx + 1}`}
                           value={row.toeLoad[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'toeLoad', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       ))}
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Weight</span>
                     <div className="testing-finishing-mobile-field__value testing-finishing-mobile-field__value--multi">
@@ -276,11 +307,12 @@ const TestingFinishingSection = ({
                           placeholder={`S${sampleIdx + 1}`}
                           value={row.weight[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'weight', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       ))}
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Paint Identification</span>
                     <div className="testing-finishing-mobile-field__value testing-finishing-mobile-field__value--multi">
@@ -289,7 +321,7 @@ const TestingFinishingSection = ({
                           key={sampleIdx}
                           value={row.paintIdentification[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'paintIdentification', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -298,6 +330,7 @@ const TestingFinishingSection = ({
                       ))}
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">ERC Coating (Linseed Oil)</span>
                     <div className="testing-finishing-mobile-field__value testing-finishing-mobile-field__value--multi">
@@ -306,7 +339,7 @@ const TestingFinishingSection = ({
                           key={sampleIdx}
                           value={row.ercCoating[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'ercCoating', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -315,6 +348,7 @@ const TestingFinishingSection = ({
                       ))}
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Rejected No. (Toe Load)</span>
                     <div className="testing-finishing-mobile-field__value">
@@ -322,9 +356,11 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.toeLoadRejected || ''}
                         onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Rejected No. (Weight)</span>
                     <div className="testing-finishing-mobile-field__value">
@@ -332,9 +368,11 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.weightRejected || ''}
                         onChange={e => updateData(idx, 'weightRejected', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Rejected No. (Paint ID)</span>
                     <div className="testing-finishing-mobile-field__value">
@@ -342,9 +380,11 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.paintIdentificationRejected || ''}
                         onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Rejected No. (ERC Coating)</span>
                     <div className="testing-finishing-mobile-field__value">
@@ -352,9 +392,11 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.ercCoatingRejected || ''}
                         onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
+
                   <div className="testing-finishing-mobile-field">
                     <span className="testing-finishing-mobile-field__label">Remarks</span>
                     <div className="testing-finishing-mobile-field__value">
@@ -362,6 +404,7 @@ const TestingFinishingSection = ({
                         type="text"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>

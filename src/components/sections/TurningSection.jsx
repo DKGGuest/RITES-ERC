@@ -12,9 +12,35 @@ const TurningSection = ({
 }) => {
   const [expanded] = useState(true);
 
+  const clearHour = (updated, idx) => {
+    const base = updated[idx] || {};
+    updated[idx] = {
+      ...base,
+      lotNo: '',
+      parallelLength: [],
+      fullTurningLength: [],
+      turningDia: [],
+      remarks: '',
+      noProduction: true
+    };
+  };
+
   const updateData = (idx, field, value, sampleIdx = null) => {
     const newData = [...data];
-    if (sampleIdx !== null && Array.isArray(newData[idx][field])) {
+
+    if (field === 'noProduction') {
+      if (value === true) {
+        clearHour(newData, idx);
+        onDataChange(newData);
+        return;
+      }
+      newData[idx] = { ...(newData[idx] || {}), noProduction: false };
+      onDataChange(newData);
+      return;
+    }
+
+    if (sampleIdx !== null) {
+      if (!Array.isArray(newData[idx][field])) newData[idx][field] = [];
       const arr = [...newData[idx][field]];
       arr[sampleIdx] = value;
       newData[idx][field] = arr;
@@ -49,7 +75,7 @@ const TurningSection = ({
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={`${row.hour}-group`}>
                   {/* Header row for this hour block */}
-                  <tr className="turning-header-row">
+                  <tr className={`turning-header-row${row.noProduction ? ' no-production' : ''}`}>
                     <th className="turning-th turning-th--time">Time Range</th>
                     <th className="turning-th turning-th--checkbox">No Production</th>
                     <th className="turning-th turning-th--lot">Lot No.</th>
@@ -58,7 +84,7 @@ const TurningSection = ({
                     <th className="turning-th turning-th--dia">Turning Dia</th>
                   </tr>
                   {/* Row 1: First sample */}
-                  <tr className="turning-row">
+                  <tr className={`turning-row${row.noProduction ? ' no-production' : ''}`}>
                     <td rowSpan="4" className="turning-td turning-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -90,7 +116,7 @@ const TurningSection = ({
                         className="form-control turning-parallel-input"
                         value={row.parallelLength[0] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -101,7 +127,7 @@ const TurningSection = ({
                         className="form-control turning-full-input"
                         value={row.fullTurningLength[0] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -112,7 +138,7 @@ const TurningSection = ({
                         className="form-control turning-dia-input"
                         value={row.turningDia[0] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>

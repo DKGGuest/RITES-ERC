@@ -5,7 +5,8 @@ import React from 'react';
 // - selectedLines: string[] like ["Line-1", "Line-2"]
 // - activeLine: string
 // - onChange: (line: string) => void
-const ProcessLineToggle = ({ selectedLines = [], activeLine, onChange }) => {
+// - mapping: object mapping internal IDs to display labels
+const ProcessLineToggle = ({ selectedLines = [], activeLine, onChange, mapping = null }) => {
   if (!selectedLines || selectedLines.length === 0) return null;
   return (
     <div
@@ -40,7 +41,7 @@ const ProcessLineToggle = ({ selectedLines = [], activeLine, onChange }) => {
           }}
           aria-pressed={activeLine === line}
         >
-          {line}
+          {mapping && mapping[line] ? mapping[line].displayLabel : line}
         </button>
       ))}
     </div>

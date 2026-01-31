@@ -228,8 +228,8 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
           productType: productType,
           sectionCVerified: data?.sectionCVerified,
           reason: !data?.sectionAVerified ? 'Section A not verified' :
-                  !data?.sectionBVerified ? 'Section B not verified' :
-                  (isSectionCRequired && !data?.sectionCVerified) ? 'Section C required but not verified' : 'Unknown'
+            !data?.sectionBVerified ? 'Section B not verified' :
+              (isSectionCRequired && !data?.sectionCVerified) ? 'Section C required but not verified' : 'Unknown'
         });
       } else {
         console.log(`✅ [MultiTab] Call ${call.call_no} validation PASSED`);
@@ -376,10 +376,9 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
             resultMessage += `• ${failed.callNo}: ${failed.error}\n`;
           });
           console.warn('⚠️ Partial failure:', failedCalls);
-          alert(resultMessage);
+          console.log(resultMessage);
         } else {
-          console.log('✅ All calls initiated successfully');
-          alert(resultMessage);
+          console.log('✅ All calls initiated successfully:', resultMessage);
         }
 
         handleCloseInitiateModal();
@@ -432,7 +431,7 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
         {calls.map((call, index) => {
           const isValid = formDataByCall[call.id].shiftOfInspection &&
             (formDataByCall[call.id].offeredQty === call.call_qty ||
-             (formDataByCall[call.id].offeredQty > call.call_qty && formDataByCall[call.id].cmApproval));
+              (formDataByCall[call.id].offeredQty > call.call_qty && formDataByCall[call.id].cmApproval));
 
           return (
             <div

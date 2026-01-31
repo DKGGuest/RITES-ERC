@@ -12,8 +12,31 @@ const MpiSection = ({
 }) => {
   const [expanded] = useState(true);
 
+  const clearHour = (updated, idx) => {
+    const base = updated[idx] || {};
+    updated[idx] = {
+      ...base,
+      lotNo: '',
+      testResults: [],
+      rejectedQty: '',
+      remarks: '',
+      noProduction: true
+    };
+  };
+
   const updateData = (idx, field, value, arrayIndex = null) => {
     const newData = [...data];
+    if (field === 'noProduction') {
+      if (value === true) {
+        clearHour(newData, idx);
+        onDataChange(newData);
+        return;
+      }
+      newData[idx] = { ...(newData[idx] || {}), noProduction: false };
+      onDataChange(newData);
+      return;
+    }
+
     if (arrayIndex !== null) {
       const arr = [...(newData[idx][field] || [])];
       arr[arrayIndex] = value;
@@ -49,14 +72,14 @@ const MpiSection = ({
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={`${row.hour}-group`}>
                   {/* Header row for this hour block */}
-                  <tr className="mpi-header-row">
+                  <tr className={`mpi-header-row${row.noProduction ? ' no-production' : ''}`}>
                     <th className="mpi-th mpi-th--time">Time Range</th>
                     <th className="mpi-th mpi-th--checkbox">No Production</th>
                     <th className="mpi-th mpi-th--lot">Lot No.</th>
                     <th className="mpi-th mpi-th--results">MPI Results</th>
                   </tr>
                   {/* Row 1: First sample */}
-                  <tr key={`${row.hour}-r1`} className="mpi-row">
+                  <tr key={`${row.hour}-r1`} className={`mpi-row${row.noProduction ? ' no-production' : ''}`}>
                     <td rowSpan="4" className="mpi-td mpi-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -86,7 +109,7 @@ const MpiSection = ({
                         className="form-control mpi-results-select"
                         value={row.testResults[0] || ''}
                         onChange={e => updateData(idx, 'testResults', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -95,13 +118,13 @@ const MpiSection = ({
                     </td>
                   </tr>
                   {/* Row 2: Second sample */}
-                  <tr key={`${row.hour}-r2`} className="mpi-row">
+                  <tr key={`${row.hour}-r2`} className={`mpi-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="mpi-td mpi-td--results-input">
                       <select
                         className="form-control mpi-results-select"
                         value={row.testResults[1] || ''}
                         onChange={e => updateData(idx, 'testResults', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -110,13 +133,13 @@ const MpiSection = ({
                     </td>
                   </tr>
                   {/* Row 3: Third sample */}
-                  <tr key={`${row.hour}-r3`} className="mpi-row">
+                  <tr key={`${row.hour}-r3`} className={`mpi-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="mpi-td mpi-td--results-input">
                       <select
                         className="form-control mpi-results-select"
                         value={row.testResults[2] || ''}
                         onChange={e => updateData(idx, 'testResults', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -125,7 +148,7 @@ const MpiSection = ({
                     </td>
                   </tr>
                   {/* Row 4: Rejected No. */}
-                  <tr key={`${row.hour}-r4`} className="mpi-row mpi-row--rejected">
+                  <tr key={`${row.hour}-r4`} className={`mpi-row mpi-row--rejected${row.noProduction ? ' no-production' : ''}`}>
                     <td className="mpi-td mpi-td--rejected-label">
                       <span className="mpi-rejected-label">Rejected No.</span>
                     </td>
@@ -135,12 +158,12 @@ const MpiSection = ({
                         className="form-control mpi-input mpi-input--rejected"
                         value={row.rejectedQty || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
                   {/* Row 5: Remarks */}
-                  <tr key={`${row.hour}-r5`} className="mpi-row mpi-row--remarks">
+                  <tr key={`${row.hour}-r5`} className={`mpi-row mpi-row--remarks${row.noProduction ? ' no-production' : ''}`}>
                     <td className="mpi-td mpi-td--remarks-label">
                       <span className="mpi-remarks-label">Remarks</span>
                     </td>
@@ -150,6 +173,7 @@ const MpiSection = ({
                         className="form-control mpi-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>

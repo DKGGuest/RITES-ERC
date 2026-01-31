@@ -12,9 +12,36 @@ const ForgingSection = ({
 }) => {
   const [expanded] = useState(true);
 
+  const clearHour = (updated, idx) => {
+    const base = updated[idx] || {};
+    updated[idx] = {
+      ...base,
+      lotNo: '',
+      forgingTemperature: [],
+      forgingStabilisation: [],
+      improperForging: [],
+      forgingDefect: [],
+      embossingDefect: [],
+      remarks: '',
+      noProduction: true
+    };
+  };
+
   const updateData = (idx, field, value, sampleIdx = null) => {
     const newData = [...data];
-    if (sampleIdx !== null && Array.isArray(newData[idx][field])) {
+    if (field === 'noProduction') {
+      if (value === true) {
+        clearHour(newData, idx);
+        onDataChange(newData);
+        return;
+      }
+      newData[idx] = { ...(newData[idx] || {}), noProduction: false };
+      onDataChange(newData);
+      return;
+    }
+
+    if (sampleIdx !== null) {
+      if (!Array.isArray(newData[idx][field])) newData[idx][field] = [];
       const arr = [...newData[idx][field]];
       arr[sampleIdx] = value;
       newData[idx][field] = arr;
@@ -49,7 +76,7 @@ const ForgingSection = ({
               {visibleRows(data, showAll).map(({ row, idx }) => (
                 <React.Fragment key={`${row.hour}-group`}>
                   {/* Header row for this hour block */}
-                  <tr className="forging-header-row">
+                  <tr className={`forging-header-row${row.noProduction ? ' no-production' : ''}`}>
                     <th className="forging-th forging-th--time">Time Range</th>
                     <th className="forging-th forging-th--checkbox">No Production</th>
                     <th className="forging-th forging-th--lot">Lot No.</th>
@@ -60,7 +87,7 @@ const ForgingSection = ({
                     <th className="forging-th forging-th--embossing">Embossing Defect</th>
                   </tr>
                   {/* Row 1: First sample */}
-                  <tr key={`${row.hour}-r1`} className="forging-row">
+                  <tr key={`${row.hour}-r1`} className={`forging-row${row.noProduction ? ' no-production' : ''}`}>
                     <td rowSpan="3" className="forging-td forging-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -92,7 +119,7 @@ const ForgingSection = ({
                         placeholder="Float"
                         value={row.forgingTemperature[0] || ''}
                         onChange={e => updateData(idx, 'forgingTemperature', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="forging-td forging-td--stabilisation-input">
@@ -100,7 +127,7 @@ const ForgingSection = ({
                         className="form-control forging-select"
                         value={row.forgingStabilisation[0] || ''}
                         onChange={e => updateData(idx, 'forgingStabilisation', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -112,7 +139,7 @@ const ForgingSection = ({
                         className="form-control forging-select"
                         value={row.improperForging[0] || ''}
                         onChange={e => updateData(idx, 'improperForging', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -124,7 +151,7 @@ const ForgingSection = ({
                         className="form-control forging-select"
                         value={row.forgingDefect[0] || ''}
                         onChange={e => updateData(idx, 'forgingDefect', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -136,7 +163,7 @@ const ForgingSection = ({
                         className="form-control forging-select"
                         value={row.embossingDefect[0] || ''}
                         onChange={e => updateData(idx, 'embossingDefect', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -145,7 +172,7 @@ const ForgingSection = ({
                     </td>
                   </tr>
                   {/* Row 2: Second sample */}
-                  <tr key={`${row.hour}-r2`} className="forging-row">
+                  <tr key={`${row.hour}-r2`} className={`forging-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="forging-td forging-td--temp-input">
                       <input
                         type="number"
@@ -206,7 +233,7 @@ const ForgingSection = ({
                     </td>
                   </tr>
                   {/* Row 3: Rejected No. for Forging Defects - 5 separate inputs */}
-                  <tr key={`${row.hour}-r3`} className="forging-row forging-row--rejected">
+                  <tr key={`${row.hour}-r3`}className={`forging-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="forging-td forging-td--rejected-label">
                       <span className="forging-rejected-label">Rejected No. for Forging Defects</span>
                     </td>
@@ -227,7 +254,8 @@ const ForgingSection = ({
                     </td>
                   </tr>
                   {/* Row 4: Remarks */}
-                  <tr key={`${row.hour}-r4`} className="forging-row forging-row--remarks">
+                  
+                  <tr key={`${row.hour}-r4`} className={`forging-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="forging-td forging-td--remarks-label">
                       <span className="forging-remarks-label">Remarks</span>
                     </td>

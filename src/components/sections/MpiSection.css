@@ -191,3 +191,14 @@
     font-size: 1rem;
   }
 }
+
+/* No Production highlight */
+.mpi-table .no-production td,
+.mpi-table .no-production th,
+.mpi-mobile-card.no-production {
+  background-color: #f9cf99; /* light orange */
+}
+
+.mpi-table .no-production td {
+  color: #7a3e00;
+}
