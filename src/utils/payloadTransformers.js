@@ -11,12 +11,6 @@ const parseNumber = (val) => {
     return isNaN(num) ? null : num;
 };
 
-const parseBoolean = (val) => {
-    // Frontend might send "YES"/"NO", true/false, or "true"/"false"
-    if (val === true || val === 'true' || val === 'YES' || val === 'Yes') return true;
-    if (val === false || val === 'false' || val === 'NO' || val === 'No') return false;
-    return null;
-};
 
 const parseString = (val) => {
     if (val === '' || val === null || val === undefined) return null;
