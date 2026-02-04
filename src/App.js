@@ -49,6 +49,7 @@ import {
 import { CMDashboardWrapper } from './pages/wrappers/CMWrappers';
 import { CallDeskDashboardWrapper } from './pages/wrappers/CallDeskWrapper';
 import { FinanceDashboardWrapper } from './pages/wrappers/FinanceWrapper';
+import { RailwayBoardDashboardWrapper } from './pages/wrappers/RailwayBoardWrapper';
 
 /**
  * Role-based redirect component
@@ -184,6 +185,9 @@ const App = () => {
 
             {/* Finance Routes */}
             <Route path={ROUTES.FINANCE} element={<FinanceDashboardWrapper />} />
+
+            {/* Railway Board Routes */}
+            <Route path={ROUTES.RAILWAY_BOARD_DASHBOARD} element={<RailwayBoardDashboardWrapper />} />
           </Route>
 
           {/* Catch-all redirect - role-based */}

@@ -60,6 +60,9 @@ export const ROUTES = {
 
   // Finance Routes
   FINANCE: '/finance',
+
+  // Railway Board Routes
+  RAILWAY_BOARD_DASHBOARD: '/railway-board',
 };
 
 /**
@@ -140,9 +143,10 @@ export const FINAL_PRODUCT_SUBMODULE_ROUTES = {
 
 export const ROLE_LANDING_ROUTE = {
   IE: ROUTES.LANDING,
-'Process IE': ROUTES.LANDING,   
+  'Process IE': ROUTES.LANDING,
   CM: ROUTES.CM_DASHBOARD,
   CALL_DESK: ROUTES.CALL_DESK,
-  'RIO Help Desk': ROUTES.CALL_DESK, 
+  'RIO Help Desk': ROUTES.CALL_DESK,
   Finance: ROUTES.FINANCE,
+  RAILWAY_BOARD: ROUTES.RAILWAY_BOARD_DASHBOARD,
 };

@@ -35,6 +35,15 @@ const HARDCODED_USERS = {
       roleName: 'Finance',
       token: 'finance-mock-token-' + Date.now()
     }
+  },
+  'Railwayboard': {
+    password: 'password',
+    userData: {
+      userId: 'Railwayboard',
+      userName: 'Railway Board Member',
+      roleName: 'RAILWAY_BOARD',
+      token: 'railwayboard-mock-token-' + Date.now()
+    }
   }
 };
 

@@ -81,18 +81,22 @@ const AppLayout = () => {
   const isActivePage = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   const isCallDeskRoute = location.pathname.startsWith(ROUTES.CALL_DESK);
+  const isRailwayBoardRoute = location.pathname.startsWith(ROUTES.RAILWAY_BOARD_DASHBOARD);
+
+  // Determine if sidebar should be hidden
+  const shouldHideSidebar = isCallDeskRoute || isRailwayBoardRoute;
 
   return (
     <div>
       <header className="app-header">
         <div className="header-left">
           <div className="brand-block">
-          <img
-            src="/sarthi-logo1.png"
-            alt="SARTHI Logo"
-            className="brand-logo"
-          />
-        </div>         
+            <img
+              src="/sarthi-logo1.png"
+              alt="SARTHI Logo"
+              className="brand-logo"
+            />
+          </div>
           {/* <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
             {currentUser?.roleName === 'CM' ? 'Controlling Manager Dashboard' :
              currentUser?.roleName === 'CALL_DESK' ? 'Call Desk Dashboard' :
@@ -108,7 +112,7 @@ const AppLayout = () => {
           </div>
         </div>
         <div className="header-right">
-          {!isCallDeskRoute && (
+          {!shouldHideSidebar && (
             <button
               className="btn btn-sm btn-outline hamburger-btn"
               onClick={() => setIsSidebarOpen(open => !open)}
@@ -137,101 +141,101 @@ const AppLayout = () => {
       </header>
 
       <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        {!isCallDeskRoute && (
+        {!shouldHideSidebar && (
           <aside className={`sidebar ${isSidebarOpen ? 'open' : ''} ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-          <button
-            className="sidebar-toggle-btn"
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {isSidebarCollapsed ? '»' : '«'}
-          </button>
-          <nav>
-            <ul className="sidebar-nav">
-              {/* Landing Page - Only show for IE users (not CM, CALL_DESK, or Finance) */}
-              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (
-                <li
-                  className={`sidebar-item ${isActivePage(ROUTES.LANDING) ? 'active' : ''}`}
-                  onClick={handleNavigateToLanding}
-                  title="Landing Page"
-                >
-                  <span className="sidebar-icon">🏠</span>
-                  <span className="sidebar-text">Landing Page</span>
-                </li>
-              )}
-              {/* Inspection modules - Only show for IE users (not CM, CALL_DESK, or Finance) */}
-              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (activeInspectionType === 'raw-material' || activeInspectionType === null) && (
-                <li
-                  className={`sidebar-item ${isActivePage(ROUTES.RAW_MATERIAL) ? 'active' : ''}`}
-                  onClick={handleNavigateToRawMaterial}
-                  style={{ opacity: activeInspectionType === 'raw-material' ? 1 : 0.5, cursor: activeInspectionType === 'raw-material' ? 'pointer' : 'not-allowed' }}
-                  title="Raw Material Inspection"
-                >
-                  <span className="sidebar-icon">📦</span>
-                  <span className="sidebar-text">Raw Material Inspection</span>
-                </li>
-              )}
-              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (activeInspectionType === 'process' || activeInspectionType === null) && (
-                <li
-                  className={`sidebar-item ${isActivePage(ROUTES.PROCESS) ? 'active' : ''}`}
-                  onClick={handleNavigateToProcess}
-                  style={{ opacity: activeInspectionType === 'process' ? 1 : 0.5, cursor: activeInspectionType === 'process' ? 'pointer' : 'not-allowed' }}
-                  title="Process Inspection"
-                >
-                  <span className="sidebar-icon">⚙️</span>
-                  <span className="sidebar-text">Process Inspection</span>
-                </li>
-              )}
-              {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (activeInspectionType === 'final-product' || activeInspectionType === null) && (
-                <li
-                  className={`sidebar-item ${isActivePage(ROUTES.FINAL_PRODUCT) ? 'active' : ''}`}
-                  onClick={handleNavigateToFinalProduct}
-                  style={{ opacity: activeInspectionType === 'final-product' ? 1 : 0.5, cursor: activeInspectionType === 'final-product' ? 'pointer' : 'not-allowed' }}
-                  title="Final Product Inspection"
-                >
-                  <span className="sidebar-icon">✅</span>
-                  <span className="sidebar-text">Final Product Inspection</span>
-                </li>
-              )}
-              {/* CM Dashboard - Only show for CM role */}
-              {currentUser?.roleName === 'CM' && (
-                <li
-                  className={`sidebar-item ${isActivePage(ROUTES.CM_DASHBOARD) ? 'active' : ''}`}
-                  onClick={handleNavigateToCMDashboard}
-                  title="CM Dashboard"
-                >
-                  <span className="sidebar-icon">👔</span>
-                  <span className="sidebar-text">CM Dashboard</span>
-                </li>
-              )}
-              {/* Call Desk - Only show for CALL_DESK role */}
-              {currentUser?.roleName === 'CALL_DESK' && (
-                <li
-                  className={`sidebar-item ${isActivePage(ROUTES.CALL_DESK) ? 'active' : ''}`}
-                  onClick={handleNavigateToCallDesk}
-                  title="Call Desk"
-                >
-                  <span className="sidebar-icon">📞</span>
-                  <span className="sidebar-text">Call Desk</span>
-                </li>
-              )}
-              {/* Finance Dashboard - Only show for Finance role */}
-              {currentUser?.roleName === 'Finance' && (
-                <li
-                  className={`sidebar-item ${isActivePage(ROUTES.FINANCE) ? 'active' : ''}`}
-                  onClick={handleNavigateToFinance}
-                  title="Finance Dashboard"
-                >
-                  <span className="sidebar-icon">💰</span>
-                  <span className="sidebar-text">Finance Dashboard</span>
-                </li>
-              )}
-            </ul>
-          </nav>
+            <button
+              className="sidebar-toggle-btn"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {isSidebarCollapsed ? '»' : '«'}
+            </button>
+            <nav>
+              <ul className="sidebar-nav">
+                {/* Landing Page - Only show for IE users (not CM, CALL_DESK, or Finance) */}
+                {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (
+                  <li
+                    className={`sidebar-item ${isActivePage(ROUTES.LANDING) ? 'active' : ''}`}
+                    onClick={handleNavigateToLanding}
+                    title="Landing Page"
+                  >
+                    <span className="sidebar-icon">🏠</span>
+                    <span className="sidebar-text">Landing Page</span>
+                  </li>
+                )}
+                {/* Inspection modules - Only show for IE users (not CM, CALL_DESK, or Finance) */}
+                {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (activeInspectionType === 'raw-material' || activeInspectionType === null) && (
+                  <li
+                    className={`sidebar-item ${isActivePage(ROUTES.RAW_MATERIAL) ? 'active' : ''}`}
+                    onClick={handleNavigateToRawMaterial}
+                    style={{ opacity: activeInspectionType === 'raw-material' ? 1 : 0.5, cursor: activeInspectionType === 'raw-material' ? 'pointer' : 'not-allowed' }}
+                    title="Raw Material Inspection"
+                  >
+                    <span className="sidebar-icon">📦</span>
+                    <span className="sidebar-text">Raw Material Inspection</span>
+                  </li>
+                )}
+                {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (activeInspectionType === 'process' || activeInspectionType === null) && (
+                  <li
+                    className={`sidebar-item ${isActivePage(ROUTES.PROCESS) ? 'active' : ''}`}
+                    onClick={handleNavigateToProcess}
+                    style={{ opacity: activeInspectionType === 'process' ? 1 : 0.5, cursor: activeInspectionType === 'process' ? 'pointer' : 'not-allowed' }}
+                    title="Process Inspection"
+                  >
+                    <span className="sidebar-icon">⚙️</span>
+                    <span className="sidebar-text">Process Inspection</span>
+                  </li>
+                )}
+                {currentUser?.roleName !== 'CM' && currentUser?.roleName !== 'CALL_DESK' && currentUser?.roleName !== 'Finance' && (activeInspectionType === 'final-product' || activeInspectionType === null) && (
+                  <li
+                    className={`sidebar-item ${isActivePage(ROUTES.FINAL_PRODUCT) ? 'active' : ''}`}
+                    onClick={handleNavigateToFinalProduct}
+                    style={{ opacity: activeInspectionType === 'final-product' ? 1 : 0.5, cursor: activeInspectionType === 'final-product' ? 'pointer' : 'not-allowed' }}
+                    title="Final Product Inspection"
+                  >
+                    <span className="sidebar-icon">✅</span>
+                    <span className="sidebar-text">Final Product Inspection</span>
+                  </li>
+                )}
+                {/* CM Dashboard - Only show for CM role */}
+                {currentUser?.roleName === 'CM' && (
+                  <li
+                    className={`sidebar-item ${isActivePage(ROUTES.CM_DASHBOARD) ? 'active' : ''}`}
+                    onClick={handleNavigateToCMDashboard}
+                    title="CM Dashboard"
+                  >
+                    <span className="sidebar-icon">👔</span>
+                    <span className="sidebar-text">CM Dashboard</span>
+                  </li>
+                )}
+                {/* Call Desk - Only show for CALL_DESK role */}
+                {currentUser?.roleName === 'CALL_DESK' && (
+                  <li
+                    className={`sidebar-item ${isActivePage(ROUTES.CALL_DESK) ? 'active' : ''}`}
+                    onClick={handleNavigateToCallDesk}
+                    title="Call Desk"
+                  >
+                    <span className="sidebar-icon">📞</span>
+                    <span className="sidebar-text">Call Desk</span>
+                  </li>
+                )}
+                {/* Finance Dashboard - Only show for Finance role */}
+                {currentUser?.roleName === 'Finance' && (
+                  <li
+                    className={`sidebar-item ${isActivePage(ROUTES.FINANCE) ? 'active' : ''}`}
+                    onClick={handleNavigateToFinance}
+                    title="Finance Dashboard"
+                  >
+                    <span className="sidebar-icon">💰</span>
+                    <span className="sidebar-text">Finance Dashboard</span>
+                  </li>
+                )}
+              </ul>
+            </nav>
           </aside>
         )}
 
-        {!isCallDeskRoute && isSidebarOpen && (
+        {!shouldHideSidebar && isSidebarOpen && (
           <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} aria-hidden="true" />
         )}
 

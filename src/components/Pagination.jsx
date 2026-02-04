@@ -9,10 +9,11 @@ const Pagination = ({
   totalCount,
   onPageChange,
   rows,
-  onRowsChange
+  onRowsChange,
+  theme = 'teal' // teal, blue, orange, slate
 }) => {
   return (
-    <div className="pg-wrapper">
+    <div className={`pg-wrapper pg-theme-${theme}`}>
 
       {/* LEFT: Count */}
       <div className="pg-count">
