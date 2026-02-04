@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { getHourLabels } from '../utils/helpers';
 import ProcessLineToggle from '../components/ProcessLineToggle';
 import ProcessSubmoduleNav from '../components/ProcessSubmoduleNav';
 import ShearingSection from '../components/sections/ShearingSection';
@@ -391,19 +392,32 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     activeLine
   });
 
+  // Compute hour labels - must be before useEffect that uses it
+  const hourLabels = useMemo(() => getHourLabels(shift), [shift]);
+
   // Keep refs updated with latest data
+  // Inject shift and hourLabel into each row before saving
   useEffect(() => {
-    currentDataRef.current = {
-      shearing: shearingData,
-      turning: turningData,
-      mpi: mpiData,
-      forging: forgingData,
-      quenching: quenchingData,
-      tempering: temperingData,
-      finalCheck: finalCheckData,
-      testingFinishing: testingFinishingData
+    const enrich = (data) => {
+      if (!data) return [];
+      return data.map((row, idx) => ({
+        ...row,
+        shift: shift,
+        hourLabel: hourLabels[idx] || ''
+      }));
     };
-  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, testingFinishingData]);
+
+    currentDataRef.current = {
+      shearing: enrich(shearingData),
+      turning: enrich(turningData),
+      mpi: enrich(mpiData),
+      forging: enrich(forgingData),
+      quenching: enrich(quenchingData),
+      tempering: enrich(temperingData),
+      finalCheck: enrich(finalCheckData),
+      testingFinishing: enrich(testingFinishingData)
+    };
+  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, testingFinishingData, shift, hourLabels]);
 
   // Keep context ref updated
   useEffect(() => {
@@ -904,16 +918,6 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     return `${shift} (${format(s.h, s.m)} - ${format(end.h, end.m)})`;
   })();
 
-  const hourLabels = (() => {
-    const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
-    const labels = [];
-    for (let i = 0; i < 8; i++) {
-      const start = addHours(s.h, s.m, i);
-      const end = addHours(s.h, s.m, i + 1);
-      labels.push(`${format(start.h, start.m)} - ${format(end.h, end.m)}`);
-    }
-    return labels;
-  })();
   const currentHourIndex = (() => {
     const now = new Date();
     const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
@@ -945,6 +949,100 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     (showAll ? arr.map((row, idx) => ({ row, idx }))
       : arr.map((row, idx) => ({ row, idx })).filter(({ idx }) => idx === currentHourIndex))
   );
+
+  // Master "No Production" checkbox - toggles all sections at once
+  // Check if ALL hours across ALL sections are marked as noProduction
+  const allSectionsNoProduction = useMemo(() => {
+    const allSections = [
+      shearingData,
+      turningData,
+      mpiData,
+      forgingData,
+      quenchingData,
+      temperingData,
+      finalCheckData,
+      testingFinishingData
+    ];
+
+    return allSections.every(sectionData =>
+      sectionData.every(row => row.noProduction === true)
+    );
+  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, testingFinishingData]);
+
+  // Handler for master "No Production" checkbox
+  const handleMasterNoProduction = useCallback((checked) => {
+    // Helper function to update all hours in a section
+    const updateAllHours = (data, setterFn, resetFn) => {
+      const newData = data.map((row, i) => {
+        if (checked) {
+          // When marking No Production = true, clear the entire hour data
+          return {
+            ...resetFn(i),
+            noProduction: true
+          };
+        } else {
+          // If unchecking No Production, just set the flag to false
+          return {
+            ...row,
+            noProduction: false
+          };
+        }
+      });
+      setterFn(newData);
+    };
+
+    // Mark as modified
+    hasDataBeenModified.current = true;
+
+    // Update all sections with their specific reset logic
+    updateAllHours(shearingData, setShearingData, (i) => ({
+      hour: i + 1, lotNo: '', lengthCutBar: ['', '', ''], qualityDia: ['', '', ''],
+      sharpEdges: ['', '', ''], crackedEdges: ['', '', ''], rejectedQty: ['', '', '', ''], remarks: ''
+    }));
+
+    updateAllHours(turningData, setTurningData, (i) => ({
+      hour: i + 1, lotNo: '', parallelLength: ['', '', ''], fullTurningLength: ['', '', ''],
+      turningDia: ['', '', ''], rejectedQty: ['', '', ''], remarks: ''
+    }));
+
+    updateAllHours(mpiData, setMpiData, (i) => ({
+      hour: i + 1, lotNo: '', testResults: ['', '', ''], rejectedQty: '', remarks: ''
+    }));
+
+    updateAllHours(forgingData, setForgingData, (i) => ({
+      hour: i + 1, lotNo: '', forgingTemperature: ['', ''], forgingStabilisation: ['', ''],
+      improperForging: ['', ''], forgingDefect: ['', ''], embossingDefect: ['', ''],
+      forgingTemperatureRejected: '', forgingStabilisationRejected: '', improperForgingRejected: '',
+      forgingDefectRejected: '', embossingDefectRejected: '', remarks: ''
+    }));
+
+    updateAllHours(quenchingData, setQuenchingData, (i) => ({
+      hour: i + 1, lotNo: '', quenchingTemperature: ['', ''], quenchingDuration: ['', ''],
+      quenchingHardness: ['', ''], boxGauge: ['', ''], flatBearingArea: ['', ''],
+      fallingGauge: ['', ''], quenchingTemperatureRejected: '', quenchingDurationRejected: '',
+      quenchingHardnessRejected: '', boxGaugeRejected: '', flatBearingAreaRejected: '',
+      fallingGaugeRejected: '', remarks: ''
+    }));
+
+    updateAllHours(temperingData, setTemperingData, (i) => ({
+      hour: i + 1, lotNo: '', temperingTemperature: ['', ''], temperingTemperatureRejected: '',
+      temperingDuration: ['', ''], temperingDurationRejected: '', remarks: ''
+    }));
+
+    updateAllHours(finalCheckData, setFinalCheckData, (i) => ({
+      hour: i + 1, lotNo: '', boxGauge: ['', ''], flatBearingArea: ['', ''],
+      fallingGauge: ['', ''], surfaceDefect: ['', ''], embossingDefect: ['', ''],
+      marking: ['', ''], temperingHardness: ['', ''], boxGaugeRejected: '',
+      flatBearingAreaRejected: '', fallingGaugeRejected: '', surfaceDefectRejected: '',
+      embossingDefectRejected: '', markingRejected: '', temperingHardnessRejected: '', remarks: ''
+    }));
+
+    updateAllHours(testingFinishingData, setTestingFinishingData, (i) => ({
+      hour: i + 1, lotNo: '', toeLoad: ['', ''], weight: ['', ''],
+      paintIdentification: ['', ''], ercCoating: ['', ''], toeLoadRejected: '',
+      weightRejected: '', paintIdentificationRejected: '', ercCoatingRejected: '', remarks: ''
+    }));
+  }, [shearingData, turningData, mpiData, forgingData, quenchingData, temperingData, finalCheckData, testingFinishingData]);
 
   // Wrapper functions to mark data as modified when user changes data
   const handleShearingChange = useCallback((newData) => {
@@ -1012,6 +1110,24 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
             ← Back to Process Dashboard
           </button>
         </div>
+      </div>
+
+      {/* Master "No Production" Checkbox - Controls All Sections */}
+      <div className="master-no-production-container">
+        <label className="master-no-production-label">
+          <input
+            type="checkbox"
+            checked={allSectionsNoProduction}
+            onChange={(e) => handleMasterNoProduction(e.target.checked)}
+            className="master-no-production-checkbox"
+          />
+          <span className="master-no-production-text">
+            🚫 No Production (All Sections & All Hours)
+          </span>
+        </label>
+        <p className="master-no-production-hint">
+          Check this to mark all sections as "No Production" at once
+        </p>
       </div>
 
       {/* Shearing Section */}

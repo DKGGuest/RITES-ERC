@@ -16,7 +16,7 @@ import { markAsScheduled, isCallInitiated, getCallStatusData } from '../services
 import { fetchCompletedCallsForIC, getCurrentUserId } from '../services/workflowApiService';
 // import { fetchRawMaterialCallsByStatus } from '../services/rawMaterial/rawMaterialApiService';
 
-const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending' }) => {
+const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending', setInspectionShift, setInspectionDate, setProcessShift }) => {
   // Restore active tab from sessionStorage on page load, fallback to initialTab
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('ie_landing_active_tab');
@@ -54,6 +54,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   const [shiftDetailsShift, setShiftDetailsShift] = useState('');
   const [shiftDetailsDate, setShiftDetailsDate] = useState(new Date().toISOString().split('T')[0]);
   const [shiftDetailsError, setShiftDetailsError] = useState('');
+  const [isResumeFromShiftModal, setIsResumeFromShiftModal] = useState(false);
 
   // Fetch pending workflow transitions for logged-in user from Azure API
   // PERFORMANCE OPTIMIZATION: Returns data immediately, fetches vendor names in background
@@ -394,6 +395,32 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       const productType = call.product_type;
       setSelectedCall(call);
 
+      // Try to load shift/date for resume
+      let shiftOfInspection = sessionStorage.getItem('inspectionShift');
+      let dateOfInspection = sessionStorage.getItem('inspectionDate');
+
+      if (!shiftOfInspection || !dateOfInspection) {
+        const initiationData = sessionStorage.getItem(`inspection_initiation_${call.call_no}`);
+        if (initiationData) {
+          try {
+            const data = JSON.parse(initiationData);
+            shiftOfInspection = data.shiftOfInspection;
+            dateOfInspection = data.dateOfInspection;
+          } catch (e) { /* ignore */ }
+        }
+      }
+
+      if (shiftOfInspection) {
+        sessionStorage.setItem('inspectionShift', shiftOfInspection);
+        if (typeof setInspectionShift === 'function') setInspectionShift(shiftOfInspection);
+
+        const productTypeLower = productType?.toLowerCase() || '';
+        if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
+          sessionStorage.setItem('processShift', shiftOfInspection);
+          if (typeof setProcessShift === 'function') setProcessShift(shiftOfInspection);
+        }
+      }
+
       const productTypeLower = productType?.toLowerCase() || '';
       if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
         console.log('➡️ Routing to process-dashboard');
@@ -450,7 +477,17 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       if (shiftOfInspection && dateOfInspection) {
         sessionStorage.setItem('inspectionShift', shiftOfInspection);
         sessionStorage.setItem('inspectionDate', dateOfInspection);
-        console.log('💾 Stored shift/date in sessionStorage');
+
+        // Update context if possible
+        if (typeof setInspectionShift === 'function') setInspectionShift(shiftOfInspection);
+        if (typeof setInspectionDate === 'function') setInspectionDate(dateOfInspection);
+
+        // CRITICAL: For Process Dashboard, we must set processShift
+        if ((call.product_type?.toLowerCase() || '').includes('process') || call.product_type === 'ERC-PROCESS MATERIAL') {
+          sessionStorage.setItem('processShift', shiftOfInspection);
+          if (typeof setProcessShift === 'function') setProcessShift(shiftOfInspection);
+        }
+        console.log('💾 Stored shift/date in sessionStorage and context');
       }
 
       // Navigate directly to dashboard based on product type
@@ -545,12 +582,13 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   };
 
   // Handle Enter Shift Details button - for PAUSE_INSPECTION_RESUME_NEXT_DAY status
-  const handleEnterShiftDetails = (call) => {
-    console.log('🔍 handleEnterShiftDetails called for:', call.call_no);
+  const handleEnterShiftDetails = (call, isResume = false) => {
+    console.log('🔍 handleEnterShiftDetails called for:', call.call_no, 'isResume:', isResume);
     console.log('🔍 Call status:', call.status);
 
     // Show the shift details modal
     setShiftDetailsCall(call);
+    setIsResumeFromShiftModal(isResume);
     setShiftDetailsShift('');
     setShiftDetailsDate(new Date().toISOString().split('T')[0]);
     setShiftDetailsError('');
@@ -577,57 +615,77 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       const currentUser = getStoredUser();
       const userId = currentUser?.userId || 0;
 
-      // Fetch the latest workflow transition ID for this call
-      let workflowTransitionId = shiftDetailsCall?.id || shiftDetailsCall?.workflowTransitionId || null;
+      // Map action based on whether this is a resume
+      if (isResumeFromShiftModal) {
+        console.log('⏭️ Resume flow - skipping workflow API call as requested');
+      } else {
+        // Fetch the latest workflow transition ID for this call
+        let workflowTransitionId = shiftDetailsCall?.id || shiftDetailsCall?.workflowTransitionId || null;
 
-      try {
-        const latestTransition = await fetchLatestWorkflowTransition(shiftDetailsCall?.call_no);
-        if (latestTransition && latestTransition.workflowTransitionId) {
-          workflowTransitionId = latestTransition.workflowTransitionId;
-          console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${shiftDetailsCall?.call_no}`);
+        try {
+          const latestTransition = await fetchLatestWorkflowTransition(shiftDetailsCall?.call_no);
+          if (latestTransition && latestTransition.workflowTransitionId) {
+            workflowTransitionId = latestTransition.workflowTransitionId;
+            console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${shiftDetailsCall?.call_no}`);
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
         }
-      } catch (error) {
-        console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
-      }
 
-      // Call workflow API for all product types (Process/Final Product and Raw Material)
-      console.log('🔄 Calling workflow API for enter shift details...');
+        // Call workflow API for all product types (Process/Final Product and Raw Material)
+        console.log('🔄 Calling workflow API for enter shift details...');
 
-      // Determine the action based on call status
-      // If status is INSPECTION_PAUSED, use INSPECTION_PAUSED action, otherwise use ENTER_SHIFT_DETAILS_AND_START_INSPECTION
-      const action = shiftDetailsCall?.status === 'INSPECTION_PAUSED'
-        ? 'INSPECTION_PAUSED'
-        : 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION';
+        // Determine the action based on call status
+        // If status is INSPECTION_PAUSED, use INSPECTION_PAUSED action, otherwise use ENTER_SHIFT_DETAILS_AND_START_INSPECTION
+        const action = shiftDetailsCall?.status === 'INSPECTION_PAUSED'
+          ? 'INSPECTION_PAUSED'
+          : 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION';
 
-      const workflowActionData = {
-        workflowTransitionId: workflowTransitionId,
-        requestId: shiftDetailsCall?.call_no,
-        action: action,
-        remarks: `Shift details entered - Shift: ${shiftDetailsShift}, Date: ${shiftDetailsDate}`,
-        actionBy: userId,
-        pincode: shiftDetailsCall?.pincode || '560001',
-        materialAvailable: 'YES'
-      };
+        const workflowActionData = {
+          workflowTransitionId: workflowTransitionId,
+          requestId: shiftDetailsCall?.call_no,
+          action: action,
+          remarks: `Shift details entered - Shift: ${shiftDetailsShift}, Date: ${shiftDetailsDate}`,
+          actionBy: userId,
+          pincode: shiftDetailsCall?.pincode || '560001',
+          materialAvailable: 'YES'
+        };
 
-      console.log('Workflow Action Data:', workflowActionData);
+        console.log('Workflow Action Data:', workflowActionData);
 
-      try {
-        await performTransitionAction(workflowActionData);
-        console.log('✅ Workflow transition successful');
-      } catch (workflowError) {
-        console.error('❌ Workflow API error:', workflowError);
-        throw new Error(workflowError.message || 'Failed to enter shift details via workflow');
+        try {
+          await performTransitionAction(workflowActionData);
+          console.log('✅ Workflow transition successful');
+        } catch (workflowError) {
+          console.error('❌ Workflow API error:', workflowError);
+          throw new Error(workflowError.message || 'Failed to enter shift details via workflow');
+        }
       }
 
       // Store shift and date in sessionStorage for dashboard to use
       sessionStorage.setItem('inspectionShift', shiftDetailsShift);
       sessionStorage.setItem('inspectionDate', shiftDetailsDate);
 
+      const productType = shiftDetailsCall?.product_type;
+
+      // CRITICAL: For Process Dashboard, we must set processShift
+      if ((productType?.toLowerCase() || '').includes('process') || productType === 'ERC-PROCESS MATERIAL') {
+        sessionStorage.setItem('processShift', shiftDetailsShift);
+      }
+
       // Close modal
       setShowEnterShiftDetailsModal(false);
 
+      // Update context if possible
+      try {
+        if (typeof setInspectionShift === 'function') setInspectionShift(shiftDetailsShift);
+        if (typeof setInspectionDate === 'function') setInspectionDate(shiftDetailsDate);
+        if (typeof setProcessShift === 'function') setProcessShift(shiftDetailsShift);
+      } catch (e) {
+        console.warn('Failed to update context in handleEnterShiftDetailsConfirm:', e);
+      }
+
       // Navigate to dashboard based on product type
-      const productType = shiftDetailsCall?.product_type;
       console.log('🚀 Navigating to dashboard for product type:', productType);
 
       setSelectedCall(shiftDetailsCall);
@@ -832,9 +890,9 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       </div> */}
 
       <h1 style={{ marginBottom: 'var(--space-24)' }}>IE Dashboard</h1>
-      
+
       <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
-      
+
       {/* 1. List of Calls Pending - Combined: Real RM calls + Mock Process/Final calls */}
       {activeTab === 'pending' && (
         <PendingCallsTab
@@ -942,10 +1000,10 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
                       <div style={{ fontWeight: '500', color: '#059669' }}>
                         {call.scheduleInfo?.scheduleDate
                           ? new Date(call.scheduleInfo.scheduleDate).toLocaleDateString('en-IN', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                          })
                           : 'N/A'}
                       </div>
                     </div>
@@ -1032,10 +1090,10 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
                 <div style={{ fontWeight: '500' }}>
                   {previousSchedule.scheduleDate
                     ? new Date(previousSchedule.scheduleDate).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                      })
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric'
+                    })
                     : '-'}
                 </div>
               </div>
@@ -1073,11 +1131,11 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
             disabled={isSubmitting}
             min={isBulkSchedule
               ? selectedCalls.reduce((maxDate, call) => {
-                  if (call.desired_inspection_date && call.desired_inspection_date > maxDate) {
-                    return call.desired_inspection_date;
-                  }
-                  return maxDate;
-                }, '')
+                if (call.desired_inspection_date && call.desired_inspection_date > maxDate) {
+                  return call.desired_inspection_date;
+                }
+                return maxDate;
+              }, '')
               : (selectedCallLocal?.desired_inspection_date || '')}
           />
           <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
@@ -1086,11 +1144,11 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
               <span style={{ color: '#f59e0b', marginLeft: '8px' }}>
                 (Min: {isBulkSchedule
                   ? selectedCalls.reduce((maxDate, call) => {
-                      if (call.desired_inspection_date && call.desired_inspection_date > maxDate) {
-                        return call.desired_inspection_date;
-                      }
-                      return maxDate;
-                    }, selectedCalls[0]?.desired_inspection_date || '')
+                    if (call.desired_inspection_date && call.desired_inspection_date > maxDate) {
+                      return call.desired_inspection_date;
+                    }
+                    return maxDate;
+                  }, selectedCalls[0]?.desired_inspection_date || '')
                   : selectedCallLocal?.desired_inspection_date})
               </span>
             )}

@@ -50,6 +50,21 @@ const TurningSection = ({
     onDataChange(newData);
   };
 
+  // Handle master "No Production" checkbox (toggle all 8 hours)
+  const handleMasterNoProduction = (checked) => {
+    const newData = [...data];
+    newData.forEach((row, idx) => {
+      row.noProduction = checked;
+      if (checked) {
+        clearHour(newData, idx);
+      }
+    });
+    onDataChange(newData);
+  };
+
+  // Check if all hours are marked as "No Production"
+  const allNoProduction = data.every(row => row.noProduction);
+
   return (
     <div className="turning-section">
       <div className="turning-section__header">
@@ -57,6 +72,15 @@ const TurningSection = ({
           <h3 className="turning-section__title">Turning Section - 8 Hour Grid</h3>
           <p className="turning-section__subtitle">Enter hourly turning production data</p>
         </div>
+        <label className="section-master-no-production-label">
+          <input
+            type="checkbox"
+            checked={allNoProduction}
+            onChange={(e) => handleMasterNoProduction(e.target.checked)}
+            className="section-master-checkbox"
+          />
+          <span>No Production (All Hours)</span>
+        </label>
         <button
           type="button"
           className="btn btn-secondary turning-section__toggle"
@@ -152,7 +176,7 @@ const TurningSection = ({
                         className="form-control turning-parallel-input"
                         value={row.parallelLength[1] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -163,7 +187,7 @@ const TurningSection = ({
                         className="form-control turning-full-input"
                         value={row.fullTurningLength[1] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -174,7 +198,7 @@ const TurningSection = ({
                         className="form-control turning-dia-input"
                         value={row.turningDia[1] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -188,7 +212,7 @@ const TurningSection = ({
                         className="form-control turning-parallel-input"
                         value={row.parallelLength[2] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -199,7 +223,7 @@ const TurningSection = ({
                         className="form-control turning-full-input"
                         value={row.fullTurningLength[2] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -210,7 +234,7 @@ const TurningSection = ({
                         className="form-control turning-dia-input"
                         value={row.turningDia[2] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </td>
@@ -226,7 +250,7 @@ const TurningSection = ({
                         className="form-control turning-input turning-input--rejected"
                         value={row.rejectedQty[0] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="turning-td turning-td--rejected-input">
@@ -235,7 +259,7 @@ const TurningSection = ({
                         className="form-control turning-input turning-input--rejected"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="turning-td turning-td--rejected-input">
@@ -244,7 +268,7 @@ const TurningSection = ({
                         className="form-control turning-input turning-input--rejected"
                         value={row.rejectedQty[2] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
@@ -259,6 +283,7 @@ const TurningSection = ({
                         className="form-control turning-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
@@ -304,7 +329,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.parallelLength[0] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -317,7 +342,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.parallelLength[1] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -330,7 +355,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.parallelLength[2] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -343,7 +368,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.fullTurningLength[0] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -356,7 +381,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.fullTurningLength[1] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -369,7 +394,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.fullTurningLength[2] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -382,7 +407,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.turningDia[0] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -395,7 +420,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.turningDia[1] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -408,7 +433,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.turningDia[2] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
                       />
                     </div>
@@ -420,6 +445,7 @@ const TurningSection = ({
                         type="text"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -430,7 +456,7 @@ const TurningSection = ({
                         type="number"
                         value={row.rejectedQty[0] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -441,7 +467,7 @@ const TurningSection = ({
                         type="number"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -452,7 +478,7 @@ const TurningSection = ({
                         type="number"
                         value={row.rejectedQty[2] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>

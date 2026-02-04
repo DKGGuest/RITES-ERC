@@ -23,7 +23,7 @@ const FinalCheckSection = ({
     }
     onDataChange(newData);
   };
-  
+
   const clearHour = (updated, idx) => {
     const base = updated[idx] || {};
     updated[idx] = {
@@ -72,6 +72,21 @@ const FinalCheckSection = ({
     onDataChange(newData);
   };
 
+  // Handle master "No Production" checkbox (toggle all 8 hours)
+  const handleMasterNoProduction = (checked) => {
+    const newData = [...data];
+    newData.forEach((row, idx) => {
+      row.noProduction = checked;
+      if (checked) {
+        clearHour(newData, idx);
+      }
+    });
+    onDataChange(newData);
+  };
+
+  // Check if all hours are marked as "No Production"
+  const allNoProduction = data.every(row => row.noProduction);
+
   return (
     <div className="final-check-section">
       <div className="final-check-section__header">
@@ -79,6 +94,15 @@ const FinalCheckSection = ({
           <h3 className="final-check-section__title">Final Check Section</h3>
           <p className="final-check-section__subtitle">Enter hourly final check data</p>
         </div>
+        <label className="section-master-no-production-label">
+          <input
+            type="checkbox"
+            checked={allNoProduction}
+            onChange={(e) => handleMasterNoProduction(e.target.checked)}
+            className="section-master-checkbox"
+          />
+          <span>No Production (All Hours)</span>
+        </label>
         <button
           type="button"
           className="btn btn-secondary final-check-section__toggle"
@@ -110,9 +134,9 @@ const FinalCheckSection = ({
                     <th className="final-check-th final-check-th--tempering-hardness">Tempering Hardness</th>
                   </tr>
                   {/* Row 1: First sample */}
-                  
+
                   <tr className={`final-check-row${row.noProduction ? ' no-production' : ''}`}>
-  
+
                     <td rowSpan="4" className="final-check-td final-check-td--time">
                       <strong>{hourLabels[idx]}</strong>
                     </td>
@@ -327,7 +351,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.flatBearingAreaRejected || ''}
                         onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="final-check-td final-check-td--rejected-input">
@@ -337,7 +361,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.fallingGaugeRejected || ''}
                         onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="final-check-td final-check-td--rejected-input">
@@ -347,7 +371,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.surfaceDefectRejected || ''}
                         onChange={e => updateData(idx, 'surfaceDefectRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="final-check-td final-check-td--rejected-input">
@@ -357,7 +381,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.embossingDefectRejected || ''}
                         onChange={e => updateData(idx, 'embossingDefectRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="final-check-td final-check-td--rejected-input">
@@ -367,7 +391,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.markingRejected || ''}
                         onChange={e => updateData(idx, 'markingRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                     <td className="final-check-td final-check-td--rejected-input">
@@ -377,7 +401,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.temperingHardnessRejected || ''}
                         onChange={e => updateData(idx, 'temperingHardnessRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
@@ -392,6 +416,7 @@ const FinalCheckSection = ({
                         className="form-control final-check-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </td>
                   </tr>
@@ -423,7 +448,7 @@ const FinalCheckSection = ({
                       <select
                         value={row.lotNo}
                         onChange={e => updateData(idx, 'lotNo', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select Lot No.</option>
                         {availableLotNumbers.map(lot => (
@@ -440,7 +465,7 @@ const FinalCheckSection = ({
                           key={sampleIdx}
                           value={row.boxGauge[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'boxGauge', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -457,7 +482,7 @@ const FinalCheckSection = ({
                           key={sampleIdx}
                           value={row.flatBearingArea[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'flatBearingArea', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -474,7 +499,7 @@ const FinalCheckSection = ({
                           key={sampleIdx}
                           value={row.fallingGauge[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'fallingGauge', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -491,7 +516,7 @@ const FinalCheckSection = ({
                           key={sampleIdx}
                           value={row.surfaceDefect[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'surfaceDefect', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -508,7 +533,7 @@ const FinalCheckSection = ({
                           key={sampleIdx}
                           value={row.embossingDefect[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'embossingDefect', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -525,7 +550,7 @@ const FinalCheckSection = ({
                           key={sampleIdx}
                           value={row.marking[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'marking', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">S{sampleIdx + 1}</option>
                           <option value="OK">OK</option>
@@ -544,7 +569,7 @@ const FinalCheckSection = ({
                           placeholder={`S${sampleIdx + 1}`}
                           value={row.temperingHardness?.[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'temperingHardness', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       ))}
                     </div>
@@ -557,7 +582,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.boxGaugeRejected || ''}
                         onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -569,7 +594,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.flatBearingAreaRejected || ''}
                         onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -581,7 +606,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.fallingGaugeRejected || ''}
                         onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -593,7 +618,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.surfaceDefectRejected || ''}
                         onChange={e => updateData(idx, 'surfaceDefectRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -605,7 +630,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.embossingDefectRejected || ''}
                         onChange={e => updateData(idx, 'embossingDefectRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -617,7 +642,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.markingRejected || ''}
                         onChange={e => updateData(idx, 'markingRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -629,7 +654,7 @@ const FinalCheckSection = ({
                         placeholder="0"
                         value={row.temperingHardnessRejected || ''}
                         onChange={e => updateData(idx, 'temperingHardnessRejected', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>

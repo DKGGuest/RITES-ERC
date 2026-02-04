@@ -8,11 +8,14 @@ import { ROUTES } from '../../routes';
  */
 const LandingPageWrapper = () => {
   const navigate = useNavigate();
-  const { 
-    setSelectedCall, 
-    setSelectedCalls, 
+  const {
+    setSelectedCall,
+    setSelectedCalls,
     landingActiveTab,
-    setLandingActiveTab 
+    setLandingActiveTab,
+    setInspectionShift,
+    setInspectionDate,
+    setProcessShift
   } = useInspection();
 
   const handleStartInspection = (call) => {
@@ -58,6 +61,9 @@ const LandingPageWrapper = () => {
       setCurrentPage={handleSetCurrentPage}
       initialTab={landingActiveTab}
       onTabChange={setLandingActiveTab}
+      setInspectionShift={setInspectionShift}
+      setInspectionDate={setInspectionDate}
+      setProcessShift={setProcessShift}
     />
   );
 };

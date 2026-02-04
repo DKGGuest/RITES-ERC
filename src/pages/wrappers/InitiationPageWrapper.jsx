@@ -46,6 +46,10 @@ const InitiationPageWrapper = () => {
       }
       if (shift) {
         sessionStorage.setItem('inspectionShift', shift);
+        // Also set processShift for grid page
+        if (inspectionType === 'process') {
+          sessionStorage.setItem('processShift', shift);
+        }
       }
       if (date) {
         sessionStorage.setItem('inspectionDate', date);

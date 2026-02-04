@@ -47,6 +47,21 @@ const TestingFinishingSection = ({
     onDataChange(newData);
   };
 
+  // Handle master "No Production" checkbox (toggle all 8 hours)
+  const handleMasterNoProduction = (checked) => {
+    const newData = [...data];
+    newData.forEach((row, idx) => {
+      row.noProduction = checked;
+      if (checked) {
+        clearHour(newData, idx);
+      }
+    });
+    onDataChange(newData);
+  };
+
+  // Check if all hours are marked as "No Production"
+  const allNoProduction = data.every(row => row.noProduction);
+
   return (
     <div className="testing-finishing-section">
       <div className="testing-finishing-section__header">
@@ -54,6 +69,15 @@ const TestingFinishingSection = ({
           <h3 className="testing-finishing-section__title">Testing & Finishing Section</h3>
           <p className="testing-finishing-section__subtitle">Enter hourly testing and finishing data</p>
         </div>
+        <label className="section-master-no-production-label">
+          <input
+            type="checkbox"
+            checked={allNoProduction}
+            onChange={(e) => handleMasterNoProduction(e.target.checked)}
+            className="section-master-checkbox"
+          />
+          <span>No Production (All Hours)</span>
+        </label>
         <button
           type="button"
           className="btn btn-secondary testing-finishing-section__toggle"
@@ -269,7 +293,7 @@ const TestingFinishingSection = ({
                       <select
                         value={row.lotNo}
                         onChange={e => updateData(idx, 'lotNo', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       >
                         <option value="">Select Lot No.</option>
                         {availableLotNumbers.map(lot => (

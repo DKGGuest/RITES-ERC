@@ -13,8 +13,9 @@
 // Get API URL from environment variable or fallback to Azure production URL
 // TEMPORARY: Force Azure URL for testing (comment out to use .env.local)
 // export const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+// export const API_BASE_URL = 'http://localhost:8080/sarthi-backend';
 export const API_BASE_URL = process.env.REACT_APP_API_URL ||
-    'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+   'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 
 // Log current environment for debugging
 console.log('🌐 API Configuration:', {
@@ -29,38 +30,38 @@ console.log('🌐 API Configuration:', {
 export const API_ENDPOINTS = {
     // Authentication
     AUTH: `${API_BASE_URL}/api/auth`,
-    
+
     // Inspection Requests
     INSPECTION_REQUESTS: `${API_BASE_URL}/api/inspection-requests`,
-    
+
     // Raw Material
     RAW_MATERIAL: `${API_BASE_URL}/api/raw-material`,
     RM_INSPECTION: `${API_BASE_URL}/api/rm-inspection`,
     // Final Material
     FINAL_MATERIAL: `${API_BASE_URL}/api/final-material`,
-    
+
     // Process Material
     PROCESS_MATERIAL: `${API_BASE_URL}/api/process-material`,
     PROCESS_INSPECTION: `${API_BASE_URL}/api/process-inspection`,
-    
+
     // Inspection Sections
     INSPECTION_SECTIONS: `${API_BASE_URL}/api/inspection-sections`,
-    
+
     // Workflow
     WORKFLOW: `${API_BASE_URL}/api/workflow`,
-    
+
     // Billing
     BILLING: `${API_BASE_URL}/api/billing`,
-    
+
     // Certificates
     CERTIFICATES: `${API_BASE_URL}/api/certificate`,
-    
+
     // Schedule
     SCHEDULE: `${API_BASE_URL}/api/inspection-schedule`,
-    
+
     // PO Data
     PO_DATA: `${API_BASE_URL}/api/po-data`,
-    
+
     // Vendor
     VENDOR: `${API_BASE_URL}/api/vendor`,
 };

@@ -25,6 +25,35 @@ const TemperingSection = ({
     onDataChange(newData);
   };
 
+  const clearHour = (updated, idx) => {
+    const base = updated[idx] || {};
+    updated[idx] = {
+      ...base,
+      lotNo: '',
+      temperingTemperature: [],
+      temperingDuration: [],
+      temperingTemperatureRejected: '',
+      temperingDurationRejected: '',
+      remarks: '',
+      noProduction: true
+    };
+  };
+
+  const wrappedUpdateData = (idx, field, value, sampleIndex = null) => {
+    const newData = [...data];
+    if (field === 'noProduction') {
+      if (value === true) {
+        clearHour(newData, idx);
+        onDataChange(newData);
+        return;
+      }
+      newData[idx] = { ...(newData[idx] || {}), noProduction: false };
+      onDataChange(newData);
+      return;
+    }
+    updateData(idx, field, value, sampleIndex);
+  };
+
   // Calculate Total Rejection at Tempering Section
   // = rejection of Tempering Temp + rejection of Tempering Duration + sum of all hours of temperingHardnessRejected from Final Check
   const getTotalRejection = (hourIndex) => {
@@ -54,6 +83,21 @@ const TemperingSection = ({
     return totalRejection;
   };
 
+  // Handle master "No Production" checkbox (toggle all 8 hours)
+  const handleMasterNoProduction = (checked) => {
+    const newData = [...data];
+    newData.forEach((row, idx) => {
+      row.noProduction = checked;
+      if (checked) {
+        clearHour(newData, idx);
+      }
+    });
+    onDataChange(newData);
+  };
+
+  // Check if all hours are marked as "No Production"
+  const allNoProduction = data.every(row => row.noProduction);
+
   return (
     <div className="tempering-section">
       <div className="tempering-section__header">
@@ -61,6 +105,15 @@ const TemperingSection = ({
           <h3 className="tempering-section__title">Tempering Section</h3>
           <p className="tempering-section__subtitle">Enter hourly tempering production data</p>
         </div>
+        <label className="section-master-no-production-label">
+          <input
+            type="checkbox"
+            checked={allNoProduction}
+            onChange={(e) => handleMasterNoProduction(e.target.checked)}
+            className="section-master-checkbox"
+          />
+          <span>No Production (All Hours)</span>
+        </label>
         <button
           type="button"
           className="btn btn-secondary tempering-section__toggle"
@@ -99,7 +152,7 @@ const TemperingSection = ({
                         <input
                           type="checkbox"
                           checked={row.noProduction}
-                          onChange={e => updateData(idx, 'noProduction', e.target.checked)}
+                          onChange={e => wrappedUpdateData(idx, 'noProduction', e.target.checked)}
                           className="tempering-checkbox"
                         />
                       </td>
@@ -124,7 +177,7 @@ const TemperingSection = ({
                           placeholder="°C"
                           value={row.temperingTemperature[0] || ''}
                           onChange={e => updateData(idx, 'temperingTemperature', e.target.value, 0)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </td>
                       <td className="tempering-td tempering-td--duration-input">
@@ -135,11 +188,11 @@ const TemperingSection = ({
                           placeholder="min"
                           value={row.temperingDuration[0] || ''}
                           onChange={e => updateData(idx, 'temperingDuration', e.target.value, 0)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </td>
                       <td rowSpan="3" className="tempering-td tempering-td--total-rejection">
-                        <span className="tempering-total-rejection">{totalRejection}</span>
+                        <span className="tempering-total-rejection">{row.lotNo ? totalRejection : ''}</span>
                       </td>
                     </tr>
                     {/* Row 2: Second sample */}
@@ -152,7 +205,7 @@ const TemperingSection = ({
                           placeholder="°C"
                           value={row.temperingTemperature[1] || ''}
                           onChange={e => updateData(idx, 'temperingTemperature', e.target.value, 1)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </td>
                       <td className="tempering-td tempering-td--duration-input">
@@ -163,7 +216,7 @@ const TemperingSection = ({
                           placeholder="min"
                           value={row.temperingDuration[1] || ''}
                           onChange={e => updateData(idx, 'temperingDuration', e.target.value, 1)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </td>
                     </tr>
@@ -179,7 +232,7 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingTemperatureRejected || ''}
                           onChange={e => updateData(idx, 'temperingTemperatureRejected', e.target.value)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </td>
                       <td className="tempering-td tempering-td--rejected-input">
@@ -189,7 +242,7 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingDurationRejected || ''}
                           onChange={e => updateData(idx, 'temperingDurationRejected', e.target.value)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </td>
                     </tr>
@@ -204,6 +257,7 @@ const TemperingSection = ({
                           className="form-control tempering-input"
                           value={row.remarks}
                           onChange={e => updateData(idx, 'remarks', e.target.value)}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </td>
                     </tr>
@@ -259,7 +313,7 @@ const TemperingSection = ({
                             placeholder={`S${sampleIdx + 1}`}
                             value={row.temperingTemperature[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'temperingTemperature', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           />
                         ))}
                       </div>
@@ -275,7 +329,7 @@ const TemperingSection = ({
                             placeholder={`S${sampleIdx + 1}`}
                             value={row.temperingDuration[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'temperingDuration', e.target.value, sampleIdx)}
-                            disabled={row.noProduction}
+                            disabled={row.noProduction || !row.lotNo}
                           />
                         ))}
                       </div>
@@ -288,7 +342,7 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingTemperatureRejected || ''}
                           onChange={e => updateData(idx, 'temperingTemperatureRejected', e.target.value)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </div>
                     </div>
@@ -300,14 +354,14 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingDurationRejected || ''}
                           onChange={e => updateData(idx, 'temperingDurationRejected', e.target.value)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </div>
                     </div>
                     <div className="tempering-mobile-field">
                       <span className="tempering-mobile-field__label">Total Rejection</span>
                       <div className="tempering-mobile-field__value">
-                        <span className="tempering-total-rejection">{totalRejection}</span>
+                        <span className="tempering-total-rejection">{row.lotNo ? totalRejection : ''}</span>
                       </div>
                     </div>
                     <div className="tempering-mobile-field">
@@ -317,6 +371,7 @@ const TemperingSection = ({
                           type="text"
                           value={row.remarks}
                           onChange={e => updateData(idx, 'remarks', e.target.value)}
+                          disabled={row.noProduction || !row.lotNo}
                         />
                       </div>
                     </div>

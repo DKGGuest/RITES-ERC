@@ -47,6 +47,21 @@ const MpiSection = ({
     onDataChange(newData);
   };
 
+  // Handle master "No Production" checkbox (toggle all 8 hours)
+  const handleMasterNoProduction = (checked) => {
+    const newData = [...data];
+    newData.forEach((row, idx) => {
+      row.noProduction = checked;
+      if (checked) {
+        clearHour(newData, idx);
+      }
+    });
+    onDataChange(newData);
+  };
+
+  // Check if all hours are marked as "No Production"
+  const allNoProduction = data.every(row => row.noProduction);
+
   return (
     <div className="mpi-section">
       <div className="mpi-section__header">
@@ -54,6 +69,15 @@ const MpiSection = ({
           <h3 className="mpi-section__title">MPI Section</h3>
           <p className="mpi-section__subtitle">Enter hourly MPI (Magnetic Particle Inspection) production data</p>
         </div>
+        <label className="section-master-no-production-label">
+          <input
+            type="checkbox"
+            checked={allNoProduction}
+            onChange={(e) => handleMasterNoProduction(e.target.checked)}
+            className="section-master-checkbox"
+          />
+          <span>No Production (All Hours)</span>
+        </label>
         <button
           type="button"
           className="btn btn-secondary mpi-section__toggle"
@@ -218,7 +242,7 @@ const MpiSection = ({
                         <select
                           value={row.testResults[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'testResults', e.target.value, sampleIdx)}
-                          disabled={row.noProduction}
+                          disabled={row.noProduction || !row.lotNo}
                         >
                           <option value="">Select</option>
                           <option value="OK">OK</option>
@@ -234,6 +258,7 @@ const MpiSection = ({
                         type="text"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -244,7 +269,7 @@ const MpiSection = ({
                         type="number"
                         value={row.rejectedQty || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction}
+                        disabled={row.noProduction || !row.lotNo}
                       />
                     </div>
                   </div>
@@ -254,7 +279,7 @@ const MpiSection = ({
           </div>
         </div>
       )}
-    </div>
+    </div >
   );
 };
 

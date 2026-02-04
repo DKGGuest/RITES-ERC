@@ -84,3 +84,53 @@ export const convertISOtoDDMMYYYY = (dateStr) => {
 
   return dateStr;
 };
+
+export const getHourLabels = (shift) => {
+  // Normalize shift input to handle cases like "General", "A Shift", etc.
+  const normalizedShift = (shift || 'A').toString().trim().toUpperCase();
+
+  const SHIFT_STARTS = {
+    'A': { h: 6, m: 0 },
+    'B': { h: 14, m: 0 },
+    'C': { h: 22, m: 0 },
+    'G': { h: 9, m: 0 },
+    'GENERAL': { h: 9, m: 0 }
+  };
+
+  const pad = (n) => n.toString().padStart(2, '0');
+  const format = (h, m) => {
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayHour = (h % 12) || 12;
+    return `${displayHour}:${pad(m)} ${period}`;
+  };
+
+  const addHours = (h, m, dh) => {
+    let totalMinutes = h * 60 + m + (dh * 60);
+    let newTotalMinutes = totalMinutes % (24 * 60);
+    if (newTotalMinutes < 0) newTotalMinutes += (24 * 60);
+    return {
+      h: Math.floor(newTotalMinutes / 60),
+      m: newTotalMinutes % 60
+    };
+  };
+
+  // Find the appropriate start time, defaulting to Shift A if not found
+  let s = SHIFT_STARTS[normalizedShift];
+
+  // Also check if the input starts with A, B, C or G (e.g. "A Shift")
+  if (!s) {
+    if (normalizedShift.startsWith('A')) s = SHIFT_STARTS.A;
+    else if (normalizedShift.startsWith('B')) s = SHIFT_STARTS.B;
+    else if (normalizedShift.startsWith('C')) s = SHIFT_STARTS.C;
+    else if (normalizedShift.startsWith('G')) s = SHIFT_STARTS.G;
+    else s = SHIFT_STARTS.A; // Default fallback
+  }
+
+  const labels = [];
+  for (let i = 0; i < 8; i++) {
+    const start = addHours(s.h, s.m, i);
+    const end = addHours(s.h, s.m, i + 1);
+    labels.push(`${format(start.h, start.m)} - ${format(end.h, end.m)}`);
+  }
+  return labels;
+};

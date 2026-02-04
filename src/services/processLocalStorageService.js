@@ -77,9 +77,9 @@ const transformToBackendFormat = (data, submodule) => {
       rejectedQty: ['rejectedQty1', 'rejectedQty2', 'rejectedQty3', 'rejectedQty4']
     },
     turning: {
-      straightLength: ['straightLength1', 'straightLength2', 'straightLength3'],
-      taperLength: ['taperLength1', 'taperLength2', 'taperLength3'],
-      dia: ['dia1', 'dia2', 'dia3'],
+      parallelLength: ['straightLength1', 'straightLength2', 'straightLength3'],
+      fullTurningLength: ['taperLength1', 'taperLength2', 'taperLength3'],
+      turningDia: ['dia1', 'dia2', 'dia3'],
       rejectedQty: ['rejectedQty1', 'rejectedQty2', 'rejectedQty3']
     },
     mpi: {
@@ -230,6 +230,28 @@ export const clearAllProcessData = (inspectionCallNo, poNo, lineNo) => {
   submodules.forEach(submodule => {
     clearFromLocalStorage(submodule, inspectionCallNo, poNo, lineNo);
   });
+
+  // CRITICAL: lot-specific lineFinalResult keys are NOT cleared by the above loop 
+  // because clearFromLocalStorage expects a lotNo to match the exact key.
+  // We need to scan localStorage for ANY keys matching the pattern for THIS call, PO, and line.
+  try {
+    const pattern = `${STORAGE_PREFIX}lineFinalResult_${inspectionCallNo}_${poNo}_${lineNo}`;
+    const keysToRemove = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(pattern)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+      console.log(`Clarifying stale lot-specific key: ${key}`);
+    });
+  } catch (error) {
+    console.error('Error clearing lot-specific process data:', error);
+  }
 };
 
 /**

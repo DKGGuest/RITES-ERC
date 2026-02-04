@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import './ShearingSection.css';
 
-const ShearingSection = ({ 
-  data, 
-  onDataChange, 
-  availableLotNumbers = [], 
+const ShearingSection = ({
+  data,
+  onDataChange,
+  availableLotNumbers = [],
   hourLabels = [],
   visibleRows,
   showAll,
@@ -58,6 +58,21 @@ const ShearingSection = ({
     onDataChange(updated);
   };
 
+  // Handle master "No Production" checkbox (toggle all 8 hours)
+  const handleMasterNoProduction = (checked) => {
+    const updated = [...data];
+    updated.forEach((row, idx) => {
+      row.noProduction = checked;
+      if (checked) {
+        clearHour(updated, idx);
+      }
+    });
+    onDataChange(updated);
+  };
+
+  // Check if all hours are marked as "No Production"
+  const allNoProduction = data.every(row => row.noProduction);
+
   return (
     <div className="card shearing-section">
       <div className="card-header shearing-section__header">
@@ -65,6 +80,15 @@ const ShearingSection = ({
           <h3 className="card-title">Shearing Section</h3>
           <p className="card-subtitle">Enter hourly shearing production data</p>
         </div>
+        <label className="section-master-no-production-label">
+          <input
+            type="checkbox"
+            checked={allNoProduction}
+            onChange={(e) => handleMasterNoProduction(e.target.checked)}
+            className="section-master-checkbox"
+          />
+          <span>No Production (All Hours)</span>
+        </label>
         <div className="shearing-section__actions">
           <button
             type="button"
@@ -169,7 +193,7 @@ const ShearingSection = ({
                     </td>
                   </tr>
                   {/* Row 2: Second sample */}
-                  
+
                   <tr key={`${row.hour}-r2`} className={`shearing-row${row.noProduction ? ' no-production' : ''}`}>
                     <td className="shearing-td shearing-td--length-input">
                       <input
