@@ -559,46 +559,6 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     return 'MK-III';
   }, [poData]);
 
-  // Sync heats and productModel to parent for submodule pages
-  useEffect(() => {
-    if (onHeatsChange) onHeatsChange(activeHeats);
-  }, [activeHeats, onHeatsChange]);
-
-  useEffect(() => {
-    if (onProductModelChange) onProductModelChange(productModel);
-  }, [productModel, onProductModelChange]);
-
-  // Save main inspection data to localStorage when it changes
-  // Note: Restoration is done during API fetch to avoid race conditions
-  useEffect(() => {
-    const inspectionCallNo = call?.call_no;
-    if (!inspectionCallNo) return;
-
-    const mainKey = `${STORAGE_KEYS.MAIN_INSPECTION}_${inspectionCallNo}`;
-    const dataToSave = {
-      numberOfBundles,
-      sourceOfRawMaterial,
-      heatRemarks,
-      heatColorCodes: fetchedHeatData.reduce((acc, heat) => {
-        if (heat.heatNo && heat.colorCode) {
-          acc[heat.heatNo] = heat.colorCode;
-        }
-        return acc;
-      }, {})
-    };
-    localStorage.setItem(mainKey, JSON.stringify(dataToSave));
-  }, [call?.call_no, numberOfBundles, sourceOfRawMaterial, heatRemarks, fetchedHeatData]);
-
-  // Handler for heat data changes (e.g., colorCode updates from HeatNumberDetails)
-  const handleHeatsUpdate = useCallback((updatedHeats) => {
-    // Update local fetchedHeatData state
-    setFetchedHeatData(updatedHeats);
-    // Also notify parent if needed
-    if (onHeatsChange) {
-      onHeatsChange(updatedHeats);
-    }
-  }, [onHeatsChange]);
-
   /**
    * Consolidate heats by grouping duplicate heat numbers
    * Returns array of unique heats with aggregated weights
@@ -607,7 +567,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     const heatMap = new Map();
 
     activeHeats.forEach((heat) => {
-      const heatNo = heat.heatNo || heat.heat_no;
+      const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
+
       if (!heatMap.has(heatNo)) {
         heatMap.set(heatNo, {
           ...heat,
@@ -649,6 +610,53 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     }
   }, [totalQuantity, productModel]);
 
+  // Sync consolidated heats and productModel to parent for submodule pages
+  useEffect(() => {
+    if (onHeatsChange) onHeatsChange(consolidatedHeats);
+  }, [consolidatedHeats, onHeatsChange]);
+
+  useEffect(() => {
+    if (onProductModelChange) onProductModelChange(productModel);
+  }, [productModel, onProductModelChange]);
+
+  // Save main inspection data to localStorage when it changes
+  // Note: Restoration is done during API fetch to avoid race conditions
+  useEffect(() => {
+    const inspectionCallNo = call?.call_no;
+    if (!inspectionCallNo) return;
+
+    const mainKey = `${STORAGE_KEYS.MAIN_INSPECTION}_${inspectionCallNo}`;
+    const dataToSave = {
+      numberOfBundles,
+      sourceOfRawMaterial,
+      heatRemarks,
+      heatColorCodes: consolidatedHeats.reduce((acc, heat) => {
+        const heatNo = heat.heatNo || heat.heat_no;
+        if (heatNo && heat.colorCode) {
+          acc[heatNo] = heat.colorCode;
+        }
+        return acc;
+      }, {})
+    };
+    localStorage.setItem(mainKey, JSON.stringify(dataToSave));
+  }, [call?.call_no, numberOfBundles, sourceOfRawMaterial, heatRemarks, consolidatedHeats]);
+
+  // Handler for heat data changes (e.g., colorCode updates from HeatNumberDetails)
+  const handleHeatsUpdate = useCallback((updatedHeats) => {
+    // If we receive updated heats from a component, we need to map them back to fetchedHeatData
+    // Usually updatedHeats will be the consolidated ones.
+    setFetchedHeatData(prev => {
+      return prev.map(originalHeat => {
+        const heatNo = originalHeat.heatNo || originalHeat.heat_no;
+        const matchingUpdated = updatedHeats.find(h => (h.heatNo || h.heat_no) === heatNo);
+        if (matchingUpdated) {
+          return { ...originalHeat, colorCode: matchingUpdated.colorCode };
+        }
+        return originalHeat;
+      });
+    });
+  }, []);
+
   // (defect lists and counts handled in visual module state)
 
   const isInitialMount = useRef(true);
@@ -675,10 +683,10 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
     // Check if ALL required fields are filled (excluding remarks)
     const allFieldsFilled = percentC && percentC !== '' &&
-                           percentSi && percentSi !== '' &&
-                           percentMn && percentMn !== '' &&
-                           percentP && percentP !== '' &&
-                           percentS && percentS !== '';
+      percentSi && percentSi !== '' &&
+      percentMn && percentMn !== '' &&
+      percentP && percentP !== '' &&
+      percentS && percentS !== '';
 
     if (!allFieldsFilled) return 'Pending';
 
@@ -772,14 +780,14 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
   }, []);
 
   /**
-   * Validate dimensional check for a heat
-   * Rules:
-   * - ALL 20 samples must be filled to enable Accept/Reject
-   * - All samples must be within tolerance (MK-III: 20.47-20.84, MK-V: 22.81-23.23)
-   * - Returns 'Pending' if not all 20 samples are filled
-   * - Returns 'OK' if all samples pass OR if only 1 sample fails
-   * - Returns 'NOT OK' if more than 1 sample fails validation
-   */
+  * Validate dimensional check for a heat
+  * Rules:
+  * - ALL 20 samples must be filled to enable Accept/Reject
+  * - All samples must be within tolerance (MK-III: 20.47-20.84, MK-V: 22.81-23.23)
+  * - Returns 'Pending' if not all 20 samples are filled
+  * - Returns 'OK' if all samples pass OR if up to 2 samples fail
+  * - Returns 'NOT OK' if more than 2 samples fail validation (3 or more)
+  */
   const validateDimensionalHeat = useCallback((dimSamples, model) => {
     if (!dimSamples || !Array.isArray(dimSamples)) return 'Pending';
 
@@ -791,18 +799,20 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     const REQUIRED_SAMPLES = 20; // Total samples required per heat
     const filledSamples = dimSamples.filter(s => s?.diameter && s.diameter !== '');
 
-    // Must have ALL 20 samples filled to proceed
-    if (filledSamples.length < REQUIRED_SAMPLES) return 'Pending';
-
-    // All samples are filled, now count failures
+    // Now count failures among filled samples
     const failedSamples = filledSamples.filter(s => {
       const val = parseFloat(s.diameter);
       return !isNaN(val) && (val < specs.min || val > specs.max);
     });
 
-    // If 0 or 1 sample fails, status is OK
-    // If more than 1 sample fails, status is NOT OK
-    return failedSamples.length > 1 ? 'NOT OK' : 'OK';
+    // If more than 2 samples fail, it is NOT OK immediately
+    if (failedSamples.length > 2) return 'NOT OK';
+
+    // If we haven't reached failure threshold, check if all 20 are filled
+    if (filledSamples.length < REQUIRED_SAMPLES) return 'Pending';
+
+    // All samples are filled and failed samples <= 2
+    return 'OK';
   }, []);
 
   /**
@@ -823,17 +833,17 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     // Check if ALL required fields are filled for all samples (excluding remarks)
     const allFieldsFilled = samples.every(sample => {
       return sample.c && sample.c !== '' &&
-             sample.si && sample.si !== '' &&
-             sample.mn && sample.mn !== '' &&
-             sample.p && sample.p !== '' &&
-             sample.s && sample.s !== '' &&
-             sample.grainSize && sample.grainSize !== '' &&
-             sample.decarb && sample.decarb !== '' &&
-             sample.inclA && sample.inclA !== '' &&
-             sample.inclB && sample.inclB !== '' &&
-             sample.inclC && sample.inclC !== '' &&
-             sample.inclD && sample.inclD !== '' &&
-             sample.hardness && sample.hardness !== '';
+        sample.si && sample.si !== '' &&
+        sample.mn && sample.mn !== '' &&
+        sample.p && sample.p !== '' &&
+        sample.s && sample.s !== '' &&
+        sample.grainSize && sample.grainSize !== '' &&
+        sample.decarb && sample.decarb !== '' &&
+        sample.inclA && sample.inclA !== '' &&
+        sample.inclB && sample.inclB !== '' &&
+        sample.inclC && sample.inclC !== '' &&
+        sample.inclD && sample.inclD !== '' &&
+        sample.hardness && sample.hardness !== '';
     });
 
     if (!allFieldsFilled) return 'Pending';
@@ -935,9 +945,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       const packData = packRaw ? JSON.parse(packRaw) : null;
 
       // Compute status for each heat
-      activeHeats.forEach((heat, heatIndex) => {
-        // Support both heatNo and heat_no property names
-        const heatNo = heat.heatNo || heat.heat_no;
+      consolidatedHeats.forEach((heat, heatIndex) => {
+        const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
+
         const statuses = {
           calibration: 'Pending',
           visual: 'Pending',
@@ -952,22 +962,19 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           statuses.calibration = validateCalibrationHeat(heatCalData);
         }
 
-        // Visual: Data is stored as array by index, validate with our function
+        // Visual, Dimensional, etc. use the index from consolidatedHeats
         if (Array.isArray(visualData) && visualData[heatIndex]) {
           statuses.visual = validateVisualHeat(visualData[heatIndex]);
         }
 
-        // Dimensional: Data stored as array by index with dimSamples
         if (Array.isArray(dimData?.heatDimData) && dimData.heatDimData[heatIndex]?.dimSamples) {
           statuses.dimensional = validateDimensionalHeat(dimData.heatDimData[heatIndex].dimSamples, productModel);
         }
 
-        // Material Test: Data stored as array by index
         if (Array.isArray(matData?.materialData) && matData.materialData[heatIndex]) {
           statuses.materialTest = validateMaterialTestHeat(matData.materialData[heatIndex]);
         }
 
-        // Packing: Per-heat checklist
         statuses.packing = validatePackingStorage(packData, heatIndex);
 
         heatStatuses[heatNo] = statuses;
@@ -998,7 +1005,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       window.removeEventListener('rm:statusRefresh', handleCustomRefresh);
       clearInterval(pollInterval);
     };
-  }, [call?.call_no, activeHeats, productModel, validateCalibrationHeat, validateVisualHeat, validateDimensionalHeat, validateMaterialTestHeat, validatePackingStorage]);
+  }, [call?.call_no, activeHeats, consolidatedHeats, productModel, validateCalibrationHeat, validateVisualHeat, validateDimensionalHeat, validateMaterialTestHeat, validatePackingStorage]);
 
   /**
    * Check if inspection can be finished based on module statuses
@@ -1012,7 +1019,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
     // Check each heat's module statuses
     for (const heat of consolidatedHeats) {
-      const heatNo = heat.heatNo || heat.heat_no;
+      const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
       const heatStatuses = heatSubmoduleStatuses[heatNo] || {
         calibration: 'Pending',
         visual: 'Pending',
@@ -1035,7 +1042,6 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       // Rule 2: If Dimension or Material Testing is NOT OK, complete heat is rejected
       // This is allowed to finish
       if (dimensionalNotOk || materialTestNotOk) {
-        // Can finish if this is the only condition
         continue;
       }
 
@@ -1047,9 +1053,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         const visualRaw = localStorage.getItem(visualKey);
         const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-        // Find this heat's visual data
-        const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNo);
-        const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+        // Find this unique heat's visual data index
+        const uniqueHeatIndex = consolidatedHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNo);
+        const heatVisualData = Array.isArray(visualData) && uniqueHeatIndex >= 0 ? visualData[uniqueHeatIndex] : null;
         const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
         const offeredWeight = heat.weight;
 
@@ -1067,9 +1073,16 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       }
     }
 
-    // All heats have valid completion status
+    // Check if remarks are entered for all heats
+    for (const heat of consolidatedHeats) {
+      const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
+      if (!heatRemarks[heatNo] || heatRemarks[heatNo].trim() === '') {
+        return { canFinish: false, reason: `Heat ${heatNo}: Remarks are required` };
+      }
+    }
+
     return { canFinish: true, reason: '' };
-  }, [consolidatedHeats, heatSubmoduleStatuses, activeHeats, call?.call_no, calculateVisualRejectedWeight]);
+  }, [consolidatedHeats, heatSubmoduleStatuses, heatRemarks, call?.call_no, calculateVisualRejectedWeight]);
 
   // Update canFinishInspectionState whenever dependencies change
   useEffect(() => {
@@ -1298,10 +1311,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       };
 
       // Collect final results per heat (status, weights, remarks)
-      // NOTE: Heat pre-inspection data (TC, manufacturer, invoice, etc.) is now stored in rm_heat_quantities table
-      // Use consolidatedHeats to group duplicate heat numbers
-      const heatFinalResults = consolidatedHeats.map((heat) => {
-        const heatNo = heat.heatNo || heat.heat_no;
+      // Use consolidatedHeats (already groups duplicate heat numbers)
+      const heatFinalResults = consolidatedHeats.map((heat, heatIndex) => {
+        const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
         const heatStatuses = heatSubmoduleStatuses[heatNo] || {
           calibration: 'Pending',
           visual: 'Pending',
@@ -1315,7 +1327,6 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
         const weight = heat.weight; // Already aggregated in consolidatedHeats
 
-        // NEW LOGIC: If Dimension or Material Testing is NOT OK, complete heat is rejected
         let totalRejectedWeight = 0;
         let acceptedQtyMt = 0;
         let wtAcceptedNumbers = 0;
@@ -1333,36 +1344,22 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           const visualRaw = localStorage.getItem(visualKey);
           const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-          const processedHeatNumbers = new Set();
-          if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
-            heat.originalHeats.forEach((originalHeat) => {
-              const originalHeatNumber = originalHeat.heatNo || originalHeat.heat_no;
-              if (!processedHeatNumbers.has(originalHeatNumber)) {
-                const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === originalHeatNumber);
-                const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
-                const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
-                totalRejectedWeight += rejectedWeight;
-                processedHeatNumbers.add(originalHeatNumber);
-              }
-            });
-          }
+          // Use the index from consolidated list
+          const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+          totalRejectedWeight = calculateVisualRejectedWeight(heatVisualData);
 
           // Check if any modules are still pending
           const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
 
           if (anyPending) {
-            // If any module is pending, accepted material is 0
             acceptedQtyMt = 0;
             wtAcceptedNumbers = 0;
             overallStatus = 'PENDING';
           } else {
-            // All modules are complete (OK or NOT OK)
-            // Calculate accepted qty: Offered Qty - Rejected Weight (in Tons)
+            // All modules are complete
             acceptedQtyMt = weight - totalRejectedWeight;
-            // Calculate Wt. Accepted (Numbers) = Accepted Qty (Tons) * 1000 / 1.15
             wtAcceptedNumbers = (acceptedQtyMt * 1000) / 1.15;
 
-            // Determine overall status
             if (allOk && !hasNotOk) {
               overallStatus = 'ACCEPTED';
             } else if (hasNotOk) {
@@ -1374,9 +1371,9 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         }
 
         return {
-          // Identification
           inspectionCallNo,
           heatNo,
+          tcNo: heat.tcNo, // Keep TC for reference in the result
 
           // Weights (MT)
           weightOfferedMt: weight,
@@ -1391,11 +1388,11 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           materialTestStatus: heatStatuses.materialTest,
           packingStatus: heatStatuses.packing,
 
-          // Final Status - use the calculated overallStatus
+          // Final Status
           status: overallStatus,
           overallStatus: overallStatus,
 
-          // Cumulative Summary (same for all heats in this call)
+          // Cumulative Summary
           totalHeatsOffered: consolidatedHeats.length,
           totalQtyOfferedMt: consolidatedHeats.reduce((sum, h) => sum + h.weight, 0),
           noOfBundles: numberOfBundles ? parseInt(numberOfBundles) : 0,
@@ -2103,10 +2100,13 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
         // Restore color codes to heat data
         if (draftData.heatColorCodes && Object.keys(draftData.heatColorCodes).length > 0) {
-          const heatsWithColorCodes = fetchedHeatData.map(heat => ({
-            ...heat,
-            colorCode: draftData.heatColorCodes[heat.heatNo] || heat.colorCode || ''
-          }));
+          const heatsWithColorCodes = fetchedHeatData.map(heat => {
+            const heatNo = heat.heatNo || heat.heat_no;
+            return {
+              ...heat,
+              colorCode: draftData.heatColorCodes[heatNo] || heat.colorCode || ''
+            };
+          });
           setFetchedHeatData(heatsWithColorCodes);
           console.log('✅ Restored color codes to heat data');
         }
@@ -2412,8 +2412,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
           {/* Heat Blocks - Each unique heat has its own section with status tags (consolidated) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {consolidatedHeats.map((heat) => {
-              const heatNo = heat.heatNo || heat.heat_no;
+            {consolidatedHeats.map((heat, heatIndex) => {
+              const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
               const heatStatuses = heatSubmoduleStatuses[heatNo] || {
                 calibration: 'Pending',
                 visual: 'Pending',
@@ -2455,7 +2455,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                     {[
                       { key: 'calibration', label: 'Calibration', tooltip: 'Fill all chemical composition fields (C, Si, Mn, P, S)' },
                       { key: 'visual', label: 'Visual', tooltip: 'Select defect option and fill counts/lengths for selected defects' },
-                      { key: 'dimensional', label: 'Dimensional', tooltip: 'Fill all 20 sample diameters' },
+                      { key: 'dimensional', label: 'Dimensional', tooltip: 'Fill all 20 samples (Automatically marks NOT OK if 3+ defects found)' },
                       { key: 'materialTest', label: 'Material Test', tooltip: 'Fill all fields for all samples (C, Si, Mn, P, S, Grain Size, Decarb, Inclusions, Hardness)' },
                       { key: 'packing', label: 'Packing', tooltip: 'Answer all checklist items (Yes/No)' }
                     ].map(({ key, label, tooltip }) => {
@@ -2552,7 +2552,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                           const callNo = call?.call_no;
                           if (!callNo) return '—';
 
-                          const heatNo = heat.heatNo || heat.heat_no;
+                          const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
                           const heatStatuses = heatSubmoduleStatuses[heatNo] || {
                             calibration: 'Pending',
                             visual: 'Pending',
@@ -2580,22 +2580,10 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                           const visualRaw = localStorage.getItem(visualKey);
                           const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-                          let totalRejectedWeight = 0;
-                          const processedHeatNumbers = new Set();
-                          if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
-                            heat.originalHeats.forEach((originalHeat) => {
-                              const heatNumber = originalHeat.heatNo || originalHeat.heat_no;
-                              if (!processedHeatNumbers.has(heatNumber)) {
-                                const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNumber);
-                                const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
-                                const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
-                                totalRejectedWeight += rejectedWeight;
-                                processedHeatNumbers.add(heatNumber);
-                              }
-                            });
-                          }
+                          // Use unique index from consolidated list
+                          const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+                          const totalRejectedWeight = calculateVisualRejectedWeight(heatVisualData);
 
-                          // Calculate: Accepted Qty = Offered Qty - Rejected Weight
                           const offeredTons = parseFloat(heat.weight) || 0;
                           const acceptedQty = offeredTons - totalRejectedWeight;
                           return acceptedQty.toFixed(6);
@@ -2639,20 +2627,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                           const visualRaw = localStorage.getItem(visualKey);
                           const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-                          let totalRejectedWeight = 0;
-                          const processedHeatNumbers = new Set();
-                          if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
-                            heat.originalHeats.forEach((originalHeat) => {
-                              const heatNumber = originalHeat.heatNo || originalHeat.heat_no;
-                              if (!processedHeatNumbers.has(heatNumber)) {
-                                const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNumber);
-                                const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
-                                const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
-                                totalRejectedWeight += rejectedWeight;
-                                processedHeatNumbers.add(heatNumber);
-                              }
-                            });
-                          }
+                          const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+                          const totalRejectedWeight = calculateVisualRejectedWeight(heatVisualData);
 
                           // Calculate: Accepted Qty (Tons) = Offered Qty - Rejected Weight
                           const offeredTons = parseFloat(heat.weight) || 0;
@@ -2675,7 +2651,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                           const callNo = call?.call_no;
                           if (!callNo) return '0';
 
-                          const heatNo = heat.heatNo || heat.heat_no;
+                          const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
                           const heatStatuses = heatSubmoduleStatuses[heatNo] || {
                             calibration: 'Pending',
                             visual: 'Pending',
@@ -2698,20 +2674,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                           const visualRaw = localStorage.getItem(visualKey);
                           const visualData = visualRaw ? JSON.parse(visualRaw) : [];
 
-                          let totalRejectedWeight = 0;
-                          const processedHeatNumbers = new Set();
-                          if (heat.originalHeats && Array.isArray(heat.originalHeats)) {
-                            heat.originalHeats.forEach((originalHeat) => {
-                              const heatNumber = originalHeat.heatNo || originalHeat.heat_no;
-                              if (!processedHeatNumbers.has(heatNumber)) {
-                                const heatIndex = activeHeats.findIndex(h => (h.heatNo || h.heat_no) === heatNumber);
-                                const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
-                                const rejectedWeight = calculateVisualRejectedWeight(heatVisualData);
-                                totalRejectedWeight += rejectedWeight;
-                                processedHeatNumbers.add(heatNumber);
-                              }
-                            });
-                          }
+                          const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+                          const totalRejectedWeight = calculateVisualRejectedWeight(heatVisualData);
 
                           // Show calculated rejected weight from visual defects
                           if (totalRejectedWeight > 0) {
@@ -2822,7 +2786,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                 transition: 'opacity 0.2s',
                 display: 'none'
               }}
-              className="finish-button-tooltip"
+                className="finish-button-tooltip"
               >
                 {canFinishInspectionState.reason}
               </div>
@@ -2922,4 +2886,3 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 };
 
 export default RawMaterialDashboard;
- 
