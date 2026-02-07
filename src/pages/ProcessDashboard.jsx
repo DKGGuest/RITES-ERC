@@ -2322,6 +2322,20 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         }
       }
 
+      // NEW FALLBACK: If no lot found in localStorage (user hasn't entered grid data yet),
+      // try to get the lot from the initiation data cache.
+      const initiationData = callInitiationDataCache[lineIcNumber];
+      if (initiationData) {
+        // Try lotDetailsList first
+        if (initiationData.lotDetailsList && initiationData.lotDetailsList.length > 0) {
+          return initiationData.lotDetailsList[0].lotNumber;
+        }
+        // Try single lotNumber field
+        if (initiationData.lotNumber) {
+          return initiationData.lotNumber;
+        }
+      }
+
       return null;
     } catch (error) {
       return null;
@@ -2369,7 +2383,13 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     }
 
     // Persist the entered manufactured quantity so lot-wise table updates immediately
-    try { persistLineFinalResult(field, value); } catch (e) { console.warn('Persist manufactured failed', e); }
+    try {
+      persistLineFinalResult(field, value);
+      // Force re-render ensures the Lot Wise Table reads the newly saved value from localStorage
+      setManufacturedQtyByLine(prev => ({ ...prev }));
+    } catch (e) {
+      console.warn('Persist manufactured failed', e);
+    }
   };
 
   // Persist lineFinalResult is declared later to ensure `rejectedQty` and `acceptedQty` are initialized
