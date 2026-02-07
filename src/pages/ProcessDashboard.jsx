@@ -3462,8 +3462,11 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     requiredModules.forEach(moduleName => {
       const moduleData = allData?.[moduleName];
+      const sectionLabel = moduleName.replace('Data', '').charAt(0).toUpperCase() + moduleName.replace('Data', '').slice(1);
 
+      // VALIDATION FIX: Fail if entire section data is missing
       if (!moduleData || !Array.isArray(moduleData) || moduleData.length === 0) {
+        incompleteSections.push(`${sectionLabel}: No data entered`);
         return;
       }
 
@@ -3590,6 +3593,11 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
       const allLots = Array.from(lotsSet);
       console.log(`🔍 [Validation] Found ${allLots.length} lots in ${lineNo}:`, allLots);
+
+      // VALIDATION FIX: Fail if no data entered for this line
+      if (allLots.length === 0) {
+        validationErrors.set(`${lineNo}|General`, [`No production data entered for ${lineNo}`]);
+      }
 
       // Validate each lot
       allLots.forEach(lotNo => {
@@ -4456,7 +4464,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         <div style={{ display: 'flex', gap: 'var(--space-24)', flexWrap: 'wrap' }}>
           <div><strong>Call No:</strong> {callNo}</div>
           <div><strong>Shift:</strong> {shiftOfInspection}</div>
-          <div><strong>Date of Inspection:</strong> {dateOfInspection}</div>
+          <div><strong>Date of Inspection:</strong> {formatDate(dateOfInspection)}</div>
         </div>
       </div>
 
@@ -5068,7 +5076,13 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                         // Fetching from localStorage ensures we use the exact values computed during user data entry
                         const lotFinalResult = loadFromLocalStorage('lineFinalResult', prodLine?.icNumber || '', prodLine?.poNumber || prodLine?.po_no || '', selectedLine, selectedLot);
 
-                        const currentLotMaxManufacturedQty = lotFinalResult?.totalManufactured || 0;
+                        // REAL-TIME UPDATE FIX: Check state first, then localStorage
+                        // This ensures the table updates AS THE USER TYPES, not just on blur
+                        const stateMfgQty = manufacturedQtyByLine?.[selectedLine]?.[selectedLot]?.shearing;
+                        const currentLotMaxManufacturedQty = (stateMfgQty !== undefined && stateMfgQty !== '')
+                          ? parseInt(stateMfgQty) || 0
+                          : (lotFinalResult?.totalManufactured || 0);
+
                         const currentTotalRejected = lotFinalResult?.totalRejected || 0;
 
                         const currentShearingManufacturedQty = currentLotMaxManufacturedQty;

@@ -747,7 +747,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     if (!heatVisualData?.selectedDefects) return 'Pending';
 
     // If heat has been marked as passed, return Pass
-    if (heatVisualData.isPassed) return 'Pass';
+    // if (heatVisualData.isPassed) return 'Pass';
 
     const selected = heatVisualData.selectedDefects;
     const counts = heatVisualData.defectCounts || {};
@@ -1017,9 +1017,20 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       return { canFinish: false, reason: 'No heats available for inspection' };
     }
 
-    // Check each heat's module statuses
+    // Check if Number of Bundles is entered
+    if (!numberOfBundles || numberOfBundles.trim() === '') {
+      return { canFinish: false, reason: 'Number of Bundles is required in Pre-Inspection Data' };
+    }
+
+    // Check each heat's module statuses and color code
     for (const heat of consolidatedHeats) {
       const heatNo = heat.heatNo || heat.heat_no || 'Unknown';
+
+      // Check for Color Code
+      if (!heat.colorCode || heat.colorCode.trim() === '') {
+        return { canFinish: false, reason: `Heat ${heatNo}: Color Code is required` };
+      }
+
       const heatStatuses = heatSubmoduleStatuses[heatNo] || {
         calibration: 'Pending',
         visual: 'Pending',
@@ -1082,7 +1093,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     }
 
     return { canFinish: true, reason: '' };
-  }, [consolidatedHeats, heatSubmoduleStatuses, heatRemarks, call?.call_no, calculateVisualRejectedWeight]);
+  }, [consolidatedHeats, heatSubmoduleStatuses, heatRemarks, numberOfBundles, call?.call_no, calculateVisualRejectedWeight]);
 
   // Update canFinishInspectionState whenever dependencies change
   useEffect(() => {
@@ -1310,6 +1321,11 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         sourceOfRawMaterial: sourceOfRawMaterial || null
       };
 
+      // Get current user for audit fields
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || currentUser?.username || 'IE_USER';
+      const shiftOfInspection = sessionStorage.getItem('inspectionShift') || null;
+
       // Collect final results per heat (status, weights, remarks)
       // Use consolidatedHeats (already groups duplicate heat numbers)
       const heatFinalResults = consolidatedHeats.map((heat, heatIndex) => {
@@ -1399,7 +1415,11 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           noOfErcFinished: numberOfERC ? parseInt(numberOfERC) : 0,
 
           // Remarks
-          remarks: heatRemarks[heatNo] || null
+          remarks: heatRemarks[heatNo] || null,
+
+          // Audit Fields
+          createdBy: userId,
+          shift: shiftOfInspection
         };
       });
 
@@ -1419,10 +1439,6 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
       console.log(`📊 Overall Inspection Status: ${overallInspectionStatus} (${acceptedHeats} accepted, ${rejectedHeats} rejected out of ${totalHeats} heats)`);
 
-      // Get current user for audit fields
-      const currentUser = getStoredUser();
-      const userId = currentUser?.userId || currentUser?.username || 'IE_USER';
-
       // Build the complete payload
       const payload = {
         inspectionCallNo,
@@ -1437,7 +1453,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           finishedBy: localStorage.getItem('username') || 'IE_USER',
           finishedAt: new Date().toISOString(),
           inspectionDate: sessionStorage.getItem('inspectionDate') || new Date().toISOString().split('T')[0],
-          shiftOfInspection: sessionStorage.getItem('inspectionShift') || null
+          shiftOfInspection: shiftOfInspection
         },
         createdBy: userId,
         updatedBy: userId
@@ -1842,6 +1858,11 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         sourceOfRawMaterial: sourceOfRawMaterial || null
       };
 
+      // Get current user for audit fields
+      const currentUser = getStoredUser();
+      const userId = currentUser?.userId || currentUser?.username || 'IE_USER';
+      const shiftOfInspection = sessionStorage.getItem('inspectionShift') || null;
+
       // Collect heat final results using consolidatedHeats to group duplicate heat numbers
       const heatFinalResults = consolidatedHeats.map((heat) => {
         const heatNo = heat.heatNo || heat.heat_no;
@@ -1909,14 +1930,15 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           totalQtyOfferedMt: consolidatedHeats.reduce((sum, h) => sum + h.weight, 0),
           noOfBundles: numberOfBundles ? parseInt(numberOfBundles) : 0,
           noOfErcFinished: numberOfERC ? parseInt(numberOfERC) : 0,
-          remarks: heatRemarks[heatNo] || null
+          remarks: heatRemarks[heatNo] || null,
+
+          // Audit Fields
+          createdBy: userId,
+          shift: shiftOfInspection
         };
       });
 
       // Build pause payload
-      const currentUser = getStoredUser();
-      const userId = currentUser?.userId || currentUser?.username || 'IE_USER';
-
       const pausePayload = {
         inspectionCallNo,
         preInspectionData,
@@ -1930,7 +1952,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           finishedBy: localStorage.getItem('username') || 'IE_USER',
           finishedAt: new Date().toISOString(),
           inspectionDate: sessionStorage.getItem('inspectionDate') || new Date().toISOString().split('T')[0],
-          shiftOfInspection: sessionStorage.getItem('inspectionShift') || null
+          shiftOfInspection: shiftOfInspection
         },
         createdBy: userId,
         updatedBy: userId
