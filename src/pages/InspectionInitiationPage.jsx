@@ -3,7 +3,7 @@ import InspectionInitiationFormContent from '../components/InspectionInitiationF
 import { saveInspectionInitiation } from '../services/vendorInspectionService';
 import { markAsUnderInspection, markAsWithheld } from '../services/callStatusService';
 import { getStoredUser } from '../services/authService';
-import { fetchLatestWorkflowTransition, performTransitionAction } from '../services/workflowService';
+import { performTransitionAction } from '../services/workflowService';
 import '../styles/inspectionInitiationPage.css';
 
 // Helper to check if call is Process or Final Product (mock mode)
@@ -380,19 +380,9 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
       const currentUser = getStoredUser();
       const userId = currentUser?.userId || 0;
 
-      // Fetch the latest workflow transition ID for this call
-      let workflowTransitionId = call.id || call.workflowTransitionId || null;
-
-      try {
-        const latestTransition = await fetchLatestWorkflowTransition(call.call_no);
-        if (latestTransition && latestTransition.workflowTransitionId) {
-          workflowTransitionId = latestTransition.workflowTransitionId;
-          console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${call.call_no}`);
-        }
-      } catch (error) {
-        console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
-        // Continue with the original workflowTransitionId from call object
-      }
+      // Use the workflow transition ID from the call object
+      const workflowTransitionId = call.id || call.workflowTransitionId || null;
+      console.log(`📍 Using workflowTransitionId: ${workflowTransitionId} for ${call.call_no}`);
 
       const initiationData = {
         inspectionRequestId: call.api_id || null,
@@ -414,71 +404,10 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
         actionBy: userId
       };
 
-      // Call workflow API for Process/Final Product, or saveInspectionInitiation for Raw Material
-      if (isProcessOrFinalProduct(call.product_type)) {
-        console.log('🏭 Process/Final Product: Calling workflow API for initiation...');
-        console.log('Initiation Data:', initiationData);
+      console.log('💾 Saving inspection initiation...', initiationData);
+      await saveInspectionInitiation(initiationData);
+      console.log('✅ Inspection initiation saved successfully');
 
-        // Trigger workflow API for Process/Final Product
-        const workflowActionData = {
-          workflowTransitionId: workflowTransitionId,
-          requestId: call.call_no,
-          action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
-          remarks: `Inspection initiated - Shift: ${shiftOfInspection}, Date: ${dateOfInspection}`,
-          actionBy: userId,
-          pincode: call.pincode || '560001',
-          materialAvailable: 'YES'
-        };
-
-        console.log('Workflow Action Data:', workflowActionData);
-
-        try {
-          await performTransitionAction(workflowActionData);
-          console.log('✅ Workflow transition successful for Process/Final Product');
-        } catch (workflowError) {
-          console.error('❌ Workflow API error:', workflowError);
-          throw new Error(workflowError.message || 'Failed to initiate inspection via workflow');
-        }
-      } else {
-        // Raw Material: Call real API
-        console.log('🔧 Raw Material: Calling saveInspectionInitiation and workflow API...');
-        await saveInspectionInitiation(initiationData);
-
-        // Fetch the latest workflow transition ID AFTER saving inspection initiation for Raw Material
-        // This ensures we have the correct transition ID for the workflow action
-        try {
-          const latestTransitionAfterSave = await fetchLatestWorkflowTransition(call.call_no);
-          if (latestTransitionAfterSave && latestTransitionAfterSave.workflowTransitionId) {
-            workflowTransitionId = latestTransitionAfterSave.workflowTransitionId;
-            console.log(`✅ Updated workflowTransitionId after save: ${workflowTransitionId} for ${call.call_no}`);
-          }
-        } catch (error) {
-          console.warn('⚠️ Failed to fetch latest workflow transition after save, using previous ID:', error);
-          // Continue with the previous workflowTransitionId
-        }
-
-        // Trigger workflow API for Raw Material with ENTER_SHIFT_DETAILS_AND_START_INSPECTION action
-        console.log('🔄 Triggering workflow API for Raw Material Inspection Initiation...');
-        const workflowActionData = {
-          workflowTransitionId: workflowTransitionId,
-          requestId: call.call_no,
-          action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
-          remarks: `Inspection initiated - Shift: ${shiftOfInspection}, Date: ${dateOfInspection}`,
-          actionBy: userId,
-          pincode: call.pincode || '560001',
-          materialAvailable: 'YES'
-        };
-
-        console.log('Workflow Action Data:', workflowActionData);
-
-        try {
-          await performTransitionAction(workflowActionData);
-          console.log('✅ Workflow transition successful for Raw Material');
-        } catch (workflowError) {
-          console.error('❌ Workflow API error:', workflowError);
-          throw new Error(workflowError.message || 'Failed to initiate inspection via workflow');
-        }
-      }
 
       // Mark call as under inspection in local storage
       markAsUnderInspection(call.call_no, { shiftOfInspection, dateOfInspection });
@@ -506,179 +435,179 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
 
   return (
     <div className="inspection-initiation-page">
-        <div className="breadcrumb">
-            <div className="breadcrumb-item breadcrumb-item--clickable" onClick={onBack}>Landing Page</div>
-            <span className="breadcrumb-separator">/</span>
-            <div className="breadcrumb-item breadcrumb-active">Inspection Initiation</div>
-        </div>
+      <div className="breadcrumb">
+        <div className="breadcrumb-item breadcrumb-item--clickable" onClick={onBack}>Landing Page</div>
+        <span className="breadcrumb-separator">/</span>
+        <div className="breadcrumb-item breadcrumb-active">Inspection Initiation</div>
+      </div>
 
-        <div className="inspection-page-header">
-            <h1 className="inspection-page-header__title">Inspection Initiation for {call.call_no}</h1>
-            <div className="inspection-page-header__datetime">{currentDateTime}</div>
-        </div>
+      <div className="inspection-page-header">
+        <h1 className="inspection-page-header__title">Inspection Initiation for {call.call_no}</h1>
+        <div className="inspection-page-header__datetime">{currentDateTime}</div>
+      </div>
 
-        <div className="inspection-form-container">
-            <InspectionInitiationFormContent
-              call={call}
-              formData={formData}
-              onFormDataChange={onFormDataChange}
-              showSectionA={showSectionA}
-              showSectionB={showSectionB}
-            />
-        </div>
+      <div className="inspection-form-container">
+        <InspectionInitiationFormContent
+          call={call}
+          formData={formData}
+          onFormDataChange={onFormDataChange}
+          showSectionA={showSectionA}
+          showSectionB={showSectionB}
+        />
+      </div>
 
-        <div className="inspection-action-buttons">
-            <button className="btn btn-secondary inspection-action-buttons__btn" onClick={onBack} disabled={isSaving}>
-              Back to Landing Page
-            </button>
-            <div className="inspection-action-buttons__group">
-              <button
-                type="button"
-                className="btn btn-warning inspection-action-buttons__btn"
-                onClick={() => handleOpenCallActionModal('WITHHELD')}
-                disabled={isSaving}
-              >
-                Withheld Call
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger inspection-action-buttons__btn"
-                onClick={() => handleOpenCallActionModal('CANCELLED')}
-                disabled={isSaving}
-              >
-                Cancel Call
-              </button>
-              <button
-                type="button"
-                className="btn btn-success inspection-action-buttons__btn"
-                onClick={handleOpenInitiateModal}
-                disabled={isSaving}
-              >
-                Initiate Inspection
-              </button>
+      <div className="inspection-action-buttons">
+        <button className="btn btn-secondary inspection-action-buttons__btn" onClick={onBack} disabled={isSaving}>
+          Back to Landing Page
+        </button>
+        <div className="inspection-action-buttons__group">
+          <button
+            type="button"
+            className="btn btn-warning inspection-action-buttons__btn"
+            onClick={() => handleOpenCallActionModal('WITHHELD')}
+            disabled={isSaving}
+          >
+            Withheld Call
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger inspection-action-buttons__btn"
+            onClick={() => handleOpenCallActionModal('CANCELLED')}
+            disabled={isSaving}
+          >
+            Cancel Call
+          </button>
+          <button
+            type="button"
+            className="btn btn-success inspection-action-buttons__btn"
+            onClick={handleOpenInitiateModal}
+            disabled={isSaving}
+          >
+            Initiate Inspection
+          </button>
+        </div>
+      </div>
+
+      {showCallActionModal && (
+        <div className="modal-overlay" onClick={handleCloseCallActionModal}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {callActionType === 'WITHHELD' ? 'Withheld Call' : 'Cancel Call'}
+              </h3>
+              <button className="modal-close" onClick={handleCloseCallActionModal}>×</button>
             </div>
-        </div>
 
-        {showCallActionModal && (
-          <div className="modal-overlay" onClick={handleCloseCallActionModal}>
-            <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3 className="modal-title">
-                  {callActionType === 'WITHHELD' ? 'Withheld Call' : 'Cancel Call'}
-                </h3>
-                <button className="modal-close" onClick={handleCloseCallActionModal}>×</button>
+            <div className="modal-body">
+              <div className="modal-field">
+                <label className="modal-label">Reason <span className="required">*</span></label>
+                <select
+                  className="modal-select"
+                  value={callActionReason}
+                  onChange={(e) => { setCallActionReason(e.target.value); setCallActionError(''); }}
+                >
+                  {CALL_ACTION_REASONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
 
-              <div className="modal-body">
+              {callActionReason === 'ANY_OTHER' && (
                 <div className="modal-field">
-                  <label className="modal-label">Reason <span className="required">*</span></label>
+                  <label className="modal-label">Remarks <span className="required">*</span></label>
+                  <textarea
+                    className="modal-textarea"
+                    placeholder="Please provide details..."
+                    value={callActionRemarks}
+                    onChange={(e) => { setCallActionRemarks(e.target.value); setCallActionError(''); }}
+                  />
+                </div>
+              )}
+
+              {callActionError && <div className="modal-error">{callActionError}</div>}
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary modal-actions__btn" onClick={handleCloseCallActionModal} disabled={isSaving}>
+                Cancel
+              </button>
+              <button type="button" className={`${callActionType === 'WITHHELD' ? 'btn btn-warning' : 'btn btn-danger'} modal-actions__btn`} onClick={handleSubmitCallAction} disabled={isSaving}>
+                {isSaving ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInitiateModal && (
+        <div className="modal-overlay" onClick={handleCloseInitiateModal}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Initiate Inspection</h3>
+              <button className="modal-close" onClick={handleCloseInitiateModal}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="modal-field">
+                <label className="modal-label">Shift of Inspection <span className="required">*</span></label>
+                <select
+                  className="modal-select"
+                  value={shiftOfInspection}
+                  onChange={(e) => {
+                    setShiftOfInspection(e.target.value);
+                    setInitiateError('');
+                    if (e.target.value && e.target.value !== 'C') {
+                      setDateOfInspection(new Date().toISOString().split('T')[0]);
+                    }
+                  }}
+                >
+                  <option value="">Select Shift</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div className="modal-field">
+                <label className="modal-label">Date of Inspection <span className="required">*</span></label>
+                {shiftOfInspection === 'C' ? (
                   <select
                     className="modal-select"
-                    value={callActionReason}
-                    onChange={(e) => { setCallActionReason(e.target.value); setCallActionError(''); }}
+                    value={dateOfInspection}
+                    onChange={(e) => { setDateOfInspection(e.target.value); setInitiateError(''); }}
                   >
-                    {CALL_ACTION_REASONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                    {getDateOptions().map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                </div>
-
-                {callActionReason === 'ANY_OTHER' && (
-                  <div className="modal-field">
-                    <label className="modal-label">Remarks <span className="required">*</span></label>
-                    <textarea
-                      className="modal-textarea"
-                      placeholder="Please provide details..."
-                      value={callActionRemarks}
-                      onChange={(e) => { setCallActionRemarks(e.target.value); setCallActionError(''); }}
-                    />
-                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    className="modal-input"
+                    value={dateOfInspection ? new Date(dateOfInspection).toLocaleDateString('en-GB') : ''}
+                    disabled
+                  />
                 )}
-
-                {callActionError && <div className="modal-error">{callActionError}</div>}
+                <span className="modal-hint">
+                  {shiftOfInspection === 'C' ? 'Shift C: Select today or yesterday' : 'Auto-set to today for shifts A, B, General'}
+                </span>
               </div>
 
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary modal-actions__btn" onClick={handleCloseCallActionModal} disabled={isSaving}>
-                  Cancel
-                </button>
-                <button type="button" className={`${callActionType === 'WITHHELD' ? 'btn btn-warning' : 'btn btn-danger'} modal-actions__btn`} onClick={handleSubmitCallAction} disabled={isSaving}>
-                  {isSaving ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
+              {initiateError && <div className="modal-error">{initiateError}</div>}
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary modal-actions__btn" onClick={handleCloseInitiateModal} disabled={isSaving}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-success modal-actions__btn" onClick={handleSubmitInitiation} disabled={isSaving}>
+                {isSaving ? 'Initiating...' : 'Confirm & Proceed'}
+              </button>
             </div>
           </div>
-        )}
-
-        {showInitiateModal && (
-          <div className="modal-overlay" onClick={handleCloseInitiateModal}>
-            <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3 className="modal-title">Initiate Inspection</h3>
-                <button className="modal-close" onClick={handleCloseInitiateModal}>×</button>
-              </div>
-
-              <div className="modal-body">
-                <div className="modal-field">
-                  <label className="modal-label">Shift of Inspection <span className="required">*</span></label>
-                  <select
-                    className="modal-select"
-                    value={shiftOfInspection}
-                    onChange={(e) => {
-                      setShiftOfInspection(e.target.value);
-                      setInitiateError('');
-                      if (e.target.value && e.target.value !== 'C') {
-                        setDateOfInspection(new Date().toISOString().split('T')[0]);
-                      }
-                    }}
-                  >
-                    <option value="">Select Shift</option>
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                    <option value="C">C</option>
-                    <option value="General">General</option>
-                  </select>
-                </div>
-
-                <div className="modal-field">
-                  <label className="modal-label">Date of Inspection <span className="required">*</span></label>
-                  {shiftOfInspection === 'C' ? (
-                    <select
-                      className="modal-select"
-                      value={dateOfInspection}
-                      onChange={(e) => { setDateOfInspection(e.target.value); setInitiateError(''); }}
-                    >
-                      {getDateOptions().map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      className="modal-input"
-                      value={dateOfInspection ? new Date(dateOfInspection).toLocaleDateString('en-GB') : ''}
-                      disabled
-                    />
-                  )}
-                  <span className="modal-hint">
-                    {shiftOfInspection === 'C' ? 'Shift C: Select today or yesterday' : 'Auto-set to today for shifts A, B, General'}
-                  </span>
-                </div>
-
-                {initiateError && <div className="modal-error">{initiateError}</div>}
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary modal-actions__btn" onClick={handleCloseInitiateModal} disabled={isSaving}>
-                  Cancel
-                </button>
-                <button type="button" className="btn btn-success modal-actions__btn" onClick={handleSubmitInitiation} disabled={isSaving}>
-                  {isSaving ? 'Initiating...' : 'Confirm & Proceed'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
+      )}
     </div>
   );
 };

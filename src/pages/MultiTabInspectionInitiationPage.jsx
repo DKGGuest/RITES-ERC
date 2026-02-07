@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
 import { saveInspectionInitiation } from '../services/vendorInspectionService';
 import { getStoredUser } from '../services/authService';
-import { fetchLatestWorkflowTransition, performTransitionAction } from '../services/workflowService';
+import { performTransitionAction } from '../services/workflowService';
 import '../styles/inspectionInitiationPage.css';
 
 // Reason options for withheld/cancel call
@@ -286,19 +286,9 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
         console.log(`\n📍 Processing call: ${call.call_no}`);
 
         try {
-          // Fetch the latest workflow transition ID for this call
-          let workflowTransitionId = call.id || call.workflowTransitionId || null;
-
-          try {
-            const latestTransition = await fetchLatestWorkflowTransition(call.call_no);
-            if (latestTransition && latestTransition.workflowTransitionId) {
-              workflowTransitionId = latestTransition.workflowTransitionId;
-              console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${call.call_no}`);
-            }
-          } catch (error) {
-            console.warn(`⚠️ Failed to fetch latest workflow transition for ${call.call_no}, using call.id:`, error);
-            // Continue with the original workflowTransitionId from call object
-          }
+          // Use the workflow transition ID from the call object
+          const workflowTransitionId = call.id || call.workflowTransitionId || null;
+          console.log(`📍 Using workflowTransitionId: ${workflowTransitionId} for ${call.call_no}`);
 
           // Save inspection initiation data
           const initiationData = {
@@ -312,51 +302,12 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
             workflowTransitionId: workflowTransitionId,
             actionBy: userId
           };
+
           console.log('💾 Saving initiation for call:', call.call_no, initiationData);
           const result = await saveInspectionInitiation(initiationData);
           console.log('✅ Saved successfully:', call.call_no, result);
 
-          // Fetch the latest workflow transition ID AFTER saving inspection initiation
-          // This ensures we have the correct transition ID for the workflow action
-          try {
-            const latestTransitionAfterSave = await fetchLatestWorkflowTransition(call.call_no);
-            if (latestTransitionAfterSave && latestTransitionAfterSave.workflowTransitionId) {
-              workflowTransitionId = latestTransitionAfterSave.workflowTransitionId;
-              console.log(`✅ Updated workflowTransitionId after save: ${workflowTransitionId} for ${call.call_no}`);
-            }
-          } catch (error) {
-            console.warn(`⚠️ Failed to fetch latest workflow transition after save for ${call.call_no}, using previous ID:`, error);
-            // Continue with the previous workflowTransitionId
-          }
-
-          // Trigger workflow API with ENTER_SHIFT_DETAILS_AND_START_INSPECTION action
-          // REMOVED: No longer calling performTransitionAction on Confirm & Proceed
-          console.log('✅ Inspection initiation saved successfully for call:', call.call_no);
           successfulCalls.push(call.call_no);
-
-          // Commented out workflow API call
-          // console.log('🔄 Triggering workflow API for Inspection Initiation...');
-          // const workflowActionData = {
-          //   workflowTransitionId: workflowTransitionId,
-          //   requestId: call.call_no,
-          //   action: 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION',
-          //   remarks: `Inspection initiated - Shift: ${initiateShift}, Date: ${initiateDate}`,
-          //   actionBy: userId,
-          //   pincode: call.pincode || '560001',
-          //   materialAvailable: 'YES'
-          // };
-          // console.log('📤 Workflow Action Data:', workflowActionData);
-          // try {
-          //   await performTransitionAction(workflowActionData);
-          //   console.log('✅ Workflow transition successful for call:', call.call_no);
-          //   successfulCalls.push(call.call_no);
-          // } catch (workflowError) {
-          //   console.error('❌ Workflow API error for call:', call.call_no, workflowError);
-          //   failedCalls.push({
-          //     callNo: call.call_no,
-          //     error: workflowError.message || 'Failed to perform workflow transition'
-          //   });
-          // }
         } catch (callError) {
           console.error(`❌ Error processing call ${call.call_no}:`, callError);
           failedCalls.push({

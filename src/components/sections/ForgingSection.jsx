@@ -22,6 +22,11 @@ const ForgingSection = ({
       improperForging: [],
       forgingDefect: [],
       embossingDefect: [],
+      forgingTemperatureRejected: '',
+      forgingStabilisationRejected: '',
+      improperForgingRejected: '',
+      forgingDefectRejected: '',
+      embossingDefectRejected: '',
       remarks: '',
       noProduction: true
     };
@@ -289,7 +294,7 @@ const ForgingSection = ({
                         className="form-control forging-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                   </tr>
@@ -400,14 +405,33 @@ const ForgingSection = ({
                     </div>
                   ))}
                   <div className="forging-mobile-field forging-mobile-field--rejected">
-                    <span className="forging-mobile-field__label">Rejected No. for Forging Defects</span>
+                    <span className="forging-mobile-field__label">Forging Temp Rejected</span>
                     <div className="forging-mobile-field__value">
-                      <input
-                        type="number"
-                        value={row.rejectedQty || ''}
-                        onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
-                      />
+                      <input type="number" value={row.forgingTemperatureRejected || ''} onChange={e => updateData(idx, 'forgingTemperatureRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                    </div>
+                  </div>
+                  <div className="forging-mobile-field forging-mobile-field--rejected">
+                    <span className="forging-mobile-field__label">Forging Stabilisation Rejected</span>
+                    <div className="forging-mobile-field__value">
+                      <input type="number" value={row.forgingStabilisationRejected || ''} onChange={e => updateData(idx, 'forgingStabilisationRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                    </div>
+                  </div>
+                  <div className="forging-mobile-field forging-mobile-field--rejected">
+                    <span className="forging-mobile-field__label">Improper Forging Rejected</span>
+                    <div className="forging-mobile-field__value">
+                      <input type="number" value={row.improperForgingRejected || ''} onChange={e => updateData(idx, 'improperForgingRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                    </div>
+                  </div>
+                  <div className="forging-mobile-field forging-mobile-field--rejected">
+                    <span className="forging-mobile-field__label">Forging Defect Rejected</span>
+                    <div className="forging-mobile-field__value">
+                      <input type="number" value={row.forgingDefectRejected || ''} onChange={e => updateData(idx, 'forgingDefectRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                    </div>
+                  </div>
+                  <div className="forging-mobile-field forging-mobile-field--rejected">
+                    <span className="forging-mobile-field__label">Embossing Defect Rejected</span>
+                    <div className="forging-mobile-field__value">
+                      <input type="number" value={row.embossingDefectRejected || ''} onChange={e => updateData(idx, 'embossingDefectRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
                     </div>
                   </div>
                   <div className="forging-mobile-field">

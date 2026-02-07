@@ -257,7 +257,7 @@ const TemperingSection = ({
                           className="form-control tempering-input"
                           value={row.remarks}
                           onChange={e => updateData(idx, 'remarks', e.target.value)}
-                          disabled={row.noProduction || !row.lotNo}
+                          disabled={row.noProduction}
                         />
                       </td>
                     </tr>
@@ -371,7 +371,7 @@ const TemperingSection = ({
                           type="text"
                           value={row.remarks}
                           onChange={e => updateData(idx, 'remarks', e.target.value)}
-                          disabled={row.noProduction || !row.lotNo}
+                          disabled={row.noProduction}
                         />
                       </div>
                     </div>

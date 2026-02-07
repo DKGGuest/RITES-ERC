@@ -283,7 +283,7 @@ const TurningSection = ({
                         className="form-control turning-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                   </tr>
@@ -368,7 +368,7 @@ const TurningSection = ({
                         step="0.01"
                         value={row.fullTurningLength[0] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                         placeholder="float"
                       />
                     </div>
@@ -445,7 +445,7 @@ const TurningSection = ({
                         type="text"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </div>
                   </div>

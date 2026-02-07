@@ -151,7 +151,7 @@ const ShearingSection = ({
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[0] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                         placeholder="float"
                       />
                     </td>
@@ -160,7 +160,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.qualityDia[0] || ''}
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -172,7 +172,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.sharpEdges[0] || ''}
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -184,7 +184,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.crackedEdges[0] || ''}
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -202,7 +202,7 @@ const ShearingSection = ({
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[1] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                         placeholder="float"
                       />
                     </td>
@@ -211,7 +211,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.qualityDia[1] || ''}
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -223,7 +223,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.sharpEdges[1] || ''}
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -235,7 +235,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.crackedEdges[1] || ''}
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -252,7 +252,7 @@ const ShearingSection = ({
                         className="form-control shearing-length-input"
                         value={row.lengthCutBar[2] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                         placeholder="float"
                       />
                     </td>
@@ -261,7 +261,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.qualityDia[2] || ''}
                         onChange={e => updateData(idx, 'qualityDia', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -273,7 +273,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.sharpEdges[2] || ''}
                         onChange={e => updateData(idx, 'sharpEdges', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -285,7 +285,7 @@ const ShearingSection = ({
                         className="form-control shearing-select"
                         value={row.crackedEdges[2] || ''}
                         onChange={e => updateData(idx, 'crackedEdges', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       >
                         <option value="">Select</option>
                         <option value="OK">OK</option>
@@ -304,7 +304,7 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[0] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -313,7 +313,7 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -322,7 +322,7 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[2] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -331,7 +331,7 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[3] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 3)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                   </tr>
@@ -346,7 +346,7 @@ const ShearingSection = ({
                         className="form-control shearing-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                   </tr>

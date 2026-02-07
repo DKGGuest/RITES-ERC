@@ -197,7 +197,7 @@ const MpiSection = ({
                         className="form-control mpi-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                   </tr>
@@ -242,7 +242,7 @@ const MpiSection = ({
                         <select
                           value={row.testResults[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'testResults', e.target.value, sampleIdx)}
-                          disabled={row.noProduction || !row.lotNo}
+                          disabled={row.noProduction}
                         >
                           <option value="">Select</option>
                           <option value="OK">OK</option>

@@ -416,7 +416,7 @@ const FinalCheckSection = ({
                         className="form-control final-check-input"
                         value={row.remarks}
                         onChange={e => updateData(idx, 'remarks', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={row.noProduction}
                       />
                     </td>
                   </tr>

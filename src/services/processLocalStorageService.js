@@ -87,13 +87,24 @@ const transformToBackendFormat = (data, submodule) => {
       rejectedQty: ['rejectedQty1', 'rejectedQty2']
     },
     forging: {
-      forgingTemperature: ['forgingTemp1', 'forgingTemp2', 'forgingTemp3']
+      forgingTemperature: ['forgingTemp1', 'forgingTemp2'],
+      forgingStabilisation: ['forgingStabilisationRejection1', 'forgingStabilisationRejection2'],
+      improperForging: ['improperForging1', 'improperForging2'],
+      forgingDefect: ['forgingDefect1', 'forgingDefect2'],
+      embossingDefect: ['embossingDefect1', 'embossingDefect2']
     },
     quenching: {
-      quenchingHardness: ['quenchingHardness1', 'quenchingHardness2']
+      quenchingTemperature: ['quenchingTemperature1', 'quenchingTemperature2'],
+      quenchingDuration: ['quenchingDuration1', 'quenchingDuration2'],
+      quenchingHardness: ['quenchingHardness1', 'quenchingHardness2'],
+      boxGauge: ['boxGauge1', 'boxGauge2'],
+      flatBearingArea: ['flatBearingArea1', 'flatBearingArea2'],
+      fallingGauge: ['fallingGauge1', 'fallingGauge2']
     },
     tempering: {
-      // temperingTemperature and temperingDuration are already single values
+      temperingTemperature: ['temperingTemperature1', 'temperingTemperature2'],
+      temperingDuration: ['temperingDuration1', 'temperingDuration2'],
+      totalTemperingRejection: 'totalTemperingRejection'
     },
     finalCheck: {
       boxGauge: ['boxGauge1', 'boxGauge2'],

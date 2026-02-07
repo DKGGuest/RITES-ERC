@@ -13,9 +13,9 @@
 // Get API URL from environment variable or fallback to Azure production URL
 // TEMPORARY: Force Azure URL for testing (comment out to use .env.local)
 // export const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-// export const API_BASE_URL = 'http://localhost:8080/sarthi-backend';
-export const API_BASE_URL = process.env.REACT_APP_API_URL ||
-   'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+export const API_BASE_URL = 'http://localhost:8080/sarthi-backend' || 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+// export const API_BASE_URL = process.env.REACT_APP_API_URL ||
+//    'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 
 // Log current environment for debugging
 console.log('🌐 API Configuration:', {

@@ -18,19 +18,118 @@ const parseString = (val) => {
 }
 
 
-export const transformLineDataForBackend = (frontendLineData) => {
+const calculateGenericRejected = (list, rejectedKeys) => {
+    if (!list) return 0;
+    return list.reduce((acc, row) => {
+        let rowRejected = 0;
+        if (row.rejectedQty) {
+            rowRejected = parseNumber(row.rejectedQty) || 0;
+        } else if (rejectedKeys && rejectedKeys.length > 0) {
+            rowRejected = rejectedKeys.reduce((sum, key) => sum + (parseNumber(row[key]) || 0), 0);
+        }
+        return acc + rowRejected;
+    }, 0);
+};
+
+const calculateGenericAccepted = (list) => {
+    if (!list) return 0;
+    return list.reduce((acc, row) => acc + (parseNumber(row.acceptedQty) || 0), 0);
+};
+
+
+export const transformLineDataForBackend = (frontendLineData, manualQuantities = {}, metaData = {}) => {
     if (!frontendLineData) return null;
+
+    const shearingData = frontendLineData.shearingData?.map(transformShearingRow) || [];
+    const turningData = frontendLineData.turningData?.map(transformTurningRow) || [];
+    const mpiData = frontendLineData.mpiData?.map(transformMpiRow) || [];
+    const forgingData = frontendLineData.forgingData?.map(transformForgingRow) || [];
+    const quenchingData = frontendLineData.quenchingData?.map(transformQuenchingRow) || [];
+    const finalCheckData = frontendLineData.finalCheckData?.map(transformFinalCheckRow) || [];
+
+    // Calculate total tempering hardness rejected from Final Check to pass to Tempering
+    const totalTemperingHardnessRejected = finalCheckData.reduce((acc, fcRow) =>
+        acc + (parseNumber(fcRow.temperingHardnessRejected) || 0), 0);
+
+    const temperingData = frontendLineData.temperingData?.map(row =>
+        transformTemperingRow(row, totalTemperingHardnessRejected)
+    ) || [];
+
+    const testingFinishingData = frontendLineData.testingFinishingData?.map(transformTestingFinishingRow) || [];
+
+    // Calculate Final Result Summary for Payload
+    const shearingRejected = calculateGenericRejected(shearingData, ['lengthCutBarRejected', 'improperDiaRejected', 'sharpEdgesRejected', 'crackedEdgesRejected']);
+
+    // Calculate granular Turning rejections
+    const parallelLengthRejected = calculateGenericRejected(turningData, ['parallelLengthRejected']);
+    const fullTurningLengthRejected = calculateGenericRejected(turningData, ['fullTurningLengthRejected']);
+    const turningDiaRejected = calculateGenericRejected(turningData, ['turningDiaRejected']);
+    const turningRejected = parallelLengthRejected + fullTurningLengthRejected + turningDiaRejected;
+    const mpiRejected = calculateGenericRejected(mpiData, ['mpiRejected']);
+    const forgingRejected = calculateGenericRejected(forgingData, ['forgingTempRejected', 'forgingStabilisationRejectionRejected', 'improperForgingRejected', 'forgingDefectRejected', 'embossingDefectRejected']);
+    const quenchingRejected = calculateGenericRejected(quenchingData, ['quenchingTemperatureRejected', 'quenchingDurationRejected', 'quenchingHardnessRejected', 'boxGaugeRejected', 'flatBearingAreaRejected', 'fallingGaugeRejected']);
+    const temperingTotalRejected = temperingData.reduce((acc, row) => acc + (parseNumber(row.totalTemperingRejection) || 0), 0);
+    const finalCheckRejected = calculateGenericRejected(finalCheckData, ['boxGaugeRejected', 'flatBearingAreaRejected', 'fallingGaugeRejected', 'surfaceDefectRejected', 'embossingDefectRejected', 'markingRejected', 'temperingHardnessRejected']);
+    const testingFinishingRejected = calculateGenericRejected(testingFinishingData, ['toeLoadRejected', 'weightRejected', 'paintIdentificationRejected', 'ercCoatingRejected']);
+    const testingFinishingAccepted = calculateGenericAccepted(testingFinishingData);
+
+    const totalRejected = shearingRejected + turningRejected + mpiRejected + forgingRejected +
+        quenchingRejected + temperingTotalRejected +
+        (finalCheckRejected - totalTemperingHardnessRejected) +
+        testingFinishingRejected;
+
+    const lineFinalResult = {
+        // Map metadata for IC/Lot resolution
+        lotNumber: metaData.lotNumbers || '',
+        heatNumber: metaData.heatNumbers || '',
+        offeredQty: metaData.totalOfferedQty || 0,
+        shift: metaData.shift || '',
+        // Map consolidated manual manufactured quantities
+        shearingManufactured: manualQuantities.shearing || 0,
+        shearingAccepted: Math.max(0, (manualQuantities.shearing || 0) - shearingRejected),
+        shearingRejected,
+        turningManufactured: manualQuantities.turning || 0,
+        turningAccepted: Math.max(0, (manualQuantities.turning || 0) - turningRejected),
+        turningRejected,
+        parallelLengthRejected,
+        fullTurningLengthRejected,
+        turningDiaRejected,
+        mpiManufactured: manualQuantities.mpiTesting || 0,
+        mpiAccepted: Math.max(0, (manualQuantities.mpiTesting || 0) - mpiRejected),
+        mpiRejected,
+        forgingManufactured: manualQuantities.forging || 0,
+        forgingAccepted: Math.max(0, (manualQuantities.forging || 0) - forgingRejected),
+        forgingRejected,
+        quenchingManufactured: manualQuantities.quenching || 0,
+        quenchingAccepted: Math.max(0, (manualQuantities.quenching || 0) - quenchingRejected),
+        quenchingRejected,
+        temperingManufactured: manualQuantities.tempering || 0,
+        temperingAccepted: Math.max(0, (manualQuantities.tempering || 0) - temperingTotalRejected),
+        temperingRejected: temperingTotalRejected,
+        finalCheckRejected,
+        testingFinishingManufactured: manualQuantities.testingFinishing || 0,
+        testingFinishingAccepted,
+        testingFinishingRejected,
+        totalManufactured: manualQuantities.shearing || 0,
+        totalAccepted: Math.max(0, (manualQuantities.shearing || 0) - totalRejected),
+        totalRejected
+    };
 
     return {
         ...frontendLineData,
-        shearingData: frontendLineData.shearingData?.map(transformShearingRow) || [],
-        turningData: frontendLineData.turningData?.map(transformTurningRow) || [],
-        mpiData: frontendLineData.mpiData?.map(transformMpiRow) || [],
-        forgingData: frontendLineData.forgingData?.map(transformForgingRow) || [],
-        quenchingData: frontendLineData.quenchingData?.map(transformQuenchingRow) || [],
-        temperingData: frontendLineData.temperingData?.map(transformTemperingRow) || [],
-        finalCheckData: frontendLineData.finalCheckData?.map(transformFinalCheckRow) || [],
-        testingFinishingData: frontendLineData.testingFinishingData?.map(transformTestingFinishingRow) || []
+        // Map metadata for IC/Lot resolution
+        lotNo: metaData.lotNumbers || '',
+        heatNo: metaData.heatNumbers || '',
+        totalOfferedQty: metaData.totalOfferedQty || 0,
+        shearingData,
+        turningData,
+        mpiData,
+        forgingData,
+        quenchingData,
+        temperingData,
+        finalCheckData,
+        testingFinishingData,
+        lineFinalResult
     };
 };
 
@@ -59,35 +158,31 @@ const transformShearingRow = (row) => ({
     improperDiaRejected: parseNumber(row.rejectedQty?.[1]),
     sharpEdgesRejected: parseNumber(row.rejectedQty?.[2]),
     crackedEdgesRejected: parseNumber(row.rejectedQty?.[3]),
-    remarks: row.remarks
+    remarks: row.remarks,
+    createdBy: row.createdBy
 });
 
 const transformTurningRow = (row) => ({
-    hourIndex: row.hour,
+    hourIndex: row.hourIndex || row.hour,
     shift: row.shift,
     hourLabel: row.hourLabel,
     noProduction: row.noProduction,
     lotNo: row.lotNo,
-    straightLength1: parseNumber(row.parallelLength?.[0]), // Frontend 'parallelLength' -> Backend 'straightLength'
+    straightLength1: parseNumber(row.parallelLength?.[0]),
     straightLength2: parseNumber(row.parallelLength?.[1]),
     straightLength3: parseNumber(row.parallelLength?.[2]),
-    taperLength1: parseNumber(row.fullTurningLength?.[0]), // Assuming 'fullTurningLength' maps to 'taperLength' based on context or confirming via DTO field names? DTO has taperLength. Frontend has fullTurningLength. Mapping assumption based on order.
-    // Wait, let's double check DTO: straightLength, taperLength, dia.
-    // Frontend: parallelLength, fullTurningLength, turningDia.
-    // Mapping:
-    // parallelLength -> straightLength
-    // fullTurningLength -> taperLength (Likely)
-    // turningDia -> dia
-    // Let's stick to this mapping.
+    taperLength1: parseNumber(row.fullTurningLength?.[0]),
     taperLength2: parseNumber(row.fullTurningLength?.[1]),
     taperLength3: parseNumber(row.fullTurningLength?.[2]),
     dia1: parseNumber(row.turningDia?.[0]),
     dia2: parseNumber(row.turningDia?.[1]),
     dia3: parseNumber(row.turningDia?.[2]),
-    rejectedQty1: parseNumber(row.rejectedQty?.[0]),
-    rejectedQty2: parseNumber(row.rejectedQty?.[1]),
-    acceptedQty: parseNumber(row.acceptedQty), // If exists in frontend row
-    remarks: row.remarks
+    parallelLengthRejected: parseNumber(row.rejectedQty?.[0]),
+    fullTurningLengthRejected: parseNumber(row.rejectedQty?.[1]),
+    turningDiaRejected: parseNumber(row.rejectedQty?.[2]),
+    acceptedQty: parseNumber(row.acceptedQty),
+    remarks: row.remarks,
+    createdBy: row.createdBy
 });
 
 const transformMpiRow = (row) => ({
@@ -100,47 +195,47 @@ const transformMpiRow = (row) => ({
     testResult2: parseString(row.testResults?.[1]),
     testResult3: parseString(row.testResults?.[2]),
     mpiRejected: parseNumber(row.rejectedQty), // Single value in UI
-    remarks: row.remarks
+    remarks: row.remarks,
+    createdBy: row.createdBy
 });
 // Correction on MPI: Payload showed "rejectedQty": "" (string). Frontend likely has single input.
 // DTO has mpiRejected.
 
-const transformForgingRow = (row) => {
-    // Calculate total rejected if not explicitly provided (Desktop view has details, Mobile has total)
-    const forgingTemperatureRejected = parseNumber(row.forgingTemperatureRejected);
-    const forgingStabilisationRejected = parseNumber(row.forgingStabilisationRejected);
-    const improperForgingRejected = parseNumber(row.improperForgingRejected);
-    const forgingDefectRejected = parseNumber(row.forgingDefectRejected);
-    const embossingDefectRejected = parseNumber(row.embossingDefectRejected);
+const transformForgingRow = (row) => ({
+    hourIndex: row.hour,
+    shift: row.shift,
+    hourLabel: row.hourLabel,
+    noProduction: row.noProduction,
+    lotNo: row.lotNo,
 
-    const calculatedRejectedQty = (forgingTemperatureRejected || 0) +
-        (forgingStabilisationRejected || 0) +
-        (improperForgingRejected || 0) +
-        (forgingDefectRejected || 0) +
-        (embossingDefectRejected || 0);
+    // Forging Temp - 2 samples (mapping from forgingTemperature array)
+    forgingTemp1: parseNumber(row.forgingTemperature?.[0]),
+    forgingTemp2: parseNumber(row.forgingTemperature?.[1]),
+    forgingTempRejected: parseNumber(row.forgingTemperatureRejected),
 
-    return {
-        hourIndex: row.hour,
-        shift: row.shift,
-        hourLabel: row.hourLabel,
-        noProduction: row.noProduction,
-        lotNo: row.lotNo,
-        forgingTemp1: parseNumber(row.forgingTemperature?.[0]),
-        forgingTemp2: parseNumber(row.forgingTemperature?.[1]),
-        forgingTemp3: parseNumber(row.forgingTemperature?.[2]), // DTO 3rd field
+    // Forging Stabilisation - 2 samples + rejected
+    forgingStabilisationRejection1: parseString(row.forgingStabilisation?.[0]),
+    forgingStabilisationRejection2: parseString(row.forgingStabilisation?.[1]),
+    forgingStabilisationRejectionRejected: parseNumber(row.forgingStabilisationRejected),
 
-        forgingTemperatureRejected,
-        forgingStabilisationRejected,
-        improperForgingRejected,
-        forgingDefectRejected,
-        embossingDefectRejected,
+    // Improper Forging - 2 samples + rejected
+    improperForging1: parseString(row.improperForging?.[0]),
+    improperForging2: parseString(row.improperForging?.[1]),
+    improperForgingRejected: parseNumber(row.improperForgingRejected),
 
-        acceptedQty: parseNumber(row.acceptedQty),
-        // Use explicit rejectedQty if available (Mobile), else use sum of details (Desktop)
-        rejectedQty: parseNumber(row.rejectedQty) ?? (calculatedRejectedQty > 0 ? calculatedRejectedQty : null),
-        remarks: row.remarks
-    };
-};
+    // Forging Defect (Marks / Notches) - 2 samples + rejected
+    forgingDefect1: parseString(row.forgingDefect?.[0]),
+    forgingDefect2: parseString(row.forgingDefect?.[1]),
+    forgingDefectRejected: parseNumber(row.forgingDefectRejected),
+
+    // Embossing Defect - 2 samples + rejected
+    embossingDefect1: parseString(row.embossingDefect?.[0]),
+    embossingDefect2: parseString(row.embossingDefect?.[1]),
+    embossingDefectRejected: parseNumber(row.embossingDefectRejected),
+
+    remarks: row.remarks,
+    createdBy: row.createdBy
+});
 
 const transformQuenchingRow = (row) => {
     const quenchingTemperatureRejected = parseNumber(row.quenchingTemperatureRejected);
@@ -163,10 +258,28 @@ const transformQuenchingRow = (row) => {
         hourLabel: row.hourLabel,
         noProduction: row.noProduction,
         lotNo: row.lotNo,
-        quenchingTemperature: parseNumber(row.quenchingTemperature?.[0]),
-        quenchingDuration: parseNumber(row.quenchingDuration?.[0]),
+
+        // Quenching Temp - 2 samples
+        quenchingTemperature1: parseNumber(row.quenchingTemperature?.[0]),
+        quenchingTemperature2: parseNumber(row.quenchingTemperature?.[1]),
+
+        // Quenching Duration - 2 samples
+        quenchingDuration1: parseNumber(row.quenchingDuration?.[0]),
+        quenchingDuration2: parseNumber(row.quenchingDuration?.[1]),
+
+        // Quenching Hardness - 2 samples
         quenchingHardness1: parseNumber(row.quenchingHardness?.[0]),
         quenchingHardness2: parseNumber(row.quenchingHardness?.[1]),
+
+        // Gauge Results - 2 samples each
+        boxGauge1: parseString(row.boxGauge?.[0]),
+        boxGauge2: parseString(row.boxGauge?.[1]),
+
+        flatBearingArea1: parseString(row.flatBearingArea?.[0]),
+        flatBearingArea2: parseString(row.flatBearingArea?.[1]),
+
+        fallingGauge1: parseString(row.fallingGauge?.[0]),
+        fallingGauge2: parseString(row.fallingGauge?.[1]),
 
         // Rejection counts
         quenchingTemperatureRejected,
@@ -177,15 +290,17 @@ const transformQuenchingRow = (row) => {
         fallingGaugeRejected,
 
         rejectedQty: parseNumber(row.rejectedQty) ?? (calculatedRejectedQty > 0 ? calculatedRejectedQty : null),
-        remarks: row.remarks
+        remarks: row.remarks,
+        createdBy: row.createdBy
     };
 };
 
-const transformTemperingRow = (row) => {
+const transformTemperingRow = (row, temperingHardnessTotal = 0) => {
     const temperingTemperatureRejected = parseNumber(row.temperingTemperatureRejected);
     const temperingDurationRejected = parseNumber(row.temperingDurationRejected);
 
     const calculatedRejectedQty = (temperingTemperatureRejected || 0) + (temperingDurationRejected || 0);
+    const totalTemperingRejection = calculatedRejectedQty + (temperingHardnessTotal || 0);
 
     return {
         hourIndex: row.hour,
@@ -193,15 +308,23 @@ const transformTemperingRow = (row) => {
         hourLabel: row.hourLabel,
         noProduction: row.noProduction,
         lotNo: row.lotNo,
-        temperingTemperature: parseNumber(row.temperingTemperature?.[0]),
-        temperingDuration: parseNumber(row.temperingDuration?.[0]),
+
+        // Tempering Temp - 2 samples
+        temperingTemperature1: parseNumber(row.temperingTemperature?.[0]),
+        temperingTemperature2: parseNumber(row.temperingTemperature?.[1]),
+
+        // Tempering Duration - 2 samples
+        temperingDuration1: parseNumber(row.temperingDuration?.[0]),
+        temperingDuration2: parseNumber(row.temperingDuration?.[1]),
 
         temperingTemperatureRejected,
         temperingDurationRejected,
+        totalTemperingRejection,
 
         acceptedQty: parseNumber(row.acceptedQty),
         rejectedQty: parseNumber(row.rejectedQty) ?? (calculatedRejectedQty > 0 ? calculatedRejectedQty : null),
-        remarks: row.remarks
+        remarks: row.remarks,
+        createdBy: row.createdBy
     };
 };
 
@@ -211,18 +334,34 @@ const transformFinalCheckRow = (row) => ({
     hourLabel: row.hourLabel,
     noProduction: row.noProduction,
     lotNo: row.lotNo,
-    // String fields in DTO
-    visualCheck1: parseString(row.visualCheck?.[0] || ''), // Frontend might use different key? Payload says "surfaceDefect"?
-    // Payload for FinalCheck: boxGauge, flatBearingArea, fallingGauge, surfaceDefect, embossingDefect, marking, temperingHardness (arrays)
-    // DTO: visualCheck1..2, dimensionCheck1..2, hardnessCheck1..2.
-    // Mismatch in naming.
-    // Let's try to map logically or leave partial.
-    // Backend DTO: visualCheck1, visualCheck2
-    // Frontend grid likely maps "surfaceDefect" to visualCheck? 
-    // Wait, let's look at the payload keys again.
-    // Payload: boxGauge, flatBearingArea, fallingGauge... these are rejection REASONS in DTO 26-31.
-    // But DTO 18-23 has visualCheck, dimensionCheck, hardnessCheck.
-    // Let's map what we can clearly match.
+
+    // Box Gauge - 2 readings
+    boxGauge1: parseString(row.boxGauge?.[0]),
+    boxGauge2: parseString(row.boxGauge?.[1]),
+
+    // Flat Bearing Area - 2 readings
+    flatBearingArea1: parseString(row.flatBearingArea?.[0]),
+    flatBearingArea2: parseString(row.flatBearingArea?.[1]),
+
+    // Falling Gauge - 2 readings
+    fallingGauge1: parseString(row.fallingGauge?.[0]),
+    fallingGauge2: parseString(row.fallingGauge?.[1]),
+
+    // Surface Defect - 2 readings
+    surfaceDefect1: parseString(row.surfaceDefect?.[0]),
+    surfaceDefect2: parseString(row.surfaceDefect?.[1]),
+
+    // Embossing Defect - 2 readings
+    embossingDefect1: parseString(row.embossingDefect?.[0]),
+    embossingDefect2: parseString(row.embossingDefect?.[1]),
+
+    // Marking - 2 readings
+    marking1: parseString(row.marking?.[0]),
+    marking2: parseString(row.marking?.[1]),
+
+    // Tempering Hardness - 2 readings
+    temperingHardness1: parseString(row.temperingHardness?.[0]),
+    temperingHardness2: parseString(row.temperingHardness?.[1]),
 
     boxGaugeRejected: parseNumber(row.boxGaugeRejected),
     flatBearingAreaRejected: parseNumber(row.flatBearingAreaRejected),
@@ -232,8 +371,8 @@ const transformFinalCheckRow = (row) => ({
     markingRejected: parseNumber(row.markingRejected),
     temperingHardnessRejected: parseNumber(row.temperingHardnessRejected),
 
-
-    remarks: row.remarks
+    remarks: row.remarks,
+    createdBy: row.createdBy
 });
 
 const transformTestingFinishingRow = (row) => ({
@@ -258,5 +397,6 @@ const transformTestingFinishingRow = (row) => ({
 
     acceptedQty: parseNumber(row.acceptedQty),
     rejectedQty: parseNumber(row.rejectedQty),
-    remarks: row.remarks
+    remarks: row.remarks,
+    createdBy: row.createdBy
 });

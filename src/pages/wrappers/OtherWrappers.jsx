@@ -16,6 +16,7 @@ export const MultiInitiationWrapper = () => {
     setSelectedCall,
     setActiveInspectionType,
     setInspectionShift,
+    setProcessShift,
     setInspectionDate,
     setLandingActiveTab
   } = useInspection();
@@ -30,6 +31,12 @@ export const MultiInitiationWrapper = () => {
     if (shift) {
       setInspectionShift(shift);
       sessionStorage.setItem('inspectionShift', shift);
+
+      // Also set processShift for grid page
+      if (productType === 'ERC Process' || productType.includes('Process')) {
+        setProcessShift(shift);
+        sessionStorage.setItem('processShift', shift);
+      }
     }
     if (date) {
       setInspectionDate(date);
