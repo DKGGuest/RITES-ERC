@@ -66,17 +66,18 @@ export const loginUser = async (userId, password) => {
 
   // For other users (IE), call the real API
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/api/auth/loginBasedOnType`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        userId: parseInt(userId, 10),
+        loginType: "IE",
+        loginId: userId,
         password: password,
       }),
     });
-
+  
     const data = await response.json();
 
     if (!response.ok) {
