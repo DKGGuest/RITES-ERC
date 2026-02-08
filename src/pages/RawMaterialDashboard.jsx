@@ -1140,6 +1140,8 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
 
     setIsSaving(true);
     try {
+      const shiftOfInspection = sessionStorage.getItem('inspectionShift') || null;
+
       // Collect Visual Inspection data - stored as array per heat index
       // Structure: [{ selectedDefects: {defectName: bool}, defectCounts: {defectName: string} }, ...]
       // NEW STRUCTURE: one record per heat with all defects as maps
@@ -1333,7 +1335,6 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       // Get current user for audit fields
       const currentUser = getStoredUser();
       const userId = currentUser?.userId || currentUser?.username || 'IE_USER';
-      const shiftOfInspection = sessionStorage.getItem('inspectionShift') || null;
 
       // Collect final results per heat (status, weights, remarks)
       // Use consolidatedHeats (already groups duplicate heat numbers)
