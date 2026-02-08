@@ -39,6 +39,9 @@ const LandingPageWrapper = () => {
     } else if (page === 'ic-processmaterial') {
       console.log('📍 Navigating to IC_PROCESS');
       navigate(ROUTES.IC_PROCESS);
+    } else if (page === 'ic-finalproduct') {
+      console.log('📍 Navigating to IC_FINAL_PRODUCT');
+      navigate(ROUTES.IC_FINAL_PRODUCT);
     } else if (page === 'rm-dashboard') {
       console.log('📍 Navigating to RAW_MATERIAL dashboard');
       navigate(ROUTES.RAW_MATERIAL);

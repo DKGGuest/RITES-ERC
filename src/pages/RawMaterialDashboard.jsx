@@ -894,11 +894,19 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
     const heatData = packingData.packingDataByHeat[heatIndex];
     if (!heatData) return 'Pending';
 
-    const checkItems = ['bundlingSecure', 'tagsAttached', 'labelsCorrect', 'protectionAdequate', 'storageCondition', 'moistureProtection', 'stackingProper'];
+    const checkItems = [
+      'storedHeatWise',
+      'suppliedInBundles',
+      'heatNumberEnds',
+      'packingStripWidth',
+      'bundleTiedLocations',
+      'identificationTagBundle',
+      'metalTagInformation'
+    ];
 
-    // Check if ALL checklist items are answered (excluding remarks)
+    // Check if ALL checklist items are answered (Yes/No/N/A)
     const allItemsAnswered = checkItems.every(item =>
-      heatData[item] === 'Yes' || heatData[item] === 'No'
+      heatData[item] === 'Yes' || heatData[item] === 'No' || heatData[item] === 'N/A'
     );
 
     if (!allItemsAnswered) return 'Pending';
@@ -1261,14 +1269,15 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                 inspectionCallNo,
                 heatNo: heat.heatNo,
                 heatIndex: parseInt(heatIdx),
-                bundlingSecure: heatData.bundlingSecure || null,
-                tagsAttached: heatData.tagsAttached || null,
-                labelsCorrect: heatData.labelsCorrect || null,
-                protectionAdequate: heatData.protectionAdequate || null,
-                storageCondition: heatData.storageCondition || null,
-                moistureProtection: heatData.moistureProtection || null,
-                stackingProper: heatData.stackingProper || null,
-                remarks: heatData.remarks || null
+                storedHeatWise: heatData.storedHeatWise || null,
+                suppliedInBundles: heatData.suppliedInBundles || null,
+                heatNumberEnds: heatData.heatNumberEnds || null,
+                packingStripWidth: heatData.packingStripWidth || null,
+                bundleTiedLocations: heatData.bundleTiedLocations || null,
+                identificationTagBundle: heatData.identificationTagBundle || null,
+                metalTagInformation: heatData.metalTagInformation || null,
+                remarks: heatData.remarks || null,
+                shift: shiftOfInspection
               });
             }
           });
@@ -1800,14 +1809,15 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                 inspectionCallNo,
                 heatNo: heat.heatNo,
                 heatIndex: parseInt(heatIdx),
-                bundlingSecure: heatData.bundlingSecure || null,
-                tagsAttached: heatData.tagsAttached || null,
-                labelsCorrect: heatData.labelsCorrect || null,
-                protectionAdequate: heatData.protectionAdequate || null,
-                storageCondition: heatData.storageCondition || null,
-                moistureProtection: heatData.moistureProtection || null,
-                stackingProper: heatData.stackingProper || null,
-                remarks: heatData.remarks || null
+                storedHeatWise: heatData.storedHeatWise || null,
+                suppliedInBundles: heatData.suppliedInBundles || null,
+                heatNumberEnds: heatData.heatNumberEnds || null,
+                packingStripWidth: heatData.packingStripWidth || null,
+                bundleTiedLocations: heatData.bundleTiedLocations || null,
+                identificationTagBundle: heatData.identificationTagBundle || null,
+                metalTagInformation: heatData.metalTagInformation || null,
+                remarks: heatData.remarks || null,
+                shift: shiftOfInspection
               });
             }
           });

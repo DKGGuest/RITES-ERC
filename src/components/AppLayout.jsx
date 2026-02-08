@@ -19,7 +19,6 @@ const AppLayout = () => {
 
   useEffect(() => {
     const user = getStoredUser();
-    console.log('🔍 AppLayout - Current User:', user);
     setCurrentUser(user);
   }, []);
 

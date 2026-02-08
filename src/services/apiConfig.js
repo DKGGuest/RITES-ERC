@@ -17,12 +17,8 @@
 export const API_BASE_URL = process.env.REACT_APP_API_URL ||
    'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 
-// Log current environment for debugging
-console.log('🌐 API Configuration:', {
-    environment: process.env.NODE_ENV,
-    apiUrl: API_BASE_URL,
-    isLocal: API_BASE_URL.includes('localhost')
-});
+// API Configuration determined by exports above
+
 
 /**
  * Common API endpoints

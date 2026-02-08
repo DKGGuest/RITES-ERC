@@ -36,7 +36,6 @@ const pendingRequests = new Map();
  */
 export const clearWorkflowCache = () => {
   workflowCache.clear();
-  console.log('🗑️ Workflow cache cleared');
 };
 
 /**
@@ -81,7 +80,6 @@ export const fetchPendingWorkflowTransitions = async (roleName, forceRefresh = f
   if (!forceRefresh) {
     const cached = workflowCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < WORKFLOW_CACHE_TTL) {
-      console.log('✅ Using cached workflow transitions');
       return cached.data;
     }
   }
@@ -89,14 +87,12 @@ export const fetchPendingWorkflowTransitions = async (roleName, forceRefresh = f
   // Deduplication: If a request is already in progress, return the same promise
   // This prevents React StrictMode from making duplicate API calls
   if (pendingRequests.has(cacheKey)) {
-    console.log('⏳ Request already in progress, waiting for result...');
     return pendingRequests.get(cacheKey);
   }
 
   // Create the request promise
   const requestPromise = (async () => {
     try {
-      console.log('🌐 Fetching workflow transitions from Azure API...');
       const response = await fetchWithTimeout(
         `${API_BASE_URL}/allPendingWorkflowTransition?roleName=${encodeURIComponent(roleName)}`,
         {
@@ -155,8 +151,6 @@ export const fetchPendingWorkflowTransitions = async (roleName, forceRefresh = f
  * @returns {Promise<Array>} Filtered list of pending workflow transitions
  */
 export const fetchUserPendingCalls = async (forceRefresh = false) => {
-  const startTime = performance.now();
-
   try {
     const user = getStoredUser();
     if (!user) {
@@ -166,15 +160,7 @@ export const fetchUserPendingCalls = async (forceRefresh = false) => {
     const roleName = user.roleName;
     const userId = parseInt(user.userId, 10);
 
-    console.log('⏱️ Fetching workflow transitions from Azure...');
     const allTransitions = await fetchPendingWorkflowTransitions(roleName, forceRefresh);
-    const fetchTime = performance.now() - startTime;
-    console.log(`✅ Workflow transitions fetched in ${fetchTime.toFixed(0)}ms`);
-
-    // Debug: Log all transitions before filtering
-    console.log('🔍 All transitions from API:', allTransitions.length);
-    console.log('🔍 Sample transition:', allTransitions[0]);
-    console.log('🔍 Product types in API:', [...new Set(allTransitions.map(t => t.productType))]);
 
     // Filter transitions based on product type:
     // - Raw Material: assignedToUser matches logged-in userId
@@ -184,31 +170,16 @@ export const fetchUserPendingCalls = async (forceRefresh = false) => {
       const productType = transition.productType;
 
       if (productType === 'Raw Material') {
-        // Raw Material: Filter by assignedToUser
-        const matches = transition.assignedToUser === userId;
-        console.log(`🔍 Raw Material: ${transition.requestId} - assignedToUser=${transition.assignedToUser} vs userId=${userId} => ${matches ? '✅' : '❌'}`);
-        return matches;
+        return transition.assignedToUser === userId;
       } else if (productType === 'Process') {
-        // Process: Filter by processIes array
-        const matches = Array.isArray(transition.processIes) && transition.processIes.includes(userId);
-        console.log(`🔍 Process: ${transition.requestId} - processIes=${JSON.stringify(transition.processIes)} includes userId=${userId} => ${matches ? '✅' : '❌'}`);
-        return matches;
+        return Array.isArray(transition.processIes) && transition.processIes.includes(userId);
       } else if (productType === 'Final') {
-        // Final: Filter by finalIes array
-        const matches = Array.isArray(transition.finalIes) && transition.finalIes.includes(userId);
-        console.log(`🔍 Final: ${transition.requestId} - finalIes=${JSON.stringify(transition.finalIes)} includes userId=${userId} => ${matches ? '✅' : '❌'}`);
-        return matches;
+        return Array.isArray(transition.finalIes) && transition.finalIes.includes(userId);
       }
 
       // Default: fallback to assignedToUser for unknown product types
-      console.log(`⚠️ Unknown product type: ${productType} for ${transition.requestId}`);
       return transition.assignedToUser === userId;
     });
-
-    console.log(`📊 Found ${userTransitions.length} transitions for user ${userId}`);
-    console.log(`  - Raw Material: ${userTransitions.filter(t => t.productType === 'Raw Material').length}`);
-    console.log(`  - Process: ${userTransitions.filter(t => t.productType === 'Process').length}`);
-    console.log(`  - Final: ${userTransitions.filter(t => t.productType === 'Final').length}`);
 
     // Transform API response - use vendor name directly from workflow API
     const transformedCalls = userTransitions.map((transition) => {
@@ -250,9 +221,6 @@ export const fetchUserPendingCalls = async (forceRefresh = false) => {
         finalIes: transition.finalIes,
       };
     });
-
-    const totalTime = performance.now() - startTime;
-    console.log(`⚡ Total fetch time: ${totalTime.toFixed(0)}ms`);
 
     return transformedCalls;
   } catch (error) {
@@ -316,7 +284,6 @@ export const performTransitionAction = async (actionData) => {
  */
 export const fetchLatestWorkflowTransition = async (requestId) => {
   try {
-    console.log(`🔍 Fetching latest workflow transition for ${requestId}...`);
     const response = await fetch(
       `${API_BASE_URL}/workflowTransitionHistory?requestId=${encodeURIComponent(requestId)}`,
       {
@@ -349,7 +316,6 @@ export const fetchLatestWorkflowTransition = async (requestId) => {
       return (current.workflowTransitionId > latest.workflowTransitionId) ? current : latest;
     }, transitions[0]);
 
-    console.log(`✅ Latest workflow transition for ${requestId}: ID ${latestTransition.workflowTransitionId}`);
     return latestTransition;
   } catch (error) {
     console.error(`Error fetching latest workflow transition for ${requestId}:`, error);

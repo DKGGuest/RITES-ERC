@@ -39,13 +39,13 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
     const initialData = {};
     heats.forEach((heat, idx) => {
       initialData[idx] = {
-        bundlingSecure: '',
-        tagsAttached: '',
-        labelsCorrect: '',
-        protectionAdequate: '',
-        storageCondition: '',
-        moistureProtection: '',
-        stackingProper: '',
+        storedHeatWise: '',
+        suppliedInBundles: '',
+        heatNumberEnds: '',
+        packingStripWidth: '',
+        bundleTiedLocations: '',
+        identificationTagBundle: '',
+        metalTagInformation: '',
         remarks: ''
       };
     });
@@ -76,24 +76,24 @@ const PackingStoragePage = ({ onBack, heats = [], onNavigateSubmodule, inspectio
 
   // Get current heat's data
   const currentHeatData = packingDataByHeat[activeHeatIndex] || {
-    bundlingSecure: '',
-    tagsAttached: '',
-    labelsCorrect: '',
-    protectionAdequate: '',
-    storageCondition: '',
-    moistureProtection: '',
-    stackingProper: '',
+    storedHeatWise: '',
+    suppliedInBundles: '',
+    heatNumberEnds: '',
+    packingStripWidth: '',
+    bundleTiedLocations: '',
+    identificationTagBundle: '',
+    metalTagInformation: '',
     remarks: ''
   };
 
   const checklistItems = [
-    { id: 'bundlingSecure', label: 'Bundling is secure and wire-tied properly' },
-    { id: 'tagsAttached', label: 'Identification tags attached to each bundle' },
-    { id: 'labelsCorrect', label: 'Labels show correct Heat No., Qty., Grade' },
-    { id: 'protectionAdequate', label: 'Protection from mechanical damage is adequate' },
-    { id: 'storageCondition', label: 'Storage area is clean and dry' },
-    { id: 'moistureProtection', label: 'Moisture protection is in place' },
-    { id: 'stackingProper', label: 'Stacking height and arrangement is proper' }
+    { id: 'storedHeatWise', label: '1. Stored in Heat wise Stacks' },
+    { id: 'suppliedInBundles', label: '2. Supplied in Bundles and tied with Binding Wires' },
+    { id: 'heatNumberEnds', label: '3. Paint or Sticker related to heat number provided at extreme ends' },
+    { id: 'packingStripWidth', label: '4. Packing strip width is between 18 to 33mm' },
+    { id: 'bundleTiedLocations', label: '5. Bundle tied at 3-4 locations using 18-33mm wide packing strip' },
+    { id: 'identificationTagBundle', label: '6. Identification Tag provided for each bundle' },
+    { id: 'metalTagInformation', label: '7. Metal Tag have information on Firm Details, PO number, Heat No., Date, Grade, Size & Length' }
   ];
 
   return (

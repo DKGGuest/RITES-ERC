@@ -16,39 +16,85 @@ import { exportToPdf } from "../../utils/exportUtils";
 export default function FinalProductCertificate({ call = {}, onBack }) {
   const printAreaRef = useRef();
   const [isEditing, setIsEditing] = useState(false);
-  const [data, setData] = useState({
-    certificateNo: call.icNo || "",
-    certificateDate: new Date().toLocaleDateString('en-GB'),
-    offeredInstNo: "",
-    passedInstNo: "",
-    contractor: "",
-    placeOfInspection: "",
-    contractRef: "",
-    contractRefDate: "",
-    billPayingOfficer: "",
-    consignee: "",
-    purchasingAuthority: "",
-    description: "",
-    quantityNowPassedText: "",
-    qtyOnOrder: "",
-    qtyOfferedPreviously: "",
-    qtyPassedPreviously: "",
-    qtyNowOffered: "",
-    qtyNowPassed: "",
-    qtyNowRejected: "",
-    qtyStillDue: "",
-    noOfItemsChecked: "",
-    dateOfCall: "",
-    noOfVisits: "",
-    datesOfInspection: "",
-    trRecDate: "",
-    sealingPattern: "",
-    facsimileText: "",
-    reasonsForRejection: "Not Applicable",
-    inspectingEngineer: "",
-    lotDetails: [],
-    remarks: "",
-  });
+  /**
+   * Transform API response to component format.
+   */
+  const transformCallToIC = (c) => {
+    if (!c || Object.keys(c).length === 0) {
+      return {
+        certificateNo: call.icNo || "",
+        certificateDate: new Date().toLocaleDateString('en-GB'),
+        offeredInstNo: "",
+        passedInstNo: "",
+        contractor: "",
+        placeOfInspection: "",
+        contractRef: "",
+        contractRefDate: "",
+        billPayingOfficer: "",
+        consignee: "",
+        purchasingAuthority: "",
+        description: "",
+        qtyOnOrder: "",
+        qtyOfferedPreviously: "",
+        qtyPassedPreviously: "",
+        qtyNowOffered: "",
+        qtyNowPassed: "",
+        qtyNowRejected: "",
+        qtyStillDue: "",
+        noOfItemsChecked: "",
+        dateOfCall: "",
+        noOfVisits: "",
+        datesOfInspection: "",
+        trRecDate: "",
+        sealingPattern: "",
+        facsimileText: "",
+        reasonsForRejection: "Not Applicable",
+        inspectingEngineer: "",
+        lotDetails: [],
+        remarks: "",
+      };
+    }
+
+    return {
+      certificateNo: c.certificateNo || c.icNo || "",
+      certificateDate: c.certificateDate || new Date().toLocaleDateString('en-GB'),
+      offeredInstNo: c.offeredInstNo || "",
+      passedInstNo: c.passedInstNo || "",
+
+      contractor: c.contractor || "",
+      placeOfInspection: c.placeOfInspection || "",
+      contractRef: c.contractRef || "",
+      contractRefDate: c.contractRefDate || "",
+      billPayingOfficer: c.billPayingOfficer || "",
+      consignee: c.consigneeRailway || c.consignee || "",
+      purchasingAuthority: c.purchasingAuthority || "",
+
+      description: c.description || "",
+      qtyOnOrder: c.qtyOnOrder || "",
+      qtyOfferedPreviously: c.qtyOfferedPreviously || "",
+      qtyPassedPreviously: c.qtyPassedPreviously || "",
+      qtyNowOffered: c.totalOfferedQty || c.qtyNowOffered || "",
+      qtyNowPassed: c.totalAcceptedQty || c.qtyNowPassed || "",
+      qtyNowRejected: c.totalRejectedQty || c.qtyNowRejected || "",
+      qtyStillDue: c.qtyStillDue || "",
+
+      noOfItemsChecked: c.noOfItemsChecked || "",
+      dateOfCall: c.dateOfCall || "",
+      noOfVisits: c.noOfVisits || "",
+      datesOfInspection: c.datesOfInspection || "",
+      trRecDate: c.trRecDate || "",
+      quantityNowPassedText: c.quantityNowPassedText || "",
+      sealingPattern: c.sealingPattern || "",
+      facsimileText: c.facsimileText || "",
+      reasonsForRejection: c.reasonsForRejection || "Not Applicable",
+      inspectingEngineer: c.inspectingEngineer || "",
+
+      lotDetails: c.lotDetails || [],
+      remarks: c.remarks || "",
+    };
+  };
+
+  const [data, setData] = useState(transformCallToIC(call));
 
   // Handle field changes when editing
   const handleFieldChange = (fieldName, value) => {

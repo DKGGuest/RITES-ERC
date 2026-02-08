@@ -59,17 +59,11 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // Fetch pending workflow transitions for logged-in user from Azure API
   // PERFORMANCE OPTIMIZATION: Returns data immediately, fetches vendor names in background
   const fetchPendingData = useCallback(async (forceRefresh = false) => {
-    const startTime = performance.now();
     setIsLoading(true);
 
     try {
-      console.log('🚀 Starting data fetch from Azure...');
-
       // Fetch workflow transitions immediately (without waiting for vendor names)
       const apiCalls = await fetchUserPendingCalls(forceRefresh);
-
-      const fetchTime = performance.now() - startTime;
-      console.log(`⚡ Data loaded in ${fetchTime.toFixed(0)}ms`);
 
       setPendingCalls(apiCalls);
       setIsLoading(false);
@@ -78,7 +72,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       // They will be available on next refresh or when needed
 
     } catch (error) {
-      console.error('❌ Error fetching pending calls from Azure API:', error);
+      // console.error('❌ Error fetching pending calls from Azure API:', error);
       setPendingCalls([]);
       setIsLoading(false);
     }
@@ -92,20 +86,17 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // Fetch completed calls for IC issuance
   const fetchCompletedCalls = useCallback(async () => {
     try {
-      console.log('🔍 Fetching completed calls for IC issuance...');
-
       const userId = getCurrentUserId();
       if (!userId) {
-        console.warn('⚠️ User ID not found, cannot fetch completed calls');
+        // console.warn('⚠️ User ID not found, cannot fetch completed calls');
         setCompletedCalls([]);
         return;
       }
 
       const calls = await fetchCompletedCallsForIC(userId);
-      console.log('✅ Completed calls fetched from API:', calls);
       setCompletedCalls(calls);
     } catch (error) {
-      console.error('❌ Error fetching completed calls:', error);
+      // console.error('❌ Error fetching completed calls:', error);
       setCompletedCalls([]);
     }
   }, []);
@@ -152,12 +143,6 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
   // Use pending calls directly from API (includes Raw Material, Process, and Final)
   // No need to combine with mock data anymore
   const combinedPendingCalls = useMemo(() => {
-    console.log('📊 Pending calls from API:');
-    console.log('  - Total calls:', pendingCalls.length);
-    console.log('  - Raw Material:', pendingCalls.filter(c => c.product_type === 'Raw Material').length);
-    console.log('  - Process:', pendingCalls.filter(c => c.product_type === 'Process').length);
-    console.log('  - Final:', pendingCalls.filter(c => c.product_type === 'Final').length);
-
     return pendingCalls;
   }, [pendingCalls]);
 
@@ -218,7 +203,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         }
       }
     } catch (error) {
-      console.error('Error fetching existing schedule:', error);
+      // console.error('Error fetching existing schedule:', error);
     }
 
     setShowScheduleModal(true);
@@ -377,13 +362,13 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
   // Handle Start/Resume button - routes immediately, validates in background
   const handleStart = (call, scheduleInfo) => {
-    console.log('🔍 handleStart called for:', call.call_no);
-    console.log('🔍 Call status:', call.status);
+    // console.log('🔍 handleStart called for:', call.call_no);
+    // console.log('🔍 Call status:', call.status);
 
     // Route immediately to inspection initiation page
     // All validations and API calls will happen in the background
     if (call.status === 'VERIFY_PO_DETAILS') {
-      console.log('🔄 VERIFY_PO_DETAILS status - routing immediately to inspection initiation page');
+      // console.log('🔄 VERIFY_PO_DETAILS status - routing immediately to inspection initiation page');
       onStartInspection(call);
       return;
     }
@@ -391,7 +376,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
     // For ENTER_SHIFT_DETAILS_AND_START_INSPECTION status (Process Material under inspection)
     // Route directly to dashboard to resume inspection
     if (call.status === 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION') {
-      console.log('🔄 ENTER_SHIFT_DETAILS_AND_START_INSPECTION status - routing directly to dashboard');
+      // console.log('🔄 ENTER_SHIFT_DETAILS_AND_START_INSPECTION status - routing directly to dashboard');
       const productType = call.product_type;
       setSelectedCall(call);
 
@@ -423,13 +408,13 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
       const productTypeLower = productType?.toLowerCase() || '';
       if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
-        console.log('➡️ Routing to process-dashboard');
+        // console.log('➡️ Routing to process-dashboard');
         setCurrentPage('process-dashboard');
       } else if (productTypeLower.includes('final') || productType === 'ERC-FINAL PRODUCT') {
-        console.log('➡️ Routing to final-dashboard');
+        // console.log('➡️ Routing to final-dashboard');
         setCurrentPage('final-dashboard');
       } else {
-        console.log('➡️ Routing to rm-dashboard');
+        // console.log('➡️ Routing to rm-dashboard');
         setCurrentPage('rm-dashboard');
       }
       return;
@@ -437,11 +422,11 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
     // Check if call is already initiated (has inspection data stored)
     const alreadyInitiated = isCallInitiated(call.call_no);
-    console.log('📊 Already initiated?', alreadyInitiated);
+    // console.log('📊 Already initiated?', alreadyInitiated);
 
     // If already initiated, navigate directly to dashboard (RESUME flow)
     if (alreadyInitiated) {
-      console.log('✅ RESUME flow - navigating to dashboard');
+      // console.log('✅ RESUME flow - navigating to dashboard');
 
       // Try to get shift and date from various storage locations
       let shiftOfInspection = sessionStorage.getItem('inspectionShift');
@@ -456,9 +441,9 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
             const data = JSON.parse(initiationData);
             shiftOfInspection = data.shiftOfInspection;
             dateOfInspection = data.dateOfInspection;
-            console.log('📝 Found shift/date in initiation data:', { shiftOfInspection, dateOfInspection });
+            // console.log('📝 Found shift/date in initiation data:', { shiftOfInspection, dateOfInspection });
           } catch (e) {
-            console.error('Error parsing initiation data:', e);
+            // console.error('Error parsing initiation data:', e);
           }
         }
       }
@@ -469,7 +454,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         if (callData?.metadata) {
           shiftOfInspection = callData.metadata.shiftOfInspection;
           dateOfInspection = callData.metadata.dateOfInspection;
-          console.log('📝 Found shift/date in call status metadata:', { shiftOfInspection, dateOfInspection });
+          // console.log('📝 Found shift/date in call status metadata:', { shiftOfInspection, dateOfInspection });
         }
       }
 
@@ -487,42 +472,42 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
           sessionStorage.setItem('processShift', shiftOfInspection);
           if (typeof setProcessShift === 'function') setProcessShift(shiftOfInspection);
         }
-        console.log('💾 Stored shift/date in sessionStorage and context');
+        // console.log('💾 Stored shift/date in sessionStorage and context');
       }
 
       // Navigate directly to dashboard based on product type
       const productType = call.product_type;
-      console.log('🚀 Navigating to dashboard for product type:', productType);
-      console.log('📞 Call object:', call);
-      console.log('🔧 setSelectedCall function:', typeof setSelectedCall);
-      console.log('🔧 setCurrentPage function:', typeof setCurrentPage);
+      // console.log('🚀 Navigating to dashboard for product type:', productType);
+      // console.log('📞 Call object:', call);
+      // console.log('🔧 setSelectedCall function:', typeof setSelectedCall);
+      // console.log('🔧 setCurrentPage function:', typeof setCurrentPage);
 
       // Set the selected call first
       setSelectedCall(call);
-      console.log('✅ setSelectedCall called');
+      // console.log('✅ setSelectedCall called');
 
       // Then navigate based on product type (handle both formats)
       const productTypeLower = productType?.toLowerCase() || '';
 
       if (productTypeLower.includes('raw') || productType === 'ERC-RAW MATERIAL') {
-        console.log('➡️ Calling setCurrentPage("rm-dashboard")');
+        // console.log('➡️ Calling setCurrentPage("rm-dashboard")');
         setCurrentPage('rm-dashboard');
-        console.log('✅ setCurrentPage called for rm-dashboard');
+        // console.log('✅ setCurrentPage called for rm-dashboard');
       } else if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
-        console.log('➡️ Calling setCurrentPage("process-dashboard")');
+        // console.log('➡️ Calling setCurrentPage("process-dashboard")');
         setCurrentPage('process-dashboard');
-        console.log('✅ setCurrentPage called for process-dashboard');
+        // console.log('✅ setCurrentPage called for process-dashboard');
       } else if (productTypeLower.includes('final') || productType === 'ERC-FINAL PRODUCT') {
-        console.log('➡️ Calling setCurrentPage("final-dashboard")');
+        // console.log('➡️ Calling setCurrentPage("final-dashboard")');
         setCurrentPage('final-dashboard');
-        console.log('✅ setCurrentPage called for final-dashboard');
+        // console.log('✅ setCurrentPage called for final-dashboard');
       } else {
-        console.error('❌ Unknown product type:', productType);
+        // console.error('❌ Unknown product type:', productType);
       }
       return;
     }
 
-    console.log('🆕 START flow - routing immediately to initiation page');
+    // console.log('🆕 START flow - routing immediately to initiation page');
 
     // Route immediately to inspection initiation page
     // All validations and API calls will happen in the background
@@ -569,12 +554,12 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
           };
 
           await performTransitionAction(actionData);
-          console.log('✅ Inspection initiated successfully in background');
+          // console.log('✅ Inspection initiated successfully in background');
 
           // Refresh the pending calls list (force refresh to get updated status)
           fetchPendingData(true);
         } catch (error) {
-          console.error('Background API error:', error);
+          // console.error('Background API error:', error);
           // Don't show error notification for background operations
         }
       })();
@@ -583,8 +568,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
   // Handle Enter Shift Details button - for PAUSE_INSPECTION_RESUME_NEXT_DAY status
   const handleEnterShiftDetails = (call, isResume = false) => {
-    console.log('🔍 handleEnterShiftDetails called for:', call.call_no, 'isResume:', isResume);
-    console.log('🔍 Call status:', call.status);
+    // console.log('🔍 handleEnterShiftDetails called for:', call.call_no, 'isResume:', isResume);
+    // console.log('🔍 Call status:', call.status);
 
     // Show the shift details modal
     setShiftDetailsCall(call);
@@ -609,7 +594,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
     setIsSubmitting(true);
     try {
-      console.log('✅ Shift details confirmed:', { shift: shiftDetailsShift, date: shiftDetailsDate });
+      // console.log('✅ Shift details confirmed:', { shift: shiftDetailsShift, date: shiftDetailsDate });
 
       // Get current user for actionBy field
       const currentUser = getStoredUser();
@@ -617,7 +602,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
       // Map action based on whether this is a resume
       if (isResumeFromShiftModal) {
-        console.log('⏭️ Resume flow - skipping workflow API call as requested');
+        // console.log('⏭️ Resume flow - skipping workflow API call as requested');
       } else {
         // Fetch the latest workflow transition ID for this call
         let workflowTransitionId = shiftDetailsCall?.id || shiftDetailsCall?.workflowTransitionId || null;
@@ -626,14 +611,14 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
           const latestTransition = await fetchLatestWorkflowTransition(shiftDetailsCall?.call_no);
           if (latestTransition && latestTransition.workflowTransitionId) {
             workflowTransitionId = latestTransition.workflowTransitionId;
-            console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${shiftDetailsCall?.call_no}`);
+            // console.log(`✅ Using latest workflowTransitionId: ${workflowTransitionId} for ${shiftDetailsCall?.call_no}`);
           }
         } catch (error) {
-          console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
+          // console.warn('⚠️ Failed to fetch latest workflow transition, using call.id:', error);
         }
 
         // Call workflow API for all product types (Process/Final Product and Raw Material)
-        console.log('🔄 Calling workflow API for enter shift details...');
+        // console.log('🔄 Calling workflow API for enter shift details...');
 
         // Determine the action based on call status
         // If status is INSPECTION_PAUSED, use INSPECTION_PAUSED action, otherwise use ENTER_SHIFT_DETAILS_AND_START_INSPECTION
@@ -651,11 +636,11 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
           materialAvailable: 'YES'
         };
 
-        console.log('Workflow Action Data:', workflowActionData);
+        // console.log('Workflow Action Data:', workflowActionData);
 
         try {
           await performTransitionAction(workflowActionData);
-          console.log('✅ Workflow transition successful');
+          // console.log('✅ Workflow transition successful');
         } catch (workflowError) {
           console.error('❌ Workflow API error:', workflowError);
           throw new Error(workflowError.message || 'Failed to enter shift details via workflow');
@@ -682,30 +667,30 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
         if (typeof setInspectionDate === 'function') setInspectionDate(shiftDetailsDate);
         if (typeof setProcessShift === 'function') setProcessShift(shiftDetailsShift);
       } catch (e) {
-        console.warn('Failed to update context in handleEnterShiftDetailsConfirm:', e);
+        // console.warn('Failed to update context in handleEnterShiftDetailsConfirm:', e);
       }
 
       // Navigate to dashboard based on product type
-      console.log('🚀 Navigating to dashboard for product type:', productType);
+      // console.log('🚀 Navigating to dashboard for product type:', productType);
 
       setSelectedCall(shiftDetailsCall);
 
       const productTypeLower = productType?.toLowerCase() || '';
       if (productTypeLower.includes('raw') || productType === 'ERC-RAW MATERIAL') {
-        console.log('➡️ Routing to rm-dashboard');
+        // console.log('➡️ Routing to rm-dashboard');
         setCurrentPage('rm-dashboard');
       } else if (productTypeLower.includes('process') || productType === 'ERC-PROCESS MATERIAL') {
-        console.log('➡️ Routing to process-dashboard');
+        // console.log('➡️ Routing to process-dashboard');
         setCurrentPage('process-dashboard');
       } else if (productTypeLower.includes('final') || productType === 'ERC-FINAL PRODUCT') {
-        console.log('➡️ Routing to final-dashboard');
+        // console.log('➡️ Routing to final-dashboard');
         setCurrentPage('final-dashboard');
       } else {
-        console.log('➡️ Routing to rm-dashboard (default)');
+        // console.log('➡️ Routing to rm-dashboard (default)');
         setCurrentPage('rm-dashboard');
       }
     } catch (error) {
-      console.error('Error entering shift details:', error);
+      // console.error('Error entering shift details:', error);
       setShiftDetailsError(error.message || 'Failed to enter shift details. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -770,7 +755,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
           allowed.push(c);
         } catch (err) {
-          console.error('Error validating schedule for bulk start', c.call_no, err);
+          // console.error('Error validating schedule for bulk start', c.call_no, err);
           blocked.push({ call: c, reason: 'Schedule verification failed' });
         }
       }
