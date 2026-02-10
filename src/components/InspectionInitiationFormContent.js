@@ -140,10 +140,14 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               lotDetailsList: processData.lotDetailsList || [],
               rlyCd: processData.rlyCd,
               poSerialNo: processData.poSerialNo,
+              rly_po_no: processData.rlyPoNo,
+              rly_po_no_serial: processData.rlyPoNoSerial,
               vendorDetails: processData.vendorDetails,
               totalOfferedQtyMt: processData.totalOfferedQtyMt,
+              place_of_inspection: processData.placeOfInspection,
               vendorName: processData.vendorName || processData.companyName,
-              vendor_address: processData.vendorDetails || processData.unitAddress
+              vendor_address: processData.vendorDetails || processData.unitAddress,
+              po_sr_qty: processData.poSrQty
             };
 
             setFetchedPoData(transformedPoData);
@@ -226,7 +230,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 vendor_name: poDataFromDb.vendorName,
                 vendor_code: poDataFromDb.vendorCode,
                 vendor_address: poDataFromDb.vendorDetails,
-                place_of_inspection: poDataFromDb.inspPlace || ic.placeOfInspection || call.place_of_inspection,
+                place_of_inspection: poDataFromDb.placeOfInspection || poDataFromDb.inspPlace || ic.placeOfInspection || call.place_of_inspection,
                 manufacturer: poDataFromDb.vendorName,
                 consignee_rly: poDataFromDb.rlyCd,
                 consignee: poDataFromDb.consignee,
@@ -383,7 +387,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               vendor_name: poDataFromDb.vendorName,
               vendor_code: poDataFromDb.vendorCode,
               vendor_address: poDataFromDb.vendorDetails,
-              place_of_inspection: poDataFromDb.inspPlace || call.place_of_inspection,
+              place_of_inspection: poDataFromDb.placeOfInspection || poDataFromDb.inspPlace || call.place_of_inspection,
               manufacturer: poDataFromDb.vendorName,
               consignee_rly: poDataFromDb.rlyCd,
               consignee: poDataFromDb.consignee,
@@ -402,7 +406,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               poSerialNo: poDataFromDb.poSerialNo,
               vendorDetails: poDataFromDb.vendorDetails,
               totalOfferedQtyMt: poDataFromDb.totalOfferedQtyMt,
-              vendorName: poDataFromDb.vendorName
+              vendorName: poDataFromDb.vendorName,
+              po_sr_qty: poDataFromDb.poSrQty
             };
 
             setFetchedPoData(transformedPoData);
@@ -424,7 +429,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 invoice_date: heat.invoiceDate,
                 qty: heat.offeredQty,
                 unit: 'MT',
-                place_of_inspection: call.place_of_inspection
+                place_of_inspection: transformedPoData.place_of_inspection
               }));
               setSubPoList(transformedSubPoList);
               console.log(`✅ Loaded ${transformedSubPoList.length} RM heat details for Section C`);
@@ -956,7 +961,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               </div>
               <div className="form-group">
                 <label className="form-label">INSP_PLACE</label>
-                <input type="text" className="form-input" value={poData.place_of_inspection || call.place_of_inspection || 'N/A'} disabled />
+                <textarea className="form-textarea" value={poData.place_of_inspection || call.place_of_inspection || 'N/A'} readOnly disabled />
               </div>
               <div className="form-group">
                 <label className="form-label">VENDOR_NAME</label>
@@ -1050,17 +1055,18 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                   type="text"
                   className="form-input"
                   value={(() => {
+                    if (poData.rly_po_no_serial) return poData.rly_po_no_serial;
                     if (poData.rlyCd && poData.poSerialNo) {
                       return `${poData.rlyCd}/${poData.poSerialNo}`;
                     }
-                    return poData.rly_po_no_serial || `${poData.po_no || call.po_no} / ${poData.pl_no || '1'}`;
+                    return `${poData.po_no || call.po_no} / ${poData.pl_no || '1'}`;
                   })()}
                   disabled
                 />
               </div>
               <div className="form-group">
                 <label className="form-label">ITEM DESC</label>
-                <input type="text" className="form-input" value={poData.product_name || 'ERC Components'} disabled />
+                <textarea className="form-textarea" value={poData.product_name || 'ERC Components'} readOnly disabled />
               </div>
               <div className="form-group">
                 <label className="form-label">PRODUCT TYPE</label>
@@ -1072,8 +1078,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 <input type="text" className="form-input" value={poData.type_of_erc || poData.erc_type || call.erc_type || 'N/A'} disabled />
               </div>
               <div className="form-group">
-                <label className="form-label">PO_QTY + UNIT</label>
-                <input type="text" className="form-input" value={`${poData.po_qty || call.po_qty} ${poData.unit || 'Nos'}`} disabled />
+                <label className="form-label">PO_SR_QTY + UNIT</label>
+                <input type="text" className="form-input" value={`${poData.po_sr_qty || poData.po_qty} ${poData.unit || 'Nos'}`} disabled />
               </div>
               <div className="form-group">
                 <label className="form-label">CONSIGNEE_RLY + CONSIGNEE</label>
@@ -1111,18 +1117,9 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               </div>
               <div className="form-group">
                 <label className="form-label">PLACE OF INSPECTION</label>
-                <input type="text" className="form-input" value={
-                  (() => {
-                    const name = poData.company_name || poData.vendor_name || poData.vendorName;
-                    const addr = poData.unit_address || poData.vendor_address || poData.vendorDetails;
-
-                    if (name && addr) {
-                      const cleanAddr = addr.replace(/~#~#/g, ', ').replace(/~/g, ', ');
-                      return `${name} (${cleanAddr})`;
-                    }
-                    return poData.place_of_inspection || call.place_of_inspection || 'N/A';
-                  })()
-                } title={poData.vendorDetails || poData.unit_address || ''} disabled />
+                <textarea className="form-textarea" value={
+                  poData.place_of_inspection || call.place_of_inspection || 'N/A'
+                } title={poData.vendorDetails || poData.unit_address || ''} readOnly disabled />
               </div>
 
               {/* RM IC NUMBERS & HEAT NUMBERS TABLE - Only for Process Material Inspection with multiple lots */}
@@ -1369,16 +1366,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label">PLACE OF INSPECTION</label>
                   <input type="text" className="form-input" value={
-                    (() => {
-                      const name = poData.company_name || poData.vendor_name || poData.vendorName;
-                      const addr = poData.unit_address || poData.vendor_address || poData.vendorDetails;
-
-                      if (name && addr) {
-                        const cleanAddr = addr.replace(/~#~#/g, ', ').replace(/~/g, ', ');
-                        return `${name} (${cleanAddr})`;
-                      }
-                      return poData.place_of_inspection || call.place_of_inspection || 'N/A';
-                    })()
+                    poData.place_of_inspection || call.place_of_inspection || 'N/A'
                   } title={poData.vendorDetails || poData.unit_address || ''} disabled />
                 </div>
               </div>

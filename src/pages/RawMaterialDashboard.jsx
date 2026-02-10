@@ -1386,12 +1386,13 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             acceptedQtyMt = weight - totalRejectedWeight;
             wtAcceptedNumbers = (acceptedQtyMt * 1000) / 1.15;
 
-            if (allOk && !hasNotOk) {
+            // Determine Heat Status based on weights and submodule results
+            if (acceptedQtyMt === weight) {
               overallStatus = 'ACCEPTED';
-            } else if (hasNotOk) {
-              overallStatus = 'REJECTED';
-            } else {
+            } else if (acceptedQtyMt > 0) {
               overallStatus = 'PARTIALLY_ACCEPTED';
+            } else {
+              overallStatus = 'REJECTED';
             }
           }
         }
@@ -1436,14 +1437,15 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
       // Calculate overall inspection status based on all heat results
       const acceptedHeats = heatFinalResults.filter(h => h.status === 'ACCEPTED').length;
       const rejectedHeats = heatFinalResults.filter(h => h.status === 'REJECTED').length;
+      const partiallyAcceptedHeats = heatFinalResults.filter(h => h.status === 'PARTIALLY_ACCEPTED').length;
       const totalHeats = heatFinalResults.length;
 
       let overallInspectionStatus = 'PENDING';
-      if (acceptedHeats === totalHeats) {
+      if (acceptedHeats === totalHeats && totalHeats > 0) {
         overallInspectionStatus = 'ACCEPTED';
-      } else if (rejectedHeats === totalHeats) {
+      } else if (rejectedHeats === totalHeats && totalHeats > 0) {
         overallInspectionStatus = 'REJECTED';
-      } else if (acceptedHeats > 0 && rejectedHeats > 0) {
+      } else if (partiallyAcceptedHeats > 0 || (acceptedHeats > 0 && rejectedHeats > 0)) {
         overallInspectionStatus = 'PARTIALLY_ACCEPTED';
       }
 
@@ -1917,10 +1919,17 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
         const wtAcceptedNumbers = (acceptedQtyMt * 1000) / 1.15;
 
         let overallStatus = 'PENDING';
-        if (isAccepted) {
+        if (acceptedQtyMt === weight) {
           overallStatus = 'ACCEPTED';
-        } else if (isRejected) {
+        } else if (acceptedQtyMt > 0) {
+          overallStatus = 'PARTIALLY_ACCEPTED';
+        } else {
           overallStatus = 'REJECTED';
+        }
+
+        const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
+        if (anyPending) {
+          overallStatus = 'PENDING';
         }
 
         return {
@@ -2387,30 +2396,51 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
             </button> */}
 
             {/* Overall Status Badge */}
-            {/* {(() => {
-              // Use consolidatedHeats to count unique heat numbers
-              const acceptedCount = consolidatedHeats.filter(heat => {
+            {(() => {
+              // Calculate statuses for all heats
+              const heatResults = consolidatedHeats.map((heat, heatIndex) => {
                 const heatNo = heat.heatNo || heat.heat_no;
-                const heatStatuses = heatSubmoduleStatuses[heatNo] || {};
-                const hasNotOk = Object.values(heatStatuses).some(s => s === 'NOT OK');
-                const allOkOrPass = Object.values(heatStatuses).every(s => s === 'OK' || s === 'Pass');
-                return allOkOrPass && !hasNotOk;
-              }).length;
+                const heatStatuses = heatSubmoduleStatuses[heatNo] || {
+                  calibration: 'Pending',
+                  visual: 'Pending',
+                  dimensional: 'Pending',
+                  materialTest: 'Pending',
+                  packing: 'Pending'
+                };
 
-              const rejectedCount = consolidatedHeats.filter(heat => {
-                const heatNo = heat.heatNo || heat.heat_no;
-                const heatStatuses = heatSubmoduleStatuses[heatNo] || {};
-                return Object.values(heatStatuses).some(s => s === 'NOT OK');
-              }).length;
+                const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
+                const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
+                const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
 
-              const totalHeats = consolidatedHeats.length;
+                if (anyPending) return 'PENDING';
+
+                // Calculate accepted weight from visual inspection
+                const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${call?.call_no}`;
+                const visualRaw = localStorage.getItem(visualKey);
+                const visualData = visualRaw ? JSON.parse(visualRaw) : [];
+                const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+                const totalRejectedWeight = calculateVisualRejectedWeight(heatVisualData);
+                const offeredWeight = parseFloat(heat.weight) || 0;
+                const acceptedWeight = offeredWeight - totalRejectedWeight;
+
+                if (dimensionalNotOk || materialTestNotOk || acceptedWeight === 0) return 'REJECTED';
+                if (acceptedWeight < offeredWeight) return 'PARTIALLY_ACCEPTED';
+                return 'ACCEPTED';
+              });
+
+              const acceptedCount = heatResults.filter(s => s === 'ACCEPTED').length;
+              const rejectedCount = heatResults.filter(s => s === 'REJECTED').length;
+              const partialCount = heatResults.filter(s => s === 'PARTIALLY_ACCEPTED').length;
+              const totalHeats = heatResults.length;
 
               let overallStatus = 'PENDING';
               let statusBg = '#fef3c7';
               let statusColor = '#92400e';
               let statusBorder = '#fcd34d';
 
-              if (acceptedCount === totalHeats && totalHeats > 0) {
+              if (heatResults.some(s => s === 'PENDING')) {
+                overallStatus = 'PENDING';
+              } else if (acceptedCount === totalHeats && totalHeats > 0) {
                 overallStatus = 'ACCEPTED';
                 statusBg = '#dcfce7';
                 statusColor = '#166534';
@@ -2420,7 +2450,7 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                 statusBg = '#fee2e2';
                 statusColor = '#991b1b';
                 statusBorder = '#fca5a5';
-              } else if (acceptedCount > 0 && rejectedCount > 0) {
+              } else if (totalHeats > 0) {
                 overallStatus = 'PARTIALLY ACCEPTED';
                 statusBg = '#fef3c7';
                 statusColor = '#92400e';
@@ -2437,10 +2467,10 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                   color: statusColor,
                   border: `2px solid ${statusBorder}`
                 }}>
-                  Overall Status: {overallStatus} ({acceptedCount} Accepted, {rejectedCount} Rejected)
+                  Overall Status: {overallStatus} ({acceptedCount} Accepted, {partialCount} Partial, {rejectedCount} Rejected)
                 </div>
               );
-            })()} */}
+            })()}
           </div>
 
           {/* Heat Blocks - Each unique heat has its own section with status tags (consolidated) */}
@@ -2456,15 +2486,37 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
               };
 
               // Determine overall heat status
-              // Treat "Pass" as "OK" for overall status calculation
-              const hasNotOk = Object.values(heatStatuses).some(s => s === 'NOT OK');
-              const allOkOrPass = Object.values(heatStatuses).every(s => s === 'OK' || s === 'Pass');
-              const isAccepted = allOkOrPass && !hasNotOk;
-              const isRejected = hasNotOk;
+              const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
+              const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
+              const anyPending = Object.values(heatStatuses).some(s => s === 'Pending');
+
+              // Calculate accepted weight to determine if partial rejection occurred
+              const visualKey = `${STORAGE_KEYS.VISUAL_INSPECTION}_${call?.call_no}`;
+              const visualRaw = localStorage.getItem(visualKey);
+              const visualData = visualRaw ? JSON.parse(visualRaw) : [];
+              const heatVisualData = Array.isArray(visualData) && heatIndex >= 0 ? visualData[heatIndex] : null;
+              const totalRejectedWeight = calculateVisualRejectedWeight(heatVisualData);
+              const offeredWeight = parseFloat(heat.weight) || 0;
+              const acceptedWeight = offeredWeight - totalRejectedWeight;
+
+              let isAccepted = false;
+              let isPartiallyAccepted = false;
+              let isRejected = false;
+              let isPending = anyPending;
+
+              if (!isPending) {
+                if (dimensionalNotOk || materialTestNotOk || acceptedWeight === 0) {
+                  isRejected = true;
+                } else if (acceptedWeight < offeredWeight) {
+                  isPartiallyAccepted = true;
+                } else {
+                  isAccepted = true;
+                }
+              }
 
               // Container styling based on status
-              const containerBg = isRejected ? '#fef2f2' : isAccepted ? '#f0fdf4' : '#fffbeb';
-              const containerBorder = isRejected ? '#fecaca' : isAccepted ? '#bbf7d0' : '#fde68a';
+              const containerBg = isRejected ? '#fef2f2' : (isAccepted || isPartiallyAccepted) ? '#f0fdf4' : '#fffbeb';
+              const containerBorder = isRejected ? '#fecaca' : (isAccepted || isPartiallyAccepted) ? '#bbf7d0' : '#fde68a';
 
               return (
                 <div
@@ -2525,13 +2577,13 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                         borderRadius: '4px',
                         fontSize: '12px',
                         fontWeight: 500,
-                        background: isRejected ? '#fee2e2' : isAccepted ? '#dcfce7' : '#fef3c7',
-                        color: isRejected ? '#991b1b' : isAccepted ? '#166534' : '#92400e',
-                        border: `1px solid ${isRejected ? '#fca5a5' : isAccepted ? '#86efac' : '#fcd34d'}`,
+                        background: isRejected ? '#fee2e2' : isPartiallyAccepted ? '#fef3c7' : isAccepted ? '#dcfce7' : '#fef3c7',
+                        color: isRejected ? '#991b1b' : isPartiallyAccepted ? '#92400e' : isAccepted ? '#166534' : '#92400e',
+                        border: `1px solid ${isRejected ? '#fca5a5' : isPartiallyAccepted ? '#fcd34d' : isAccepted ? '#86efac' : '#fcd34d'}`,
                         marginLeft: 'auto'
                       }}
                     >
-                      Overall Status: {isRejected ? 'REJECTED' : isAccepted ? 'ACCEPTED' : 'PENDING'}
+                      Overall Status: {isRejected ? 'REJECTED' : isPartiallyAccepted ? 'PARTIALLY ACCEPTED' : isAccepted ? 'ACCEPTED' : 'PENDING'}
                     </span>
                   </div>
 
@@ -2560,13 +2612,13 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
                           borderRadius: '4px',
                           fontSize: '10px',
                           fontWeight: 600,
-                          background: isRejected ? '#fee2e2' : isAccepted ? '#dcfce7' : '#fef3c7',
-                          color: isRejected ? '#991b1b' : isAccepted ? '#166534' : '#92400e'
+                          background: isRejected ? '#fee2e2' : (isAccepted || isPartiallyAccepted) ? '#dcfce7' : '#fef3c7',
+                          color: isRejected ? '#991b1b' : (isAccepted || isPartiallyAccepted) ? '#166534' : '#92400e'
                         }}>
-                          {isRejected ? 'Invalid' : isAccepted ? 'Valid' : 'Pending'}
+                          {isRejected ? 'Invalid' : (isAccepted || isPartiallyAccepted) ? 'Valid' : 'Pending'}
                         </span>
                         <span style={{ fontSize: '13px', color: '#1e293b', fontWeight: 500 }}>
-                          {isRejected ? 'Rejected' : isAccepted ? 'Accepted' : 'Pending'}
+                          {isRejected ? 'Rejected' : isPartiallyAccepted ? 'Partially Accepted' : isAccepted ? 'Accepted' : 'Pending'}
                         </span>
                       </span>
                     </div>
