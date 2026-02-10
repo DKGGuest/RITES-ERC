@@ -956,3 +956,141 @@
     border-right: 2px solid #e2e8f0 !important;
     /* Thick separator */
 }
+
+/* --- Mobile Responsiveness --- */
+
+@media (max-width: 1024px) {
+    .railway-dashboard-container {
+        padding: 16px 20px;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+
+    .dashboard-title {
+        font-size: 24px;
+    }
+
+    .filter-bar {
+        gap: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+    }
+
+    .filter-group {
+        width: 100%;
+        min-width: 0;
+        align-items: flex-start;
+    }
+
+    .filter-label {
+        text-align: left;
+    }
+
+    .dashboard-select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .date-picker-card {
+        flex-direction: column;
+        height: auto;
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .date-connector {
+        border: none;
+        height: auto;
+        padding: 0;
+        justify-content: center;
+        opacity: 0.6;
+    }
+
+    .date-input-wrapper {
+        width: 100%;
+        padding: 0;
+    }
+
+    .premium-date-input {
+        width: 100%;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .content-card {
+        padding: 12px;
+        border-radius: 12px;
+    }
+
+    .table-responsive {
+        overflow-x: auto !important;
+        /* Force scroll on mobile */
+    }
+
+    .data-table {
+        font-size: 11px !important;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 6px 8px !important;
+    }
+
+    .level-label {
+        font-size: 10px;
+    }
+
+    .nested-table-wrapper {
+        margin-left: 8px !important;
+        padding: 8px !important;
+    }
+
+    .level-4-scroll-container {
+        max-width: calc(100vw - 40px);
+    }
+}
+
+@media (max-width: 480px) {
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-title {
+        font-size: 20px;
+    }
+
+    .kpi-value {
+        font-size: 20px;
+    }
+
+    .search-input {
+        width: 100%;
+    }
+
+    .control-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .search-filter-box {
+        flex-direction: column;
+    }
+}

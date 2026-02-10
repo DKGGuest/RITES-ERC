@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { PO_WISE_LIST } from '../data/railwayBoardData';
+import reportService from '../services/reportService';
+import useReportData from '../hooks/useReportData';
 import './RailwayBoardDashboard.css';
 
 // Components
@@ -24,6 +25,9 @@ const RailwayBoardDashboard = () => {
     // Pagination State (Level 1)
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(5);
+
+    // Level 1 Data Fetching using custom hook
+    const { data: reportData, loading, error } = useReportData(reportService.getLevel1Report, null);
 
     // Filter State with Persistence (Normalized 'all' for internal state)
     const [selectedCategory, setSelectedCategory] = useState('Track Components');
@@ -67,12 +71,13 @@ const RailwayBoardDashboard = () => {
         }
     };
 
-    const toggleSerial = (serialId) => {
-        if (expandedSerial === serialId) {
+    const toggleSerial = (poNo, serialId) => {
+        const compositeId = `${poNo}_${serialId}`;
+        if (expandedSerial === compositeId) {
             setExpandedSerial(null);
             setExpandedCall(null);
         } else {
-            setExpandedSerial(serialId);
+            setExpandedSerial(compositeId);
             setExpandedCall(null);
         }
     };
@@ -92,14 +97,39 @@ const RailwayBoardDashboard = () => {
 
     const handleChangeRowsPerPage = (newRows) => {
         setRowsPerPage(newRows);
-        setPage(0);
     };
 
-    // Advanced Filtering Logic (Disabled for now - Visual only)
-    const filteredData = PO_WISE_LIST;
+    // Advanced Filtering Logic
+    const filteredData = reportData;
 
     const count = filteredData.length;
     const paginatedData = filteredData.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
+    if (loading && page === 0 && reportData.length === 0) {
+        return (
+            <div className="railway-dashboard-container">
+                <DashboardHeader />
+                <div className="content-card">
+                    <div className="loading-state p-8 text-center text-teal font-medium">
+                        Loading PO Report Data...
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error && reportData.length === 0) {
+        return (
+            <div className="railway-dashboard-container">
+                <DashboardHeader />
+                <div className="content-card">
+                    <div className="error-state p-8 text-center text-red font-medium">
+                        Error: {error}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="railway-dashboard-container">
@@ -152,7 +182,7 @@ const RailwayBoardDashboard = () => {
                         <tbody>
                             {paginatedData.map((po, index) => (
                                 <Level1Row
-                                    key={po.id}
+                                    key={po.poNo || po.id}
                                     po={po}
                                     index={(page * rowsPerPage) + index}
                                     expandedPo={expandedPo}
@@ -183,7 +213,7 @@ const RailwayBoardDashboard = () => {
             </div>
 
             {/* Charts Section */}
-            <DashboardGraph />
+            <DashboardGraph liveData={reportData} />
         </div>
     );
 };

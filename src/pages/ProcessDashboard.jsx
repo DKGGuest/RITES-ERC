@@ -1415,8 +1415,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         // Set call data
         setFetchedCallData({
           inspectionCallNo: callNo,
-          shiftOfInspection: 'Day Shift',
-          dateOfInspection: new Date().toISOString().split('T')[0]
+          shiftOfInspection: sessionStorage.getItem('inspectionShift') || 'Day Shift',
+          dateOfInspection: sessionStorage.getItem('inspectionDate') || new Date().toISOString().split('T')[0]
         });
 
         // Restore production lines from sessionStorage if present to preserve user selections
@@ -1521,8 +1521,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         // Set call data
         setFetchedCallData({
           inspectionCallNo: call.call_no,
-          shiftOfInspection: 'Day Shift',
-          dateOfInspection: new Date().toISOString().split('T')[0]
+          shiftOfInspection: sessionStorage.getItem('inspectionShift') || 'Day Shift',
+          dateOfInspection: sessionStorage.getItem('inspectionDate') || new Date().toISOString().split('T')[0]
         });
 
         // Set mock production lines if not already set
@@ -3884,7 +3884,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
             cumulativeAcceptedQty: finalCumulativeAcc,
             lineNo, // Keep the last lineNo processed (or could aggregate)
             poNo,
-            pincode
+            pincode,
+            shiftCode: (sessionStorage.getItem('inspectionShift') || lineInitiationData?.shiftOfInspection || call.shiftOfInspection || call.shift || 'A').charAt(0).toUpperCase()
           });
 
           console.log(`✅ [Shift Completed] Prepared payload for ${lineNoKey} - Lot ${lotNo}. Mfg: ${currentShiftManufacturedQty}, Rej: ${currentShiftRejectedQty}`);
@@ -3933,7 +3934,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
             inspectedQty: Math.max(0, currentShiftAcceptedQty),
             remarks: `Shift completed for lot ${lotNo}, heat ${heatNo}. Current shift - Manufactured: ${currentShiftManufacturedQty}, Rejected: ${currentShiftRejectedQty}, Accepted: ${currentShiftAcceptedQty}. Cumulative - Manufactured: ${cumulativeManufacturedQty}, Rejected: ${cumulativeRejectedQty}, Accepted: ${cumulativeAcceptedQty}`,
             actionBy: userId,
-            pincode: pincode
+            pincode: pincode,
+            shiftCode: lotData.shiftCode
           };
 
           console.log(`🔄 [Shift Completed] Sending API call for ${key} (CURRENT SHIFT DATA ONLY):`, actionData);
@@ -4108,7 +4110,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       const payload = {
         inspectionCallNo: call.call_no,
         remarks: 'Inspection Finished',
-        shift: linesData.length > 0 ? linesData[0].lineFinalResult?.shift || call.shiftOfInspection || call.shift : call.shiftOfInspection || call.shift,
+        shift: linesData.length > 0 ? linesData[0].lineFinalResult?.shift || sessionStorage.getItem('inspectionShift') || call.shiftOfInspection || call.shift : sessionStorage.getItem('inspectionShift') || call.shiftOfInspection || call.shift,
+        shiftCode: (linesData.length > 0 ? linesData[0].lineFinalResult?.shift || sessionStorage.getItem('inspectionShift') || call.shiftOfInspection || call.shift : sessionStorage.getItem('inspectionShift') || call.shiftOfInspection || call.shift)?.charAt(0).toUpperCase() || 'A',
         linesData: linesData,
         createdBy: userId
       };
@@ -4284,7 +4287,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
             lineNo,
             poNo,
             pincode,
-            action
+            action,
+            shiftCode: (sessionStorage.getItem('inspectionShift') || lineInitiationData?.shiftOfInspection || call.shiftOfInspection || call.shift || 'A').charAt(0).toUpperCase()
           });
 
           console.log(`✅ [Finish] ${lineNo} - Lot ${lotNo} - Action: ${action}:`, {
@@ -4336,7 +4340,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
             inspectedQty: Math.max(0, currentShiftAcceptedQty),
             remarks: `Inspection ${action === 'INSPECTION_COMPLETE_CONFIRM' ? 'completed' : 'paused'} for lot ${lotNo}, heat ${heatNo}. Current shift - Manufactured: ${currentShiftManufacturedQty}, Rejected: ${currentShiftRejectedQty}, Accepted: ${currentShiftAcceptedQty}. Cumulative - Manufactured: ${cumulativeManufacturedQty}, Rejected: ${cumulativeRejectedQty}, Accepted: ${cumulativeAcceptedQty}`,
             actionBy: userId,
-            pincode: pincode
+            pincode: pincode,
+            shiftCode: lotData.shiftCode
           };
 
           console.log(`🔄 [Finish] Sending API call for ${key} with action ${action}:`, actionData);

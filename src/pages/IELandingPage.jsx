@@ -633,7 +633,8 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
           remarks: `Shift details entered - Shift: ${shiftDetailsShift}, Date: ${shiftDetailsDate}`,
           actionBy: userId,
           pincode: shiftDetailsCall?.pincode || '560001',
-          materialAvailable: 'YES'
+          materialAvailable: 'YES',
+          shiftCode: (shiftDetailsShift || 'A').charAt(0).toUpperCase()
         };
 
         // console.log('Workflow Action Data:', workflowActionData);

@@ -138,3 +138,30 @@
   /* Match L4 bg */
   border-top: 1px solid #e2e8f0;
 }
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 600px) {
+  .pg-wrapper {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .pg-count {
+    width: 100%;
+    margin-right: 0;
+    text-align: center;
+    order: 3;
+    padding-top: 4px;
+    border-top: 1px dashed #e2e8f0;
+  }
+
+  .pg-rows {
+    order: 1;
+  }
+
+  .pg-buttons {
+    order: 2;
+  }
+}

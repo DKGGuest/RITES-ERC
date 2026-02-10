@@ -11,11 +11,8 @@
  */
 
 // Get API URL from environment variable or fallback to Azure production URL
-// TEMPORARY: Force Azure URL for testing (comment out to use .env.local)
-// export const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
-// export const API_BASE_URL = 'http://localhost:8080/sarthi-backend';
-export const API_BASE_URL = process.env.REACT_APP_API_URL ||
-   'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
+// Dynamic API URL switching
+export const API_BASE_URL = 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sarthi-backend';
 
 // API Configuration determined by exports above
 
@@ -60,6 +57,9 @@ export const API_ENDPOINTS = {
 
     // Vendor
     VENDOR: `${API_BASE_URL}/api/vendor`,
+
+    // Reports
+    REPORTS: `${API_BASE_URL}/api/reports`,
 };
 
 /**

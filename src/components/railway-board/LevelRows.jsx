@@ -1,16 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StatusBadge, ExpandIcon } from './SharedComponents';
-import { PO_SERIAL_LIST, INSPECTION_CALL_LIST, SHIFT_RESULTS } from '../../data/railwayBoardData';
+import reportService from '../../services/reportService';
 import Pagination from '../Pagination';
+import useReportData from '../../hooks/useReportData';
 
 // --- Level 3 & 4 Components ---
 
-const Level4Table = ({ shifts, parentSerial, railway }) => {
+function Level4Table({ callNo, parentSerial, railway }) {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(5);
+    const { data: shifts, loading, error } = useReportData(reportService.getLevel4Report, callNo);
 
-    const count = shifts.length;
-    const paginatedData = shifts.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+    if (loading) return <div className="p-4 text-center">Loading Detailed Report...</div>;
+    if (error) return <div className="p-4 text-center text-red">Error: {error}</div>;
+
+    const count = shifts?.length || 0;
+    const paginatedData = shifts?.slice(page * rowsPerPage, (page + 1) * rowsPerPage) || [];
 
     return (
         <div className="nested-table-wrapper level-4">
@@ -22,7 +27,7 @@ const Level4Table = ({ shifts, parentSerial, railway }) => {
                         <tr>
                             <th rowSpan="3">Date</th>
                             <th rowSpan="3">Shift</th>
-                            <th rowSpan="3">Rly Name</th>
+                            <th rowSpan="3">Sl No.</th>
                             <th rowSpan="3">PO + Sr. No.</th>
                             <th rowSpan="3">Lot Number</th>
                             <th rowSpan="3">Total Accepted Qty</th>
@@ -84,134 +89,122 @@ const Level4Table = ({ shifts, parentSerial, railway }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {paginatedData.map(shift => (
-                            <tr key={shift.id} className="clickable-row">
-                                <td>{new Date(shift.date).toLocaleDateString()}</td>
-                                <td>{shift.shift}</td>
-                                <td>{railway || '-'}</td>
-                                <td>{parentSerial}</td>
-                                <td>{shift.lot_no}</td>
-                                <td>{shift.accepted_qty}</td>
-                                <td>{shift.total_rej}</td>
+                        {paginatedData.map((shift, index) => (
+                            <tr key={index} className="clickable-row">
+                                <td>{shift.basicDetails?.date ? new Date(shift.basicDetails.date).toLocaleDateString() : 'Invalid Date'}</td>
+                                <td>{shift.basicDetails?.shift || '-'}</td>
+                                <td>{index + 1}</td>
+                                <td>{shift.basicDetails?.poSrNo || callNo}</td>
+                                <td>{shift.basicDetails?.lotNumber || '-'}</td>
+                                <td>{shift.basicDetails?.totalAcceptedQty ?? 0}</td>
+                                <td>{shift.basicDetails?.totalRejectionQty ?? 0}</td>
 
-                                {/* Process Data */}
-                                <td>{shift.shearing?.prod}</td><td>{shift.shearing?.rej}</td>
-                                <td>{shift.turning?.prod}</td><td>{shift.turning?.rej}</td>
-                                <td>{shift.mpi?.prod}</td><td>{shift.mpi?.rej}</td>
-                                <td>{shift.forging?.prod}</td><td>{shift.forging?.rej}</td>
-                                <td>{shift.quenching?.prod}</td><td>{shift.quenching?.rej}</td>
-                                <td>{shift.tempering?.prod}</td><td>{shift.tempering?.rej}</td>
+                                <td>{shift.processQty?.shearingProductionQty ?? 0}</td><td>{shift.processQty?.shearingRejectionQty ?? 0}</td>
+                                <td>{shift.processQty?.turningProductionQty ?? 0}</td><td>{shift.processQty?.turningRejectionQty ?? 0}</td>
+                                <td>{shift.processQty?.mpiProductionQty ?? 0}</td><td>{shift.processQty?.mpiRejectionQty ?? 0}</td>
+                                <td>{shift.processQty?.forgingProductionQty ?? 0}</td><td>{shift.processQty?.forgingRejectionQty ?? 0}</td>
+                                <td>{shift.processQty?.quenchingProductionQty ?? 0}</td><td>{shift.processQty?.quenchingRejectionQty ?? 0}</td>
+                                <td>{shift.processQty?.temperingProductionQty ?? 0}</td><td>{shift.processQty?.temperingRejectionQty ?? 0}</td>
+                                <td>{shift.shearingDefects?.lengthOfCutBar ?? 0}</td>
+                                <td>{shift.shearingDefects?.ovalityImproperDiaAtEnd ?? 0}</td>
+                                <td>{shift.shearingDefects?.sharpEdges ?? 0}</td>
+                                <td>{shift.shearingDefects?.crackedEdges ?? 0}</td>
 
-                                {/* Defect Data (Mapped) */}
-                                {/* Shearing */}
-                                <td>{shift.defects?.shearing_len || 0}</td>
-                                <td>0</td>{/* Ovality placeholder */}
-                                <td>0</td>{/* Sharp placeholder */}
-                                <td>0</td>{/* Cracked placeholder */}
+                                <td>{shift.turningDefects?.parallelLength ?? 0}</td>
+                                <td>{shift.turningDefects?.fullTurningLength ?? 0}</td>
+                                <td>{shift.turningDefects?.turningDia ?? 0}</td>
 
-                                {/* Turning */}
-                                <td>0</td>{/* Parallel placeholder */}
-                                <td>0</td>{/* Full placeholder */}
-                                <td>{shift.defects?.turning_ovality || 0}</td>{/* Mapping ovality here for now */}
+                                <td>{shift.processQty?.mpiRejectionQty ?? 0}</td>
 
-                                {/* MPI */}
-                                <td>{shift.defects?.mpi || 0}</td>
+                                <td>{shift.forgingDefects?.forgingTemperature ?? 0}</td>
+                                <td>{shift.forgingDefects?.forgingStabilisationRejection ?? 0}</td>
+                                <td>{shift.forgingDefects?.improperForging ?? 0}</td>
+                                <td>{shift.forgingDefects?.forgingMarksNotches ?? 0}</td>
 
-                                {/* Forging */}
-                                <td>{shift.defects?.forging_temp || 0}</td>
+                                <td>{shift.testingDefects?.temperingHardness ?? 0}</td>
+
+                                <td>{shift.dimensionalDefects?.boxGauge ?? 0}</td>
+                                <td>{shift.dimensionalDefects?.flatBearingArea ?? 0}</td>
+                                <td>{shift.dimensionalDefects?.fallingGauge ?? 0}</td>
+
+                                <td>{shift.visualDefects?.surfaceDefect ?? 0}</td>
+                                <td>{shift.visualDefects?.embossingDefect ?? 0}</td>
+                                <td>{shift.visualDefects?.marking ?? 0}</td>
+
                                 <td>0</td>
-                                <td>0</td>
-                                <td>0</td>{/* Forge Defect Placeholder */}
-
-                                {/* Quenching */}
-                                <td>{shift.defects?.quenching_hardness || 0}</td>
-
-                                {/* Dimensional */}
-                                <td>{shift.defects?.dimensional_box || 0}</td>
-                                <td>0</td>
-                                <td>0</td>
-
-                                {/* Visual */}
-                                <td>{shift.defects?.visual_surface || 0}</td>
-                                <td>0</td>
-                                <td>0</td>{/* Marking placeholder */}
-
-                                {/* Testing */}
-                                <td>0</td>{/* Temper Hardness placeholder */}
-                                <td>{shift.defects?.testing_toe_load || 0}</td>
-                                <td>0</td>{/* Weight placeholder */}
-
-                                {/* Finishing */}
-                                <td>0</td>{/* Paint ID placeholder */}
-                                <td>0</td>{/* Coating placeholder */}
+                                <td>{shift.testingDefects?.toeLoad ?? 0}</td><td>{shift.testingDefects?.weight ?? 0}</td>
+                                <td>{shift.finishingDefects?.paintIdentification ?? 0}</td><td>{shift.finishingDefects?.ercCoating ?? 0}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
-            {(
-                <Pagination
-                    theme="slate"
-                    currentPage={page}
-                    totalPages={Math.ceil(count / rowsPerPage)}
-                    start={page * rowsPerPage}
-                    end={Math.min((page + 1) * rowsPerPage, count)}
-                    totalCount={count}
-                    onPageChange={setPage}
-                    rows={rowsPerPage}
-                    onRowsChange={(r) => { setRowsPerPage(r); setPage(0); }}
-                />
-            )}
+            <Pagination
+                theme="slate"
+                currentPage={page}
+                totalPages={Math.ceil(count / rowsPerPage)}
+                start={page * rowsPerPage}
+                end={Math.min((page + 1) * rowsPerPage, count)}
+                totalCount={count}
+                onPageChange={setPage}
+                rows={rowsPerPage}
+                onRowsChange={(r) => { setRowsPerPage(r); }}
+            />
         </div>
     );
-};
+}
 
-const Level3Row = ({ call, expandedCall, toggleCall, parentSerial, index }) => {
-    const isExpanded = expandedCall === call.id;
-    const isProcess = call.type === 'Process';
-    const shifts = SHIFT_RESULTS[call.call_no] || [];
+function Level3Row({ call, expandedCall, toggleCall, parentSerial, index, railway }) {
+    const isExpanded = expandedCall === call.inspectionCallNumber;
+    const isProcess = call.stageOfInspection === 'Process' || call.inspectionType === 'Process';
+    // const shifts = SHIFT_RESULTS[call.call_no] || [];
 
     return (
         <React.Fragment>
             <tr
                 className={`clickable-row ${isExpanded ? 'expanded-row-parent' : ''}`}
-                onClick={(e) => { e.stopPropagation(); toggleCall(call.id); }}
+                onClick={(e) => { e.stopPropagation(); toggleCall(call.inspectionCallNumber); }}
             >
                 <td className="text-center">
                     {isProcess && <ExpandIcon isExpanded={isExpanded} isSubmenu={true} />}
                 </td>
                 <td>{index + 1}</td>
                 <td className="font-medium text-teal" style={{ whiteSpace: 'nowrap' }}>{parentSerial}</td>
-                <td className="font-medium text-teal">{call.call_no}</td>
-                <td><StatusBadge status={call.stage} /></td>
-                <td>{new Date(call.desired_date).toLocaleDateString()}</td>
-                <td>{new Date(call.start_date).toLocaleDateString()}</td>
-                <td>{new Date(call.end_date).toLocaleDateString()}</td>
-                <td className="text-center">{call.visits}</td>
-                <td className="text-right">{call.offered}</td>
-                <td className="text-right">{call.accepted}</td>
-                <td className="text-right">{call.balance}</td>
-                <td className={call.rej_pct > 5 ? 'text-red' : ''}>{call.rej_pct}%</td>
-                <td className="col-reason" title={call.reason}>{call.reason}</td>
-                <td>{call.ic_number}</td>
+                <td className="font-medium text-teal">{call.inspectionCallNumber}</td>
+                <td><StatusBadge status={call.stageOfInspection} /></td>
+                <td>{call.desiredDateOfInspection ? new Date(call.desiredDateOfInspection).toLocaleDateString() : '-'}</td>
+                <td>{call.inspectionStartDate ? new Date(call.inspectionStartDate).toLocaleDateString() : '-'}</td>
+                <td>{call.inspectionCompletionDate ? new Date(call.inspectionCompletionDate).toLocaleDateString() : '-'}</td>
+                <td className="text-center">{call.noOfVisitsOrMandays}</td>
+                <td className="text-right">{call.offeredOrManufacturedQty?.toLocaleString()}</td>
+                <td className="text-right">{call.acceptedQuantity?.toLocaleString()}</td>
+                <td className="text-right">{call.balanceQty?.toLocaleString()}</td>
+                <td className={call.rejectionPercentage > 5 ? 'text-red' : ''}>{call.rejectionPercentage || 0}%</td>
+                <td className="col-reason" title={call.mainReasonForRejection}>{call.mainReasonForRejection || '-'}</td>
+                <td>{call.icNumber}</td>
             </tr>
             {isExpanded && isProcess && (
                 <tr className="detail-row level-4-container">
                     <td colSpan="15">
-                        <Level4Table shifts={shifts} parentSerial={parentSerial} />
+                        <Level4Table callNo={call.inspectionCallNumber} parentSerial={parentSerial} railway={railway} />
                     </td>
                 </tr>
             )}
         </React.Fragment>
     );
-};
+}
 
-const Level3Table = ({ calls, expandedCall, toggleCall, parentSerial }) => {
+function Level3Table({ poNo, rlyPoSrNo, expandedCall, toggleCall, parentSerial, railway }) {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(5);
+    const apiParams = useMemo(() => ({ poNo, rlyPoSrNo, page, size: rowsPerPage }), [poNo, rlyPoSrNo, page, rowsPerPage]);
+    const { data: calls, pagination, loading, error } = useReportData(reportService.getLevel3Report, apiParams);
 
-    const count = calls.length;
-    const paginatedData = calls.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+    if (loading) return <div className="p-4 text-center">Loading Inspection Calls...</div>;
+    if (error) return <div className="p-4 text-center text-red">Error: {error}</div>;
+
+    const count = pagination?.totalElements || 0;
+    const tableData = calls || [];
 
     return (
         <div className="nested-table-wrapper level-3">
@@ -237,12 +230,13 @@ const Level3Table = ({ calls, expandedCall, toggleCall, parentSerial }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {paginatedData.map((call, idx) => (
+                    {tableData.map((call, idx) => (
                         <Level3Row
-                            key={call.id}
+                            key={call.inspectionCallNumber || idx}
                             call={call}
                             index={(page * rowsPerPage) + idx}
                             parentSerial={parentSerial}
+                            railway={railway}
                             expandedCall={expandedCall}
                             toggleCall={toggleCall}
                         />
@@ -254,56 +248,56 @@ const Level3Table = ({ calls, expandedCall, toggleCall, parentSerial }) => {
                 <Pagination
                     theme="orange"
                     currentPage={page}
-                    totalPages={Math.ceil(count / rowsPerPage)}
+                    totalPages={pagination?.totalPages || Math.ceil(count / rowsPerPage)}
                     start={page * rowsPerPage}
                     end={Math.min((page + 1) * rowsPerPage, count)}
                     totalCount={count}
                     onPageChange={setPage}
                     rows={rowsPerPage}
-                    onRowsChange={(r) => { setRowsPerPage(r); setPage(0); }}
+                    onRowsChange={(r) => { setRowsPerPage(r); }}
                 />
             )}
         </div>
     );
-};
+}
 
-// --- Level 2 Component ---
-
-const Level2Row = ({ row, index, expandedSerial, toggleSerial, expandedCall, toggleCall }) => {
-    const isExpanded = expandedSerial === row.id;
-    const calls = INSPECTION_CALL_LIST[row.rly_po_sr_no] || [];
+function Level2Row({ row, index, expandedSerial, toggleSerial, expandedCall, toggleCall, railway, poNo }) {
+    const compositeId = `${poNo}_${row.rlyPoSrNo}`;
+    const isExpanded = expandedSerial === compositeId;
 
     return (
         <React.Fragment>
             <tr
                 className={`clickable-row ${isExpanded ? 'expanded-row-parent' : ''}`}
-                onClick={(e) => { e.stopPropagation(); toggleSerial(row.id); }}
+                onClick={(e) => { e.stopPropagation(); toggleSerial(poNo, row.rlyPoSrNo); }}
             >
                 <td className="text-center">
                     <ExpandIcon isExpanded={isExpanded} isSubmenu={true} />
                 </td>
                 <td>{index + 1}</td>
-                <td className="font-medium text-teal">{row.rly_po_sr_no}</td>
+                <td className="font-medium text-teal">{row.rlyPoSrNo}</td>
                 <td title={row.consignee}>{row.consignee}</td>
-                <td>{new Date(row.dp_date).toLocaleDateString()}</td>
-                <td>{row.ext_dp_date ? new Date(row.ext_dp_date).toLocaleDateString() : '-'}</td>
-                <td className="text-right">{row.qty.toLocaleString()}</td>
-                <td className="text-right">{row.balance.toLocaleString()}</td>
-                <td className="text-center">{row.ic_issued}</td>
-                <td>{row.last_ic_date ? new Date(row.last_ic_date).toLocaleDateString() : '-'}</td>
-                <td className="text-right">{row.rm_acc}</td>
-                <td className={row.rm_rej_pct > 2 ? 'text-red' : ''}>{row.rm_rej_pct || 0}%</td>
-                <td className="text-right">{row.proc_acc.toLocaleString()}</td>
-                <td className={row.proc_rej_pct > 3 ? 'text-red' : ''}>{row.proc_rej_pct || 0}%</td>
-                <td className="text-right">{row.final_acc.toLocaleString()}</td>
-                <td className={row.final_rej_pct > 1 ? 'text-red' : ''}>{row.final_rej_pct || 0}%</td>
+                <td>{new Date(row.originalDpDate).toLocaleDateString()}</td>
+                <td>{row.extendedDpDate ? new Date(row.extendedDpDate).toLocaleDateString() : '-'}</td>
+                <td className="text-right">{row.poSrNoQty?.toLocaleString()}</td>
+                <td className="text-right">{row.balancePoQty?.toLocaleString()}</td>
+                <td className="text-center">{row.noOfIcIssued}</td>
+                <td>-</td>
+                <td className="text-right">{row.rawMaterialAcceptedMt}</td>
+                <td className={row.rawMaterialRejectionPercentage > 2 ? 'text-red' : ''}>{row.rawMaterialRejectionPercentage || 0}%</td>
+                <td className="text-right">{row.processInspectionMaterialAcceptedNos?.toLocaleString()}</td>
+                <td className={row.processInspectionMaterialRejectionPercentage > 3 ? 'text-red' : ''}>{row.processInspectionMaterialRejectionPercentage || 0}%</td>
+                <td className="text-right">{row.finalInspectionMaterialAcceptedNos?.toLocaleString()}</td>
+                <td className={row.finalInspectionMaterialRejectionPercentage > 1 ? 'text-red' : ''}>{row.finalInspectionMaterialRejectionPercentage || 0}%</td>
             </tr>
             {isExpanded && (
                 <tr className="detail-row level-3-container">
                     <td colSpan="16">
                         <Level3Table
-                            calls={calls}
-                            parentSerial={row.rly_po_sr_no}
+                            rlyPoSrNo={row.rlyPoSrNo}
+                            poNo={poNo}
+                            parentSerial={row.rlyPoSrNo}
+                            railway={railway}
                             expandedCall={expandedCall}
                             toggleCall={toggleCall}
                         />
@@ -312,14 +306,18 @@ const Level2Row = ({ row, index, expandedSerial, toggleSerial, expandedCall, tog
             )}
         </React.Fragment>
     );
-};
+}
 
-const Level2Table = ({ serials, expandedSerial, toggleSerial, expandedCall, toggleCall }) => {
+function Level2Table({ poNo, expandedSerial, toggleSerial, expandedCall, toggleCall, railway }) {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(5);
+    const { data: serials, loading, error } = useReportData(reportService.getLevel2Report, poNo);
 
-    const count = serials.length;
-    const paginatedData = serials.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+    if (loading) return <div className="p-4 text-center">Loading PO Serial Details...</div>;
+    if (error) return <div className="p-4 text-center text-red">Error: {error}</div>;
+
+    const count = serials?.length || 0;
+    const paginatedData = serials?.slice(page * rowsPerPage, (page + 1) * rowsPerPage) || [];
 
     return (
         <div className="nested-table-wrapper">
@@ -348,13 +346,15 @@ const Level2Table = ({ serials, expandedSerial, toggleSerial, expandedCall, togg
                 <tbody>
                     {paginatedData.map((row, idx) => (
                         <Level2Row
-                            key={row.id}
+                            key={row.rlyPoSrNo || idx}
                             row={row}
+                            poNo={poNo}
                             index={(page * rowsPerPage) + idx}
                             expandedSerial={expandedSerial}
                             toggleSerial={toggleSerial}
                             expandedCall={expandedCall}
                             toggleCall={toggleCall}
+                            railway={railway}
                         />
                     ))}
                 </tbody>
@@ -370,16 +370,16 @@ const Level2Table = ({ serials, expandedSerial, toggleSerial, expandedCall, togg
                     totalCount={count}
                     onPageChange={setPage}
                     rows={rowsPerPage}
-                    onRowsChange={(r) => { setRowsPerPage(r); setPage(0); }}
+                    onRowsChange={(r) => { setRowsPerPage(r); }}
                 />
             )}
         </div>
     );
-};
+}
 
 // --- Level 1 Component ---
 
-export const Level1Row = ({
+export const Level1Row = React.memo(({
     po,
     index,
     expandedPo,
@@ -389,37 +389,37 @@ export const Level1Row = ({
     expandedCall,
     toggleCall
 }) => {
-    const isExpanded = expandedPo === po.po_no;
-    const serials = PO_SERIAL_LIST[po.po_no] || [];
+    const isExpanded = expandedPo === po.poNo;
 
     return (
         <React.Fragment>
             <tr
                 className={`clickable-row ${isExpanded ? 'expanded-row-parent' : ''}`}
-                onClick={() => togglePo(po.po_no)}
+                onClick={() => togglePo(po?.poNo)}
             >
                 <td className="text-center">
                     <ExpandIcon isExpanded={isExpanded} />
                 </td>
                 <td>{index + 1}</td>
-                <td><span className="badge-railway">{po.railway}</span></td>
-                <td className="font-medium text-teal">{po.po_no}</td>
-                <td>{new Date(po.po_date).toLocaleDateString()}</td>
-                <td className="col-vendor" title={po.vendor}>{po.vendor}</td>
-                <td>{po.region}</td>
-                <td className="text-right">{po.po_qty.toLocaleString()}</td>
-                <td className="text-right">{po.accepted_qty.toLocaleString()}</td>
-                <td className="text-right">{po.balance_qty.toLocaleString()}</td>
-                <td className={po.rm_rej > 2 ? 'text-red' : ''}>{po.rm_rej}%</td>
-                <td className={po.process_rej > 3 ? 'text-red' : ''}>{po.process_rej}%</td>
-                <td>{po.final_rej}%</td>
-                <td><StatusBadge status={po.status} /></td>
+                <td><span className="badge-railway">{po?.railway}</span></td>
+                <td className="font-medium text-teal">{po?.poNo}</td>
+                <td>{po?.poDate ? new Date(po.poDate).toLocaleDateString() : '-'}</td>
+                <td className="col-vendor" title={po?.vendor}>{po?.vendor}</td>
+                <td>{po?.inspectionRegion || '-'}</td>
+                <td className="text-right">{po?.poQty?.toLocaleString() || '0'}</td>
+                <td className="text-right">{po?.finalQuantityAcceptedByRites?.toLocaleString() || '0'}</td>
+                <td className="text-right">{po?.balancePoQty?.toLocaleString() || '0'}</td>
+                <td className={po?.rawMaterialRejectionPercentage > 2 ? 'text-red' : ''}>{po?.rawMaterialRejectionPercentage || 0}%</td>
+                <td className={po?.processInspectionRejectionPercentage > 3 ? 'text-red' : ''}>{po?.processInspectionRejectionPercentage || 0}%</td>
+                <td>{po?.finalInspectionRejectionPercentage || 0}%</td>
+                <td><StatusBadge status={po?.poStatus} /></td>
             </tr>
             {isExpanded && (
                 <tr className="detail-row level-2-container">
                     <td colSpan="14">
                         <Level2Table
-                            serials={serials}
+                            poNo={po?.poNo}
+                            railway={po?.railway}
                             expandedSerial={expandedSerial}
                             toggleSerial={toggleSerial}
                             expandedCall={expandedCall}
@@ -430,4 +430,4 @@ export const Level1Row = ({
             )}
         </React.Fragment>
     );
-};
+});

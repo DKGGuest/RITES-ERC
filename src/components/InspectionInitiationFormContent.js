@@ -110,7 +110,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               po_amend_no: processData.amendmentNo || 'N/A',
               po_amend_dates: processData.amendmentDate || 'N/A',
               product_name: processData.poDescription || call.product_name,
-              vendor_name: processData.vendorName,
+              vendor_name: processData.vendorName || processData.companyName,
               vendor_code: processData.vendorCode,
               consignee: processData.consignee,
               po_qty: processData.poQty,
@@ -137,7 +137,13 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               rm_ic_heat_info: processData.rmIcHeatInfoList || [],
 
               // Multiple Lots Support
-              lotDetailsList: processData.lotDetailsList || []
+              lotDetailsList: processData.lotDetailsList || [],
+              rlyCd: processData.rlyCd,
+              poSerialNo: processData.poSerialNo,
+              vendorDetails: processData.vendorDetails,
+              totalOfferedQtyMt: processData.totalOfferedQtyMt,
+              vendorName: processData.vendorName || processData.companyName,
+              vendor_address: processData.vendorDetails || processData.unitAddress
             };
 
             setFetchedPoData(transformedPoData);
@@ -204,6 +210,11 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               console.log('✅ Using PO data from database for Final Product:', poDataFromDb);
               transformedPoData = {
                 po_no: poDataFromDb.poNo,
+                rlyCd: poDataFromDb.rlyCd,
+                poSerialNo: poDataFromDb.poSerialNo,
+                vendorDetails: poDataFromDb.vendorDetails,
+                totalOfferedQtyMt: poDataFromDb.totalOfferedQtyMt,
+                vendorName: poDataFromDb.vendorName,
                 rly_po_no: poDataFromDb.rlyPoNo,
                 po_serial_no: poDataFromDb.poSerialNo,
                 rly_po_no_serial: poDataFromDb.rlyPoNoSerial,
@@ -250,6 +261,11 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               console.log('⚠️ No PO data from database, using inspection call data');
               transformedPoData = {
                 po_no: ic.poNo || ic.po_no || call.po_no,
+                rly_po_no: ic.poNo || call.po_no,
+                rlyCd: ic.rlyCd || call.rly_cd,
+                poSerialNo: ic.poSerialNo || call.po_serial_no,
+                vendorDetails: ic.vendorDetails || ic.vendor_details || call.vendor_details,
+                vendorName: ic.companyName || fd?.companyName || call.vendor_name,
                 po_date: ic.poDate || ic.po_date || call.po_date,
                 po_amend_no: ic.poAmendNo || ic.maNo || 'N/A',
                 product_name: fd?.companyName || call.product_name || ic.companyName,
@@ -283,11 +299,11 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             setFinalMappings(Array.isArray(mappings) ? mappings : []);
 
             // Debug logging
-            console.log('🔍 Final Product Data Summary:');
-            console.log('  - RM IC Number:', fd?.rmIcNumber);
-            console.log('  - Process IC Number:', fd?.processIcNumber);
-            console.log('  - Total Lots:', fd?.totalLots);
-            console.log('  - Total Offered Qty:', fd?.totalOfferedQty);
+            // console.log('🔍 Final Product Data Summary:');
+            // console.log('  - RM IC Number:', fd?.rmIcNumber);
+            // console.log('  - Process IC Number:', fd?.processIcNumber);
+            // console.log('  - Total Lots:', fd?.totalLots);
+            // console.log('  - Total Offered Qty:', fd?.totalOfferedQty);
 
             // If a saved Section A exists for this call, prefer those values (same behaviour as Raw Material)
             try {
@@ -310,7 +326,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               }
             } catch (e) {
               // No saved Section A found or API error - continue with transformed final data
-              console.debug('No saved Section A for final call or fetch failed:', e?.message || e);
+              // console.debug('No saved Section A for final call or fetch failed:', e?.message || e);
             }
 
             if (lots && Array.isArray(lots) && lots.length > 0) {
@@ -330,7 +346,7 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
                 place_of_inspection: transformedPoData.place_of_inspection
               }));
               setSubPoList(transformedSubPoList);
-              console.log(`✅ Loaded ${transformedSubPoList.length} final lot details for Section B/C`);
+              // console.log(`✅ Loaded ${transformedSubPoList.length} final lot details for Section B/C`);
             }
 
             setIsLoading(false);
@@ -381,7 +397,12 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               cond_text: poDataFromDb.condText,
               po_cond_sr_no: poDataFromDb.poCondSrNo,
               erc_type: poDataFromDb.ercType, // NEW: Type of ERC from inspection_calls
-              total_offered_qty_mt: poDataFromDb.totalOfferedQtyMt // NEW: Call Qty from rm_inspection_details
+              total_offered_qty_mt: poDataFromDb.totalOfferedQtyMt, // NEW: Call Qty from rm_inspection_details
+              rlyCd: poDataFromDb.rlyCd,
+              poSerialNo: poDataFromDb.poSerialNo,
+              vendorDetails: poDataFromDb.vendorDetails,
+              totalOfferedQtyMt: poDataFromDb.totalOfferedQtyMt,
+              vendorName: poDataFromDb.vendorName
             };
 
             setFetchedPoData(transformedPoData);
@@ -527,8 +548,8 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
 
     // Determine stage of inspection from product_type
     const stageOfInspection = (call.product_type === 'Process' || call.product_type?.includes('Process')) ? 'Process Material' :
-                              (call.product_type === 'Final' || call.product_type?.includes('Final')) ? 'Final' :
-                              'Raw Material';
+      (call.product_type === 'Final' || call.product_type?.includes('Final')) ? 'Final' :
+        'Raw Material';
 
     return {
       inspectionCallNo: call.call_no,
@@ -906,58 +927,58 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
 
       {/* SECTION A: Main PO Information */}
       {showSectionA && (
-      <div className={`card ${formData.showValidationErrors && !formData.sectionAVerified ? 'card--incomplete' : ''}`}>
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="card-title">SECTION A: Main PO Information{poSuffix} {isFromDatabase ? <span style={{ color: 'var(--color-success)', fontSize: 'var(--font-size-sm)' }}></span> : fetchedPoData ? '(Auto-Fetched)' : ''}</h3>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setSectionAExpanded(!sectionAExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
-          >
-            {sectionAExpanded ? '-' : '+'}
-          </button>
-        </div>
-        {sectionAExpanded && (
-        <div className="form-grid">
-          <div className="form-group">
-            <label className="form-label">RLY + PO_NO</label>
-            <input type="text" className="form-input" value={poData.rly_po_no || poData.po_no || call.po_no} disabled />
+        <div className={`card ${formData.showValidationErrors && !formData.sectionAVerified ? 'card--incomplete' : ''}`}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card-title">SECTION A: Main PO Information{poSuffix} {isFromDatabase ? <span style={{ color: 'var(--color-success)', fontSize: 'var(--font-size-sm)' }}></span> : fetchedPoData ? '(Auto-Fetched)' : ''}</h3>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSectionAExpanded(!sectionAExpanded)}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xl)' }}
+            >
+              {sectionAExpanded ? '-' : '+'}
+            </button>
           </div>
-          <div className="form-group">
-            <label className="form-label">PO DATE</label>
-            <input type="text" className="form-input" value={poData.po_date || formatDate(call.po_date)} disabled />
-            <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-success)' }}>✓ PO Date ≤ Today</small>
-          </div>
-          <div className="form-group">
-            <label className="form-label">PO_QTY</label>
-            <input type="text" className="form-input" value={poData.po_qty || call.po_qty} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">INSP_PLACE</label>
-            <input type="text" className="form-input" value={poData.place_of_inspection || call.place_of_inspection || 'N/A'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">VENDOR_NAME</label>
-            <input type="text" className="form-input" value={poData.vendor_name || call.vendor_name} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">MA_NO</label>
-            <input type="text" className="form-input" value={poData.po_amend_no || 'N/A'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">MA_DATE</label>
-            <input type="text" className="form-input" value={poData.po_amend_dates || 'N/A'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">PURCHASING AUTHORITY</label>
-            <input type="text" className="form-input" value={poData.purchasing_authority || 'Manager, Procurement'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">BILL PAYING OFFICER</label>
-            <input type="text" className="form-input" value={poData.bpo || 'BPO-001'} disabled />
-          </div>
-          {/* <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+          {sectionAExpanded && (
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">RLY + PO_NO</label>
+                <input type="text" className="form-input" value={poData.rly_po_no || poData.po_no || call.po_no} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">PO DATE</label>
+                <input type="text" className="form-input" value={poData.po_date || formatDate(call.po_date)} disabled />
+                <small style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-success)' }}>✓ PO Date ≤ Today</small>
+              </div>
+              <div className="form-group">
+                <label className="form-label">PO_QTY</label>
+                <input type="text" className="form-input" value={poData.po_qty || call.po_qty} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">INSP_PLACE</label>
+                <input type="text" className="form-input" value={poData.place_of_inspection || call.place_of_inspection || 'N/A'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">VENDOR_NAME</label>
+                <input type="text" className="form-input" value={poData.vendor_name || call.vendor_name} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">MA_NO</label>
+                <input type="text" className="form-input" value={poData.po_amend_no || 'N/A'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">MA_DATE</label>
+                <input type="text" className="form-input" value={poData.po_amend_dates || 'N/A'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">PURCHASING AUTHORITY</label>
+                <input type="text" className="form-input" value={poData.purchasing_authority || 'Manager, Procurement'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">BILL PAYING OFFICER</label>
+                <input type="text" className="form-input" value={poData.bpo || 'BPO-001'} disabled />
+              </div>
+              {/* <div className="form-group" style={{ gridColumn: '1 / -1' }}>
             <label className="form-label">PO_COND SR. NO.</label>
             <div className="form-grid" style={{ marginTop: 'var(--space-8)' }}>
               <div className="form-group">
@@ -971,208 +992,230 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             </div>
           </div> */}
 
-          {/* Section A OK/Not OK Buttons */}
-          <div className="section-action-buttons" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-16)', marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={handleSectionAReject}
-              disabled={isSaving || formData.sectionAStatus === 'rejected'}
-            >
-              {isSaving ? 'Saving...' : formData.sectionAStatus === 'rejected' ? 'Not OK' : 'Not OK'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-success"
-              onClick={handleSectionAApprove}
-              disabled={isSaving || formData.sectionAStatus === 'approved'}
-            >
-              {isSaving ? 'Saving...' : formData.sectionAStatus === 'approved' ? 'OK' : 'OK'}
-            </button>
-          </div>
+              {/* Section A OK/Not OK Buttons */}
+              <div className="section-action-buttons" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-16)', marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleSectionAReject}
+                  disabled={isSaving || formData.sectionAStatus === 'rejected'}
+                >
+                  {isSaving ? 'Saving...' : formData.sectionAStatus === 'rejected' ? 'Not OK' : 'Not OK'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={handleSectionAApprove}
+                  disabled={isSaving || formData.sectionAStatus === 'approved'}
+                >
+                  {isSaving ? 'Saving...' : formData.sectionAStatus === 'approved' ? 'OK' : 'OK'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        )}
-      </div>
       )}
 
       {/* SECTION B: Inspection Call Details - Only shown when Section A is approved */}
       {showSectionB && formData.sectionAStatus === 'approved' && (
-      <div className={`card ${formData.showValidationErrors && !formData.sectionBVerified ? 'card--incomplete' : ''}`}>
-        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="card-title">SECTION B: Inspection Call Details{poSuffix}</h3>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => setSectionBExpanded(!sectionBExpanded)}
-            style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xxl)' }}
-          >
-            {sectionBExpanded ? '-' : '+'}
-          </button>
-        </div>
-        {sectionBExpanded && (
-        <div className="form-grid">
-          <div className="form-group">
-            <label className="form-label">INSPECTION CALL NO.</label>
-            <input type="text" className="form-input" value={call.call_no} disabled />
+        <div className={`card ${formData.showValidationErrors && !formData.sectionBVerified ? 'card--incomplete' : ''}`}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card-title">SECTION B: Inspection Call Details{poSuffix}</h3>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSectionBExpanded(!sectionBExpanded)}
+              style={{ padding: 'var(--space-8) var(--space-16)', fontSize: 'var(--font-size-xxl)' }}
+            >
+              {sectionBExpanded ? '-' : '+'}
+            </button>
           </div>
-          <div className="form-group">
-            <label className="form-label">INSPECTION CALL DATE</label>
-            <input type="text" className="form-input" value={formatDate(call.call_date || call.requested_date)} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">INSPECTION DESIRED DATE</label>
-            <input type="text" className="form-input" value={formatDate(call.desired_inspection_date || call.requested_date)} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">RLY + PO_NO + PO_SR</label>
-            <input type="text" className="form-input" value={poData.rly_po_no_serial || `${poData.po_no || call.po_no} / ${poData.pl_no || '1'}`} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">ITEM DESC</label>
-            <input type="text" className="form-input" value={poData.product_name || 'ERC Components'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">PRODUCT TYPE</label>
-            <input type="text" className="form-input" value={getProductTypeDisplayName(call.product_type)} disabled />
-          </div>
-          {/* Type of ERC - fetched from inspection_calls.erc_type via API */}
-          <div className="form-group">
-            <label className="form-label">TYPE OF ERC</label>
-            <input type="text" className="form-input" value={poData.type_of_erc || poData.erc_type || call.erc_type || 'N/A'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">PO_QTY + UNIT</label>
-            <input type="text" className="form-input" value={`${poData.po_qty || call.po_qty} ${poData.unit || 'Nos'}`} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">CONSIGNEE_RLY + CONSIGNEE</label>
-            <input type="text" className="form-input" value={poData.consignee || call.consignee || 'N/A'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">ORIG_DP</label>
-            <input type="text" className="form-input" value={poData.orig_dp || call.delivery_period || 'N/A'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">EXT_DP</label>
-            <input type="text" className="form-input" value={poData.ext_dp || 'N/A'} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">ORIG_DP_START</label>
-            <input type="text" className="form-input" value={poData.orig_dp_start || poData.po_date || formatDate(call.po_date)} disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">STAGE OF INSPECTION</label>
-            <input type="text" className="form-input" value={
-              (call.product_type === 'Process' || call.product_type?.includes('Process')) ? 'Process Material' :
-              (call.product_type === 'Final' || call.product_type?.includes('Final')) ? 'Final' :
-              'Raw Material'
-            } disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">CALL QTY</label>
-            <input type="text" className="form-input" value={
-              poData.total_offered_qty ||
-              poData.total_offered_qty_mt ||
-              call.call_qty ||
-              'N/A'
-            } disabled />
-          </div>
-          <div className="form-group">
-            <label className="form-label">PLACE OF INSPECTION</label>
-            <input type="text" className="form-input" value={poData.place_of_inspection || call.place_of_inspection || 'N/A'} disabled />
-          </div>
+          {sectionBExpanded && (
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">INSPECTION CALL NO.</label>
+                <input type="text" className="form-input" value={call.call_no} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">INSPECTION CALL DATE</label>
+                <input type="text" className="form-input" value={formatDate(call.call_date || call.requested_date)} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">INSPECTION DESIRED DATE</label>
+                <input type="text" className="form-input" value={formatDate(call.desired_inspection_date || call.requested_date)} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">RLY + PO_NO + PO_SR</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={(() => {
+                    if (poData.rlyCd && poData.poSerialNo) {
+                      return `${poData.rlyCd}/${poData.poSerialNo}`;
+                    }
+                    return poData.rly_po_no_serial || `${poData.po_no || call.po_no} / ${poData.pl_no || '1'}`;
+                  })()}
+                  disabled
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">ITEM DESC</label>
+                <input type="text" className="form-input" value={poData.product_name || 'ERC Components'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">PRODUCT TYPE</label>
+                <input type="text" className="form-input" value={getProductTypeDisplayName(call.product_type)} disabled />
+              </div>
+              {/* Type of ERC - fetched from inspection_calls.erc_type via API */}
+              <div className="form-group">
+                <label className="form-label">TYPE OF ERC</label>
+                <input type="text" className="form-input" value={poData.type_of_erc || poData.erc_type || call.erc_type || 'N/A'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">PO_QTY + UNIT</label>
+                <input type="text" className="form-input" value={`${poData.po_qty || call.po_qty} ${poData.unit || 'Nos'}`} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">CONSIGNEE_RLY + CONSIGNEE</label>
+                <input type="text" className="form-input" value={poData.consignee || call.consignee || 'N/A'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">ORIG_DP</label>
+                <input type="text" className="form-input" value={poData.orig_dp || call.delivery_period || 'N/A'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">EXT_DP</label>
+                <input type="text" className="form-input" value={poData.ext_dp || 'N/A'} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">ORIG_DP_START</label>
+                <input type="text" className="form-input" value={poData.orig_dp_start || poData.po_date || formatDate(call.po_date)} disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">STAGE OF INSPECTION</label>
+                <input type="text" className="form-input" value={
+                  (call.product_type === 'Process' || call.product_type?.includes('Process')) ? 'Process Material' :
+                    (call.product_type === 'Final' || call.product_type?.includes('Final')) ? 'Final' :
+                      'Raw Material'
+                } disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">CALL QTY (MT)</label>
+                <input type="text" className="form-input" value={
+                  poData.totalOfferedQtyMt ||
+                  poData.total_offered_qty ||
+                  poData.total_offered_qty_mt ||
+                  call.call_qty ||
+                  'N/A'
+                } disabled />
+              </div>
+              <div className="form-group">
+                <label className="form-label">PLACE OF INSPECTION</label>
+                <input type="text" className="form-input" value={
+                  (() => {
+                    const name = poData.company_name || poData.vendor_name || poData.vendorName;
+                    const addr = poData.unit_address || poData.vendor_address || poData.vendorDetails;
 
-          {/* RM IC NUMBERS & HEAT NUMBERS TABLE - Only for Process Material Inspection with multiple lots */}
-          {(call.product_type === 'Process' || call.product_type?.includes('Process')) &&
-           poData.lotDetailsList && poData.lotDetailsList.length > 0 && (
-            <div className="form-group" style={{ gridColumn: '1 / -1', marginTop: 'var(--space-16)' }}>
-              <label className="form-label">RM IC NUMBERS & HEAT NUMBERS</label>
-              <div style={{ overflowX: 'auto', border: '1px solid var(--color-gray-300)', borderRadius: '6px' }}>
-                <table style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: 'var(--font-size-sm)'
-                }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'var(--color-gray-100)', borderBottom: '2px solid var(--color-gray-300)' }}>
-                      <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>RM IC Number</th>
-                      <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>Heat Number</th>
-                      <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>Call Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {poData.lotDetailsList.map((lot, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--color-gray-200)', backgroundColor: idx % 2 === 0 ? '#fff' : 'var(--color-gray-50)' }}>
-                        <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.rmIcNumber || 'N/A'}</td>
-                        <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.heatNumber || 'N/A'}</td>
-                        <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.offeredQty || 0}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    if (name && addr) {
+                      const cleanAddr = addr.replace(/~#~#/g, ', ').replace(/~/g, ', ');
+                      return `${name} (${cleanAddr})`;
+                    }
+                    return poData.place_of_inspection || call.place_of_inspection || 'N/A';
+                  })()
+                } title={poData.vendorDetails || poData.unit_address || ''} disabled />
+              </div>
+
+              {/* RM IC NUMBERS & HEAT NUMBERS TABLE - Only for Process Material Inspection with multiple lots */}
+              {(call.product_type === 'Process' || call.product_type?.includes('Process')) &&
+                poData.lotDetailsList && poData.lotDetailsList.length > 0 && (
+                  <div className="form-group" style={{ gridColumn: '1 / -1', marginTop: 'var(--space-16)' }}>
+                    <label className="form-label">RM IC NUMBERS & HEAT NUMBERS</label>
+                    <div style={{ overflowX: 'auto', border: '1px solid var(--color-gray-300)', borderRadius: '6px' }}>
+                      <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: 'var(--font-size-sm)'
+                      }}>
+                        <thead>
+                          <tr style={{ backgroundColor: 'var(--color-gray-100)', borderBottom: '2px solid var(--color-gray-300)' }}>
+                            <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>RM IC Number</th>
+                            <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>Heat Number</th>
+                            <th style={{ padding: 'var(--space-12)', textAlign: 'left', fontWeight: '600', color: 'var(--color-gray-700)' }}>Call Qty</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {poData.lotDetailsList.map((lot, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid var(--color-gray-200)', backgroundColor: idx % 2 === 0 ? '#fff' : 'var(--color-gray-50)' }}>
+                              <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.rmIcNumber || 'N/A'}</td>
+                              <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.heatNumber || 'N/A'}</td>
+                              <td style={{ padding: 'var(--space-12)', color: 'var(--color-gray-700)', fontWeight: '500' }}>{lot.offeredQty || 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              {/* PROCESS IC NUMBER - Only for Final Inspection */}
+              {(call.product_type === 'Final' || call.product_type?.includes('Final')) && (
+                <div className="form-group">
+                  <label className="form-label">PROCESS IC NUMBERS</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={(() => {
+                      const set = new Set();
+                      if (call.process_ic_number) set.add(call.process_ic_number);
+                      if (poData.process_ic_number) set.add(poData.process_ic_number);
+                      if (fetchedPoData && fetchedPoData.process_ic_number) set.add(fetchedPoData.process_ic_number);
+                      if (finalDetailsState && finalDetailsState.processIcNumber) set.add(finalDetailsState.processIcNumber);
+                      // include process ic numbers from finalMappings and from subPoList (if present)
+                      if (finalMappings && finalMappings.length) {
+                        finalMappings.forEach(m => {
+                          if (m.processIcNumber) set.add(m.processIcNumber);
+                          if (m.process_ic_number) set.add(m.process_ic_number);
+                        });
+                      }
+                      if (subPoList && subPoList.length) {
+                        subPoList.forEach(s => {
+                          if (s.process_ic_number) set.add(s.process_ic_number);
+                          if (s.processIcNumber) set.add(s.processIcNumber);
+                        });
+                      }
+                      const arr = Array.from(set).filter(Boolean);
+                      return arr.length ? arr.join(', ') : 'N/A';
+                    })()}
+                    disabled
+                  />
+                </div>
+              )}
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">REMARKS</label>
+                <textarea className="form-textarea" rows="2" value={call.remarks || poData.remarks || ''} disabled />
+              </div>
+
+              {/* Section B OK/Not OK Buttons */}
+              <div className="section-action-buttons" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-16)', marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleSectionBReject}
+                  disabled={isSaving || formData.sectionBStatus === 'rejected'}
+                >
+                  {isSaving ? 'Saving...' : formData.sectionBStatus === 'rejected' ? 'Not OK' : 'Not OK'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={handleSectionBApprove}
+                  disabled={isSaving || formData.sectionBStatus === 'approved'}
+                >
+                  {isSaving ? 'Saving...' : formData.sectionBStatus === 'approved' ? 'OK' : 'OK'}
+                </button>
               </div>
             </div>
           )}
-          {/* PROCESS IC NUMBER - Only for Final Inspection */}
-          {(call.product_type === 'Final' || call.product_type?.includes('Final')) && (
-            <div className="form-group">
-              <label className="form-label">PROCESS IC NUMBERS</label>
-              <input
-                type="text"
-                className="form-input"
-                value={(() => {
-                  const set = new Set();
-                  if (call.process_ic_number) set.add(call.process_ic_number);
-                  if (poData.process_ic_number) set.add(poData.process_ic_number);
-                  if (fetchedPoData && fetchedPoData.process_ic_number) set.add(fetchedPoData.process_ic_number);
-                  if (finalDetailsState && finalDetailsState.processIcNumber) set.add(finalDetailsState.processIcNumber);
-                  // include process ic numbers from finalMappings and from subPoList (if present)
-                  if (finalMappings && finalMappings.length) {
-                    finalMappings.forEach(m => {
-                      if (m.processIcNumber) set.add(m.processIcNumber);
-                      if (m.process_ic_number) set.add(m.process_ic_number);
-                    });
-                  }
-                  if (subPoList && subPoList.length) {
-                    subPoList.forEach(s => {
-                      if (s.process_ic_number) set.add(s.process_ic_number);
-                      if (s.processIcNumber) set.add(s.processIcNumber);
-                    });
-                  }
-                  const arr = Array.from(set).filter(Boolean);
-                  return arr.length ? arr.join(', ') : 'N/A';
-                })()}
-                disabled
-              />
-            </div>
-          )}
-          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">REMARKS</label>
-            <textarea className="form-textarea" rows="2" value={call.remarks || poData.remarks || ''} disabled />
-          </div>
-
-          {/* Section B OK/Not OK Buttons */}
-          <div className="section-action-buttons" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-16)', marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={handleSectionBReject}
-              disabled={isSaving || formData.sectionBStatus === 'rejected'}
-            >
-              {isSaving ? 'Saving...' : formData.sectionBStatus === 'rejected' ? 'Not OK' : 'Not OK'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-success"
-              onClick={handleSectionBApprove}
-              disabled={isSaving || formData.sectionBStatus === 'approved'}
-            >
-              {isSaving ? 'Saving...' : formData.sectionBStatus === 'approved' ? 'OK' : 'OK'}
-            </button>
-          </div>
         </div>
-        )}
-      </div>
       )}
 
       {/* SECTION C: Sub PO Details - Only shown for Raw Material, hidden for Process and Final Product */}
@@ -1193,162 +1236,173 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
             </button>
           </div>
           {sectionCExpanded && (
-          <div>
-            {/* Display multiple sub POs if available from database */}
-            {subPoList.length > 0 ? (
-              subPoList.map((subPo, index) => (
-                <div key={index} style={{
-                  marginBottom: index < subPoList.length - 1 ? 'var(--space-24)' : '0',
-                  paddingBottom: index < subPoList.length - 1 ? 'var(--space-24)' : '0',
-                  borderBottom: index < subPoList.length - 1 ? '2px solid var(--color-gray-300)' : 'none'
-                }}>
-                  {subPoList.length > 1 && (
-                    <h4 style={{
-                      color: 'var(--color-primary)',
-                      marginBottom: 'var(--space-16)',
-                      fontSize: 'var(--font-size-lg)',
-                      fontWeight: 'var(--font-weight-semibold)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: 'var(--space-8)'
-                    }}>
-                      <span>Heat {index + 1}: {subPo.heat_no || ''}</span>
-                      <span style={{ color: 'var(--color-gray-600)', fontWeight: 'var(--font-weight-normal)' }}>
-                        Sub PO: {subPo.sub_po_no}
-                      </span>
-                    </h4>
-                  )}
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label className="form-label">RAW MATERIAL NAME</label>
-                      <input type="text" className="form-input" value={subPo.raw_material_name || poData.product_name || poData.po_description || 'Raw Material'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">GRADE / SPEC</label>
-                      <input type="text" className="form-input" value={subPo.grade_spec || poData.grade || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">HEAT NO./ NO.S</label>
-                      <input type="text" className="form-input" value={subPo.heat_no || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">MANUFACTURER OF STEEL BARS</label>
-                      <input type="text" className="form-input" value={subPo.manufacturer || poData.manufacturer || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">TC NO</label>
-                      <input type="text" className="form-input" value={subPo.tc_no || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">TC DATE</label>
-                      <input type="text" className="form-input" value={subPo.tc_date || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">SUB PO NO.</label>
-                      <input type="text" className="form-input" value={subPo.sub_po_no || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">SUB PO DATE</label>
-                      <input type="text" className="form-input" value={subPo.sub_po_date || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">SUB PO QTY</label>
-                      <input type="text" className="form-input" value={subPo.sub_po_qty || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">INVOICE NO.</label>
-                      <input type="text" className="form-input" value={subPo.invoice_no || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">INVOICE DATE</label>
-                      <input type="text" className="form-input" value={subPo.invoice_date || 'N/A'} disabled />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">OFFERED QTY</label>
-                      <input type="text" className="form-input" value={subPo.qty || 'N/A'} disabled />
+            <div>
+              {/* Display multiple sub POs if available from database */}
+              {subPoList.length > 0 ? (
+                subPoList.map((subPo, index) => (
+                  <div key={index} style={{
+                    marginBottom: index < subPoList.length - 1 ? 'var(--space-24)' : '0',
+                    paddingBottom: index < subPoList.length - 1 ? 'var(--space-24)' : '0',
+                    borderBottom: index < subPoList.length - 1 ? '2px solid var(--color-gray-300)' : 'none'
+                  }}>
+                    {subPoList.length > 1 && (
+                      <h4 style={{
+                        color: 'var(--color-primary)',
+                        marginBottom: 'var(--space-16)',
+                        fontSize: 'var(--font-size-lg)',
+                        fontWeight: 'var(--font-weight-semibold)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 'var(--space-8)'
+                      }}>
+                        <span>Heat {index + 1}: {subPo.heat_no || ''}</span>
+                        <span style={{ color: 'var(--color-gray-600)', fontWeight: 'var(--font-weight-normal)' }}>
+                          Sub PO: {subPo.sub_po_no}
+                        </span>
+                      </h4>
+                    )}
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label className="form-label">RAW MATERIAL NAME</label>
+                        <input type="text" className="form-input" value={subPo.raw_material_name || poData.product_name || poData.po_description || 'Raw Material'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">GRADE / SPEC</label>
+                        <input type="text" className="form-input" value={subPo.grade_spec || poData.grade || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">HEAT NO./ NO.S</label>
+                        <input type="text" className="form-input" value={subPo.heat_no || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">MANUFACTURER OF STEEL BARS</label>
+                        <input type="text" className="form-input" value={subPo.manufacturer || poData.manufacturer || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">TC NO</label>
+                        <input type="text" className="form-input" value={subPo.tc_no || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">TC DATE</label>
+                        <input type="text" className="form-input" value={subPo.tc_date || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">SUB PO NO.</label>
+                        <input type="text" className="form-input" value={subPo.sub_po_no || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">SUB PO DATE</label>
+                        <input type="text" className="form-input" value={subPo.sub_po_date || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">SUB PO QTY (MT)</label>
+                        <input type="text" className="form-input" value={subPo.sub_po_qty || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">INVOICE NO.</label>
+                        <input type="text" className="form-input" value={subPo.invoice_no || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">INVOICE DATE</label>
+                        <input type="text" className="form-input" value={subPo.invoice_date || 'N/A'} disabled />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">OFFERED QTY (MT)</label>
+                        <input type="text" className="form-input" value={subPo.qty || 'N/A'} disabled />
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                /* Fallback to single sub PO display (mock data or single sub PO) */
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">RAW MATERIAL NAME</label>
+                    <input type="text" className="form-input" value={subPoData.raw_material_name || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">GRADE / SPEC</label>
+                    <input type="text" className="form-input" value={subPoData.grade || subPoData.spec || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">HEAT NO./ NO.S</label>
+                    <input type="text" className="form-input" value={subPoData.heat_no || subPoData.heat_numbers || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">MANUFACTURER OF STEEL BARS</label>
+                    <input type="text" className="form-input" value={subPoData.manufacturer || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">TC NO</label>
+                    <input type="text" className="form-input" value={subPoData.tc_no || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">TC DATE</label>
+                    <input type="text" className="form-input" value={subPoData.tc_date || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">SUB PO NO.</label>
+                    <input type="text" className="form-input" value={subPoData.sub_po_no || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">SUB PO DATE</label>
+                    <input type="text" className="form-input" value={subPoData.sub_po_date || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">INVOICE NO.</label>
+                    <input type="text" className="form-input" value={subPoData.invoice_no || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">INVOICE DATE</label>
+                    <input type="text" className="form-input" value={subPoData.invoice_date || 'N/A'} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">SUB PO QTY (MT)</label>
+                    <input type="text" className="form-input" value={subPoData.sub_po_qty || 'N/A'} disabled />
+                  </div>
                 </div>
-              ))
-            ) : (
-              /* Fallback to single sub PO display (mock data or single sub PO) */
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">RAW MATERIAL NAME</label>
-                  <input type="text" className="form-input" value={subPoData.raw_material_name || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">GRADE / SPEC</label>
-                  <input type="text" className="form-input" value={subPoData.grade || subPoData.spec || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">HEAT NO./ NO.S</label>
-                  <input type="text" className="form-input" value={subPoData.heat_no || subPoData.heat_numbers || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">MANUFACTURER OF STEEL BARS</label>
-                  <input type="text" className="form-input" value={subPoData.manufacturer || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">TC NO</label>
-                  <input type="text" className="form-input" value={subPoData.tc_no || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">TC DATE</label>
-                  <input type="text" className="form-input" value={subPoData.tc_date || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">SUB PO NO.</label>
-                  <input type="text" className="form-input" value={subPoData.sub_po_no || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">SUB PO DATE</label>
-                  <input type="text" className="form-input" value={subPoData.sub_po_date || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">INVOICE NO.</label>
-                  <input type="text" className="form-input" value={subPoData.invoice_no || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">INVOICE DATE</label>
-                  <input type="text" className="form-input" value={subPoData.invoice_date || 'N/A'} disabled />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">SUB PO QTY</label>
-                  <input type="text" className="form-input" value={subPoData.sub_po_qty || 'N/A'} disabled />
+              )}
+
+              {/* Place of Inspection - Common for all heats */}
+              <div className="form-grid" style={{ marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">PLACE OF INSPECTION</label>
+                  <input type="text" className="form-input" value={
+                    (() => {
+                      const name = poData.company_name || poData.vendor_name || poData.vendorName;
+                      const addr = poData.unit_address || poData.vendor_address || poData.vendorDetails;
+
+                      if (name && addr) {
+                        const cleanAddr = addr.replace(/~#~#/g, ', ').replace(/~/g, ', ');
+                        return `${name} (${cleanAddr})`;
+                      }
+                      return poData.place_of_inspection || call.place_of_inspection || 'N/A';
+                    })()
+                  } title={poData.vendorDetails || poData.unit_address || ''} disabled />
                 </div>
               </div>
-            )}
 
-            {/* Place of Inspection - Common for all heats */}
-            <div className="form-grid" style={{ marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">PLACE OF INSPECTION</label>
-                <input type="text" className="form-input" value={poData.place_of_inspection || call.place_of_inspection || 'N/A'} disabled />
+              {/* Section C OK/Not OK Buttons */}
+              <div className="section-action-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-16)', marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleSectionCReject}
+                  disabled={isSaving || formData.sectionCStatus === 'rejected'}
+                >
+                  {isSaving ? 'Saving...' : formData.sectionCStatus === 'rejected' ? 'Not OK' : 'Not OK'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={handleSectionCApprove}
+                  disabled={isSaving || formData.sectionCStatus === 'approved'}
+                >
+                  {isSaving ? 'Saving...' : formData.sectionCStatus === 'approved' ? 'OK' : 'OK'}
+                </button>
               </div>
             </div>
-
-            {/* Section C OK/Not OK Buttons */}
-            <div className="section-action-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-16)', marginTop: 'var(--space-16)', paddingTop: 'var(--space-16)', borderTop: '1px solid var(--color-gray-300)' }}>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={handleSectionCReject}
-                disabled={isSaving || formData.sectionCStatus === 'rejected'}
-              >
-                {isSaving ? 'Saving...' : formData.sectionCStatus === 'rejected' ? 'Not OK' : 'Not OK'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-success"
-                onClick={handleSectionCApprove}
-                disabled={isSaving || formData.sectionCStatus === 'approved'}
-              >
-                {isSaving ? 'Saving...' : formData.sectionCStatus === 'approved' ? 'OK' : 'OK'}
-              </button>
-            </div>
-          </div>
           )}
         </div>
       )}

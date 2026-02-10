@@ -2,18 +2,17 @@ import React from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { PO_WISE_LIST } from '../../data/railwayBoardData';
 
-const DashboardGraph = () => {
-    // Transform data for the chart
-    // We will show Top 5 POs by Quantity or just aggregate by Railway if needed.
-    // Let's show individual PO performance for now as it's a detail report.
-    const data = PO_WISE_LIST.slice(0, 5).map(item => ({
+const DashboardGraph = ({ liveData = [] }) => {
+    // Transform data for the chart using liveData
+    const displayData = liveData || [];
+
+    const data = displayData.slice(0, 5).map(item => ({
         name: `${item.railway} - ${item.vendor}`,
-        po_no: item.po_no,
-        "PO Qty": item.po_qty,
-        "Accepted": item.accepted_qty,
-        "Balance": item.balance_qty,
+        po_no: item.poNo || item.po_no,
+        "PO Qty": item.poQty || item.po_qty || 0,
+        "Accepted": item.finalQuantityAcceptedByRites || item.accepted_qty || 0,
+        "Balance": item.balancePoQty || item.balance_qty || 0,
     }));
 
     return (

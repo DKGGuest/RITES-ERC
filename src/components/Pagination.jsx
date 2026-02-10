@@ -27,10 +27,10 @@ const Pagination = ({
           value={rows}
           onChange={(e) => onRowsChange(Number(e.target.value))}
         >
-          <option value={10}>1</option>
-          <option value={20}>2</option>
-          <option value={30}>3</option>
-          <option value={40}>4</option>
+          <option value={5}>5</option>
+          <option value={10}>10</option>
+          <option value={15}>15</option>
+          <option value={20}>20</option>
         </select>
       </div>
 
