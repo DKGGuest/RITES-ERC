@@ -144,7 +144,6 @@ const InspectionInitiationFormContent = ({ call, formData, onFormDataChange, sho
               rly_po_no_serial: processData.rlyPoNoSerial,
               vendorDetails: processData.vendorDetails,
               totalOfferedQtyMt: processData.totalOfferedQtyMt,
-              place_of_inspection: processData.placeOfInspection,
               vendorName: processData.vendorName || processData.companyName,
               vendor_address: processData.vendorDetails || processData.unitAddress,
               po_sr_qty: processData.poSrQty

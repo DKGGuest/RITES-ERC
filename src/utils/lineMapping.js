@@ -50,9 +50,11 @@ export const buildLineMapping = (productionLines) => {
     const mapping = {};
 
     productionLines.forEach((line, index) => {
+        if (!line) return; // Skip undefined/null lines
+
         const internalId = getInternalLineId(index);
-        const displayNumber = line.lineNumber || (index + 1); // Backward compatibility
-        const callNo = line.icNumber || '';
+        const displayNumber = line?.lineNumber || (index + 1); // Backward compatibility
+        const callNo = line?.icNumber || '';
 
         mapping[internalId] = {
             displayNumber,
@@ -85,6 +87,7 @@ export const validateLineNumber = (productionLines, lineIndex, selectedNumber) =
 
     // Check for duplicates in same call
     const isDuplicate = productionLines.some((line, idx) =>
+        line && typeof line === 'object' && // Safely handle null/undefined lines in array
         idx !== lineIndex &&
         line.icNumber === currentCallNo &&
         line.lineNumber === selectedNumber

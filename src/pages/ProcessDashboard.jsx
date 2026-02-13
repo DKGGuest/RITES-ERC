@@ -4,8 +4,10 @@ import { formatDate, getHourLabels } from '../utils/helpers';
 import { getAllProcessData, saveToLocalStorage, loadFromLocalStorage, loadGridDataForLine } from '../services/processLocalStorageService';
 import { fetchProcessInitiationData } from '../services/processInitiationDataService';
 import { markAsWithheld } from '../services/callStatusService';
-import { fetchPendingWorkflowTransitions, performTransitionAction } from '../services/workflowService';
+import { fetchPendingWorkflowTransitions, performTransitionAction, fetchLatestWorkflowTransition } from '../services/workflowService';
 import { getStoredUser } from '../services/authService';
+import { cleanVendorName } from '../services/poDataService';
+import { processVendorName } from '../utils/vendorMapper';
 import { getQuantitySummary, getPoSerialNumberByCallId, getManufacturedQtyOfPo, finishProcessInspection, pauseProcessInspection } from '../services/processMaterialService';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
 import Notification from '../components/Notification';
@@ -13,6 +15,11 @@ import { resetSessionControl } from '../utils/inspectionSessionControl';
 import { performInspectionCleanup } from '../utils/inspectionCleanup';
 import { buildLineMapping, validateLineNumber } from '../utils/lineMapping';
 import { transformLineDataForBackend } from '../utils/payloadTransformers';
+import AddNewCallModal from '../components/AddNewCallModal';
+import ResumeCallModal from '../components/ResumeCallModal';
+import Modal from '../components/Modal';
+import { scheduleInspection, rescheduleInspection, getScheduleByCallNo, validateScheduleLimit, MAX_CALLS_PER_DAY } from '../services/scheduleService';
+import { clearWorkflowCache } from '../services/workflowService';
 
 // Reason options for withheld/cancel call
 const WITHHELD_REASONS = [
@@ -702,9 +709,12 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const [isLoading, setIsLoading] = useState(true);
 
   // State for additional initiated calls (added through "Add New Call Number" modal)
-  // Persisted in sessionStorage
+  // Persisted in sessionStorage - scoped to call number
   const [additionalInitiatedCalls, setAdditionalInitiatedCalls] = useState(() => {
-    const saved = sessionStorage.getItem('additionalInitiatedCalls');
+    const callNoForScoping = call?.call_no;
+    if (!callNoForScoping) return [];
+
+    const saved = sessionStorage.getItem(`additionalInitiatedCalls_${callNoForScoping}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -718,31 +728,69 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   // State for production lines section
   const [productionLinesExpanded, setProductionLinesExpanded] = useState(true);
 
-  // State for editable production lines - persisted in sessionStorage
+  // State for editable production lines - persisted in sessionStorage - scoped to call number
   const [localProductionLines, setLocalProductionLines] = useState(() => {
+    const callNoForScoping = call?.call_no;
+    if (!callNoForScoping) return [{ lineNumber: 1, icNumber: '', poNumber: '', rawMaterialICs: '', productType: '' }];
+
     // First check sessionStorage for persisted data
-    const savedLines = sessionStorage.getItem('processProductionLinesData');
+    const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNoForScoping}`);
     if (savedLines) {
       try {
         const parsed = JSON.parse(savedLines);
-        if (parsed && parsed.length > 0) {
-          // Ensure each line has a lineNumber property (backward compatibility)
-          return parsed.map((line, idx) => ({
-            ...line,
-            lineNumber: line.lineNumber || (idx + 1)
-          }));
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          // Ensure each line has a lineNumber property and is a valid object
+          return parsed
+            .filter(line => line && typeof line === 'object') // Filter out null/undefined or non-objects
+            .map((line, idx) => ({
+              ...line,
+              lineNumber: line.lineNumber || (idx + 1)
+            }));
         }
       } catch (e) {
         console.log('Error parsing saved production lines:', e);
       }
     }
 
+    // Helper to extract unique calls from available sources
+    const getUniqueCalls = () => {
+      const callMap = new Map();
+      if (availableCalls && Array.isArray(availableCalls)) {
+        availableCalls.forEach(c => {
+          if (c?.call_no) callMap.set(c.call_no, c);
+        });
+      }
+      if (call?.call_no && !callMap.has(call.call_no)) {
+        callMap.set(call.call_no, {
+          call_no: call.call_no,
+          po_no: call.po_no,
+          rawMaterialICs: call.rm_heat_tc_mapping?.map(m => m.subPoNumber).filter(Boolean).join(', ') || '',
+          productType: call.erc_type || call.product_type || 'ERC Process'
+        });
+      }
+      return Array.from(callMap.values());
+    };
+
+    const uniqueCallList = getUniqueCalls();
+
     if (initialProductionLines && initialProductionLines.length > 0) {
       return initialProductionLines;
     }
+
+    // If only one call available across all sources, auto-fill it in the first line
+    if (uniqueCallList.length === 1) {
+      return [{
+        lineNumber: 1,
+        icNumber: uniqueCallList[0].call_no || '',
+        poNumber: uniqueCallList[0].po_no || uniqueCallList[0].poNumber || '',
+        rawMaterialICs: uniqueCallList[0].rawMaterialICs || '',
+        productType: uniqueCallList[0].product_type || uniqueCallList[0].productType || ''
+      }];
+    }
+
     // If multiple calls available, create rows for each but leave unselected
-    if (availableCalls && availableCalls.length > 0) {
-      return availableCalls.map((_, idx) => ({
+    if (uniqueCallList.length > 1) {
+      return uniqueCallList.map((_, idx) => ({
         lineNumber: idx + 1,
         icNumber: '',
         poNumber: '',
@@ -804,6 +852,31 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const [allProcessCalls, setAllProcessCalls] = useState([]);
   const [isLoadingProcessCalls, setIsLoadingProcessCalls] = useState(false);
 
+  // State for Resume Call modal
+  const [showResumeCallModal, setShowResumeCallModal] = useState(false);
+  const [resumeCallData, setResumeCallData] = useState(null);
+  const [isResumingCall, setIsResumingCall] = useState(false);
+  const [isResumeFlow, setIsResumeFlow] = useState(true);
+
+  // Scheduling State
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedCallForSchedule, setSelectedCallForSchedule] = useState(null);
+  const [isReschedule, setIsReschedule] = useState(false);
+  const [selectedNewCallTransitionId, setSelectedNewCallTransitionId] = useState(null);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleRemarks, setScheduleRemarks] = useState('');
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [previousSchedule, setPreviousSchedule] = useState(null);
+
+  // Filter out call numbers that are already selected in production lines
+  const availableCallNumbersForModal = useMemo(() => {
+    const selectedCallNumbers = localProductionLines
+      .filter(line => line && typeof line === 'object')
+      .map(line => line?.icNumber)
+      .filter(Boolean);
+    return allProcessCalls.filter(call => call && call.call_no && !selectedCallNumbers.includes(call.call_no));
+  }, [allProcessCalls, localProductionLines]);
+
   // State for initiation form data (matching InspectionInitiationPage)
   const [newCallShift, setNewCallShift] = useState('');
   const [newCallOfferedQty, setNewCallOfferedQty] = useState(0);
@@ -832,12 +905,19 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const [newCallInitiateError, setNewCallInitiateError] = useState('');
   const [isNewCallSaving, setIsNewCallSaving] = useState(false);
 
-  // Persist production lines to sessionStorage whenever they change
+  // Persist production lines to sessionStorage whenever they change - scoped to call number
   useEffect(() => {
-    if (localProductionLines && localProductionLines.length > 0) {
-      sessionStorage.setItem('processProductionLinesData', JSON.stringify(localProductionLines));
+    if (call?.call_no && localProductionLines && localProductionLines.length > 0) {
+      sessionStorage.setItem(`processProductionLinesData_${call.call_no}`, JSON.stringify(localProductionLines));
     }
-  }, [localProductionLines]);
+  }, [localProductionLines, call?.call_no]);
+
+  // Persist additional initiated calls to sessionStorage - scoped to call number
+  useEffect(() => {
+    if (call?.call_no && additionalInitiatedCalls) {
+      sessionStorage.setItem(`additionalInitiatedCalls_${call.call_no}`, JSON.stringify(additionalInitiatedCalls));
+    }
+  }, [additionalInitiatedCalls, call?.call_no]);
 
   // Persist call initiation data cache to sessionStorage whenever it changes
   useEffect(() => {
@@ -848,56 +928,72 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   }, [callInitiationDataCache]);
 
   // Fetch all process calls on component mount and cache them
-  useEffect(() => {
-    const fetchAllProcessCalls = async () => {
-      try {
-        setIsLoadingProcessCalls(true);
-        console.log('🚀 [Process Dashboard] Fetching all process calls on mount...');
+  const fetchAllProcessCalls = useCallback(async (forceRefresh = false) => {
+    try {
+      setIsLoadingProcessCalls(true);
+      console.log(`🚀 [Process Dashboard] Fetching all process calls (forceRefresh: ${forceRefresh})...`);
 
-        // Get current user info
-        const user = getStoredUser();
-        if (!user) {
-          console.warn('⚠️ User not authenticated, skipping process calls fetch');
-          setIsLoadingProcessCalls(false);
-          return;
+      // Get current user info
+      const user = getStoredUser();
+      if (!user) {
+        console.warn('⚠️ User not authenticated, skipping process calls fetch');
+        setIsLoadingProcessCalls(false);
+        return;
+      }
+
+      const roleName = user.roleName;
+      const userId = parseInt(user.userId, 10);
+
+      // Fetch all pending workflow transitions for IE role
+      const allTransitions = await fetchPendingWorkflowTransitions(roleName, forceRefresh);
+      console.log('✅ [Process Dashboard] Fetched workflow transitions:', allTransitions.length);
+
+      // Filter only Process type calls assigned to current user
+      const processCalls = allTransitions.filter(transition => {
+        const isProcess = transition.productType === 'Process';
+        const isAssignedToUser = Array.isArray(transition.processIes) && transition.processIes.includes(userId);
+        return isProcess && isAssignedToUser;
+      });
+      console.log('✅ [Process Dashboard] Filtered process calls:', processCalls.length);
+
+      // Transform to match the format expected by the modal and PendingCallsTab
+      const transformedCalls = processCalls.map(transition => {
+        let vendorName = transition.vendorName;
+        if (vendorName && typeof vendorName === 'string' && vendorName.trim() !== '') {
+          vendorName = processVendorName(vendorName);
+          vendorName = cleanVendorName(vendorName);
+        } else {
+          vendorName = 'SHIVAM HIGHRISE PVT. LTD';
         }
 
-        const roleName = user.roleName;
-        const userId = parseInt(user.userId, 10);
-
-        // Fetch all pending workflow transitions for IE role
-        const allTransitions = await fetchPendingWorkflowTransitions(roleName, false); // use cache if available
-        console.log('✅ [Process Dashboard] Fetched workflow transitions:', allTransitions.length);
-
-        // Filter only Process type calls assigned to current user
-        const processCalls = allTransitions.filter(transition => {
-          const isProcess = transition.productType === 'Process';
-          const isAssignedToUser = Array.isArray(transition.processIes) && transition.processIes.includes(userId);
-          return isProcess && isAssignedToUser;
-        });
-        console.log('✅ [Process Dashboard] Filtered process calls:', processCalls.length);
-
-        // Transform to match the format expected by the modal
-        const transformedCalls = processCalls.map(transition => ({
+        return {
+          id: transition.workflowTransitionId, // Ensure ID is present for selection
           call_no: transition.requestId || '',
           po_no: transition.poNo || '',
+          vendor_name: vendorName,
+          product_type: transition.ercType || transition.productType || 'Process',
+          status: transition.status || '',
+          call_date: transition.createdDate ? transition.createdDate.split('T')[0] : null,
+          desired_inspection_date: transition.desiredInspectionDate || null,
           rawMaterialICs: transition.rmIcNumber || '',
-          productType: transition.ercType || '', // Use ercType from workflow transition, not hardcoded
-          vendorName: transition.vendorName || '',
-          status: transition.status || ''
-        }));
+          poQty: transition.poQty || 0,
+          callQty: transition.callQty || 0,
+          cmApproval: transition.cmApproval || 'NO'
+        };
+      });
 
-        setAllProcessCalls(transformedCalls);
-        console.log('💾 [Process Dashboard] Cached process calls:', transformedCalls.length);
-        setIsLoadingProcessCalls(false);
-      } catch (error) {
-        console.error('❌ [Process Dashboard] Error fetching process calls:', error);
-        setIsLoadingProcessCalls(false);
-      }
-    };
+      setAllProcessCalls(transformedCalls);
+      console.log('💾 [Process Dashboard] Cached process calls:', transformedCalls.length);
+      setIsLoadingProcessCalls(false);
+    } catch (error) {
+      console.error('❌ [Process Dashboard] Error fetching process calls:', error);
+      setIsLoadingProcessCalls(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchAllProcessCalls();
-  }, []); // Run once on mount
+  }, [fetchAllProcessCalls]); // Run once on mount
 
   // Persist additionalInitiatedCalls to sessionStorage whenever it changes
   useEffect(() => {
@@ -916,35 +1012,83 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   }, [call?.call_no, call?.po_no, call?.rm_heat_tc_mapping, call?.erc_type, call?.product_type]);
 
   // Show all calls from current inspection session (availableCalls)
-  // This supports multi-call inspections where user selects multiple calls to inspect
-  // But excludes old cached calls from PREVIOUS inspection sessions
+  // Includes the main call so it can be used for multiple production lines
   const allCallOptions = useMemo(() => {
-    // Filter availableCalls to only include calls that are part of the current session
-    // This prevents old completed calls from appearing when resuming a different call
-    if (availableCalls && availableCalls.length > 0) {
-      // If current call exists, check if it's in availableCalls
-      if (currentCallOption) {
-        const currentCallInAvailable = availableCalls.find(c => c.call_no === currentCallOption.call_no);
+    // Create a map to ensure unique call numbers
+    const callMap = new Map();
 
-        if (currentCallInAvailable) {
-          // Current call is in availableCalls - use all availableCalls (multi-call session)
-          return availableCalls;
-        } else {
-          // Current call NOT in availableCalls - only show current call (resuming different call)
-          return [currentCallOption];
+    // 1. Add availableCalls (these come from the dashboard wrapper)
+    if (availableCalls && Array.isArray(availableCalls)) {
+      availableCalls.forEach(c => {
+        if (c && c.call_no) {
+          callMap.set(c.call_no, c);
         }
-      } else {
-        // No current call - use availableCalls as-is
-        return availableCalls;
-      }
-    } else if (currentCallOption) {
-      // No availableCalls - show current call only
-      return [currentCallOption];
+      });
     }
 
-    // No calls available
-    return [];
-  }, [availableCalls, currentCallOption]);
+    // 2. Add current call if not present (needed for multiple production lines of same call)
+    if (currentCallOption && currentCallOption.call_no) {
+      callMap.set(currentCallOption.call_no, currentCallOption);
+    }
+
+    // 3. Add additional initiated/resumed calls from this session
+    if (additionalInitiatedCalls && Array.isArray(additionalInitiatedCalls)) {
+      additionalInitiatedCalls.forEach(c => {
+        if (c && c.call_no) {
+          callMap.set(c.call_no, c);
+        }
+      });
+    }
+
+    const combined = Array.from(callMap.values());
+    console.log('📋 [Call Options] Combined calls for dropdown:', combined.map(c => c.call_no));
+    return combined;
+  }, [availableCalls, currentCallOption, additionalInitiatedCalls]);
+
+  // Auto-fill and Validate Production Lines based on available calls
+  useEffect(() => {
+    if (!allCallOptions || allCallOptions.length === 0) return;
+
+    const availableCallNumbers = allCallOptions.map(c => c.call_no);
+    const singleCall = allCallOptions.length === 1 ? allCallOptions[0] : null;
+
+    setLocalProductionLines(prev => {
+      let changed = false;
+      const updated = prev.map((line, idx) => {
+        // Condition 1: Single Call Auto-fill/Correction
+        // If there's only one call, the first line MUST have that call
+        if (idx === 0 && singleCall) {
+          if (line.icNumber !== singleCall.call_no) {
+            changed = true;
+            return {
+              ...line,
+              icNumber: singleCall.call_no,
+              poNumber: singleCall.po_no || '',
+              rawMaterialICs: singleCall.rawMaterialICs || '',
+              productType: singleCall.productType || singleCall.product_type || ''
+            };
+          }
+        }
+
+        // Condition 2: Stale Data Cleanup
+        // If line has an icNumber that is NOT in availableCallNumbers, clear it
+        if (line.icNumber && !availableCallNumbers.includes(line.icNumber)) {
+          changed = true;
+          return {
+            ...line,
+            icNumber: '',
+            poNumber: '',
+            rawMaterialICs: '',
+            productType: ''
+          };
+        }
+
+        return line;
+      });
+
+      return changed ? updated : prev;
+    });
+  }, [allCallOptions]); // Only sync when available calls change
 
   // NEW: Line display mapping logic (Phase 4)
   // Mapping of internal line IDs (Line-1, Line-2) to user-facing labels
@@ -1120,45 +1264,130 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
 
   // Handle call number selection from modal
-  const handleSelectNewCall = (callNo) => {
-    console.log('🔵 Call selected:', callNo);
-    setSelectedNewCall(callNo);
-    setSelectedNewCallData(null); // Reset data
+  const handleSelectNewCall = (callData, skipInitiation = false, rowArg = null) => {
+    const callNo = typeof callData === 'object' ? callData.call_no : callData;
+    const rowData = typeof callData === 'object' ? callData : rowArg;
+
+    console.log('🔵 Call selected:', callNo, 'skipInitiation:', skipInitiation, 'hasRowData:', !!rowData);
+    console.log('📍 Transition ID:', rowData?.id);
+
+    // Always close modal immediately for instant feedback
     setShowAddCallModal(false);
+    setSelectedNewCall(callNo);
+    setSelectedNewCallTransitionId(rowData?.id || null);
 
-    // Show initiation form immediately (data will be fetched inside the modal)
-    setShowInitiationForm(true);
+    if (skipInitiation) {
+      // For RESUME flow, we skip the initiation form and add directly to production lines
+      console.log('🔄 RESUME flow - adding call with Optimistic Update');
+      setSelectedNewCallData(null); // Reset data
+
+      // 1. Create a "basic" line instantly from available rowData
+      const basicLine = {
+        lineNumber: localProductionLines.length + 1,
+        icNumber: callNo,
+        poNumber: rowData?.po_no || rowData?.poNo || '',
+        rawMaterialICs: rowData?.rawMaterialICs || rowData?.rmIcNumber || '',
+        productType: rowData?.product_type || rowData?.typeOfErc || 'ERC Process',
+        manufacturer: rowData?.vendor_name || rowData?.vendorName || ''
+      };
+
+      // 2. Update UI state instantly
+      setLocalProductionLines(prev => [...prev, basicLine]);
+
+      // 3. Ensure dropdown options are updated immediately
+      setAdditionalInitiatedCalls(prev => {
+        const alreadyExists = prev.some(c => c.call_no === callNo);
+        if (alreadyExists) return prev;
+        return [...prev, {
+          call_no: callNo,
+          po_no: basicLine.poNumber,
+          rawMaterialICs: basicLine.rawMaterialICs,
+          productType: basicLine.productType,
+          vendor_name: basicLine.manufacturer
+        }];
+      });
+
+      // 4. Update available calls list
+      setAllProcessCalls(prev => prev.filter(c => c.call_no !== callNo));
+
+      showNotification('success', `Call ${callNo} has been resumed and added to the production lines!`);
+
+      // 5. Enrich data in the background (Async Background Fetch)
+      const enrichData = async () => {
+        try {
+          console.log('📤 Background enriching data for call:', callNo);
+          const richData = await fetchProcessInitiationData(callNo);
+
+          if (richData) {
+            console.log('✅ Background data fetched for:', callNo);
+
+            // Update the specific line in localProductionLines with rich data
+            setLocalProductionLines(prev => prev.map(line => {
+              if (line.icNumber === callNo) {
+                return {
+                  ...line,
+                  poNumber: richData.poNo || richData.po_no || line.poNumber,
+                  rawMaterialICs: richData.rmIcNumber || richData.rawMaterialICs || line.rawMaterialICs,
+                  productType: richData.typeOfErc || richData.product_type || line.productType,
+                  manufacturer: richData.vendorName || richData.vendor_name || line.manufacturer
+                };
+              }
+              return line;
+            }));
+
+            // Cache the full initiation data
+            setCallInitiationDataCache(prev => ({
+              ...prev,
+              [callNo]: richData
+            }));
+          }
+        } catch (error) {
+          console.error('Error in background data enrichment:', error);
+          // Don't show error notification to user for background fetch unless critical
+        }
+      };
+
+      // Start enrichment without awaiting it
+      enrichData();
+    } else {
+      // For START flow, show modal immediately and fetch data in background
+      console.log('📤 START flow - showing modal immediately, fetching data in background');
+
+      // Show the modal instantly with loading state
+      setShowInitiationForm(true);
+      setIsLoadingInitiationData(true);
+
+      // Fetch data in background
+      const fetchAndShowForm = async () => {
+        try {
+          // Fetch BOTH initiation data AND workflow transition ID in parallel
+          const [data, workflowData] = await Promise.all([
+            fetchProcessInitiationData(callNo),
+            fetchLatestWorkflowTransition(callNo)
+          ]);
+
+          console.log('✅ Initiation data fetched:', data);
+          console.log('✅ Workflow transition data fetched:', workflowData);
+
+          // Store the actual workflow transition ID from the backend
+          const actualWorkflowTransitionId = workflowData?.id || workflowData?.workflowTransitionId;
+          console.log('📌 Storing workflow transition ID:', actualWorkflowTransitionId);
+          setSelectedNewCallTransitionId(actualWorkflowTransitionId);
+
+          setSelectedNewCallData(data);
+          setNewCallOfferedQty(data.callQty || data.poQty || 0);
+          setIsLoadingInitiationData(false);
+        } catch (error) {
+          console.error('❌ Error fetching initiation data:', error);
+          setIsLoadingInitiationData(false);
+          setShowInitiationForm(false); // Close modal on error
+          showNotification('error', 'Error loading initiation data. Please try again.');
+        }
+      };
+
+      fetchAndShowForm();
+    }
   };
-
-  // Fetch initiation data when modal opens
-  useEffect(() => {
-    if (!showInitiationForm || !selectedNewCall) return;
-
-    const fetchInitiationData = async () => {
-      try {
-        setIsLoadingInitiationData(true);
-        console.log('📤 Fetching initiation data for:', selectedNewCall);
-
-        const data = await fetchProcessInitiationData(selectedNewCall);
-        console.log('✅ Initiation data fetched:', data);
-
-        setSelectedNewCallData(data);
-
-        // Initialize offeredQty with callQty or poQty
-        setNewCallOfferedQty(data.callQty || data.poQty || 0);
-
-        setIsLoadingInitiationData(false);
-      } catch (error) {
-        console.error('❌ Error fetching initiation data:', error);
-        setIsLoadingInitiationData(false);
-        showNotification('error', 'Error loading initiation data. Please try again.');
-        setShowInitiationForm(false);
-        setSelectedNewCall(null);
-      }
-    };
-
-    fetchInitiationData();
-  }, [showInitiationForm, selectedNewCall]);
 
   // Create formData object for InspectionInitiationFormContent
   const newCallFormData = {
@@ -1213,6 +1442,101 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     setNewCallActionError('');
   };
 
+  // Handle scheduling from AddNewCallModal
+  const handleOpenScheduleModal = async (callData, reschedule = false) => {
+    setSelectedCallForSchedule(callData);
+    setIsReschedule(reschedule);
+    setScheduleDate('');
+    setScheduleRemarks('');
+    setPreviousSchedule(null);
+
+    if (reschedule) {
+      try {
+        const existingSchedule = await getScheduleByCallNo(callData.call_no);
+        if (existingSchedule) {
+          setPreviousSchedule(existingSchedule);
+          if (existingSchedule.scheduleDate) {
+            setScheduleDate(existingSchedule.scheduleDate);
+          }
+          if (existingSchedule.reason) {
+            setScheduleRemarks(existingSchedule.reason);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch existing schedule:', error);
+      }
+    }
+
+    setShowScheduleModal(true);
+  };
+
+  // Submit schedule/reschedule
+  const handleScheduleSubmit = async () => {
+    if (!scheduleDate) {
+      showNotification('warning', 'Please select a schedule date');
+      return;
+    }
+
+    setIsScheduling(true);
+    const currentUser = getStoredUser();
+    const userId = currentUser?.userId || 0;
+
+    try {
+      // Validate scheduled date is on or after desired inspection date
+      if (selectedCallForSchedule?.desired_inspection_date) {
+        const scheduledDateObj = new Date(scheduleDate);
+        const desiredDateObj = new Date(selectedCallForSchedule.desired_inspection_date);
+        if (scheduledDateObj < desiredDateObj) {
+          showNotification('error', `Scheduled date cannot be before the Desired Inspection Date (${selectedCallForSchedule.desired_inspection_date}).`);
+          setIsScheduling(false);
+          return;
+        }
+      }
+
+      // Validate schedule limit (5 calls per day) - only for new schedules, not reschedules
+      if (!isReschedule) {
+        const validation = await validateScheduleLimit(scheduleDate, 1);
+        if (!validation.canSchedule) {
+          showNotification('error', `Maximum ${MAX_CALLS_PER_DAY} calls allowed per day. Currently ${validation.currentCount} scheduled.`);
+          setIsScheduling(false);
+          return;
+        }
+      }
+
+      const scheduleData = {
+        callNo: selectedCallForSchedule.call_no,
+        scheduleDate: scheduleDate,
+        reason: scheduleRemarks,
+        createdBy: userId,
+        updatedBy: userId
+      };
+
+      if (isReschedule) {
+        await rescheduleInspection(scheduleData);
+      } else {
+        await scheduleInspection(scheduleData);
+      }
+
+      showNotification('success', `Inspection for call ${selectedCallForSchedule.call_no} scheduled successfully!`);
+
+      // Clear workflow cache to force fresh data on next fetch
+      clearWorkflowCache();
+
+      // Close modals immediately for prompt UI response
+      setShowScheduleModal(false);
+      setScheduleDate('');
+      setScheduleRemarks('');
+      setSelectedCallForSchedule(null);
+
+      // Refresh the process calls list to update status in the background
+      await fetchAllProcessCalls(true);
+    } catch (error) {
+      showNotification('error', error.message || 'Failed to schedule inspection');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
   // Submit call action (withheld/cancel) for new call
   const handleSubmitNewCallAction = async () => {
     if (!newCallActionReason) {
@@ -1247,12 +1571,19 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
   // Open initiate inspection modal for new call
   const handleOpenNewCallInitiateModal = () => {
-    // Validate all sections are verified
-    const isSectionCRequired = true; // Process always requires Section C
+    // Validate sections - Section C is NOT required for Process material (only for Raw Material)
+    const isSectionCRequired = false; // Process does NOT need Section C
     if (!newCallSectionAVerified || !newCallSectionBVerified || (isSectionCRequired && !newCallSectionCVerified)) {
       setNewCallShowValidationErrors(true);
-      showNotification('error', 'Please verify all sections (A, B, and C) before initiating inspection.');
+      showNotification('error', 'Please verify all required sections (A and B) before initiating inspection.');
       return;
+    }
+
+    // Pre-fill shift with the current inspection's shift
+    const currentShift = fetchedCallData?.shiftOfInspection || call?.shift_of_inspection || call?.shift || '';
+    if (currentShift && !newCallShift) {
+      console.log('📌 Pre-filling shift with current inspection shift:', currentShift);
+      setNewCallShift(currentShift);
     }
 
     setNewCallInitiateError('');
@@ -1421,7 +1752,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
         // Restore production lines from sessionStorage if present to preserve user selections
         try {
-          const savedLines = sessionStorage.getItem('processProductionLinesData');
+          const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNo}`);
           if (savedLines) {
             const parsed = JSON.parse(savedLines);
             if (parsed && parsed.length > 0) {
@@ -1430,43 +1761,54 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
             } else if (initialProductionLines && initialProductionLines.length > 0) {
               setLocalProductionLines(initialProductionLines);
               console.log('💾 [Process Dashboard] Initialized production lines from initialProductionLines (cached path)');
-            } else if (availableCalls && availableCalls.length > 1) {
-              setLocalProductionLines(availableCalls.map((_, idx) => ({
-                lineNumber: idx + 1,
-                icNumber: '',
-                poNumber: '',
-                rawMaterialICs: '',
-                productType: ''
-              })));
-              console.log('💾 [Process Dashboard] Created empty production lines for multiple available calls (cached path)');
             } else {
-              setLocalProductionLines([{
-                lineNumber: 1,
-                icNumber: '',
-                poNumber: '',
-                rawMaterialICs: '',
-                productType: ''
-              }]);
-              console.log('💾 [Process Dashboard] Created default single production line (cached path)');
+              // Recalculate unique calls to check for single call scenario
+              const callMap = new Map();
+              if (availableCalls && Array.isArray(availableCalls)) {
+                availableCalls.forEach(c => {
+                  if (c?.call_no) callMap.set(c.call_no, c);
+                });
+              }
+              if (call?.call_no && !callMap.has(call.call_no)) {
+                callMap.set(call.call_no, {
+                  call_no: call.call_no,
+                  po_no: call.po_no,
+                  productType: call.erc_type || call.product_type || 'ERC Process'
+                });
+              }
+              const uniqueCallList = Array.from(callMap.values());
+
+              if (uniqueCallList.length === 1) {
+                // Always use the main call for auto-fill
+                const mainCall = uniqueCallList.find(c => c.call_no === call?.call_no) || uniqueCallList[0];
+                setLocalProductionLines([{
+                  lineNumber: 1,
+                  icNumber: mainCall.call_no || '',
+                  poNumber: mainCall.po_no || mainCall.poNumber || '',
+                  rawMaterialICs: mainCall.rawMaterialICs || '',
+                  productType: mainCall.product_type || mainCall.productType || ''
+                }]);
+                console.log('💾 [Process Dashboard] Auto-filled production line for single available call (cached path)');
+              } else if (uniqueCallList.length > 1) {
+                setLocalProductionLines(uniqueCallList.map((_, idx) => ({
+                  lineNumber: idx + 1,
+                  icNumber: '',
+                  poNumber: '',
+                  rawMaterialICs: '',
+                  productType: ''
+                })));
+                console.log('💾 [Process Dashboard] Created empty production lines for multiple available calls (cached path)');
+              } else {
+                setLocalProductionLines([{
+                  lineNumber: 1,
+                  icNumber: '',
+                  poNumber: '',
+                  rawMaterialICs: '',
+                  productType: ''
+                }]);
+                console.log('💾 [Process Dashboard] Created default single production line (cached path)');
+              }
             }
-          } else if (initialProductionLines && initialProductionLines.length > 0) {
-            setLocalProductionLines(initialProductionLines);
-          } else if (availableCalls && availableCalls.length > 1) {
-            setLocalProductionLines(availableCalls.map((_, idx) => ({
-              lineNumber: idx + 1,
-              icNumber: '',
-              poNumber: '',
-              rawMaterialICs: '',
-              productType: ''
-            })));
-          } else {
-            setLocalProductionLines([{
-              lineNumber: 1,
-              icNumber: '',
-              poNumber: '',
-              rawMaterialICs: '',
-              productType: ''
-            }]);
           }
         } catch (e) {
           console.log('⚠️ [Process Dashboard] Error restoring production lines from sessionStorage:', e);
@@ -1525,48 +1867,76 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           dateOfInspection: sessionStorage.getItem('inspectionDate') || new Date().toISOString().split('T')[0]
         });
 
-        // Set mock production lines if not already set
-        // Check sessionStorage first to avoid overwriting user's added lines
-        const savedLines = sessionStorage.getItem('processProductionLinesData');
-        let shouldSetProductionLines = true;
-
-        if (savedLines) {
-          try {
+        // Restore production lines from sessionStorage if present to preserve user selections
+        try {
+          const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNo}`);
+          if (savedLines) {
             const parsed = JSON.parse(savedLines);
             if (parsed && parsed.length > 0) {
-              // Data already exists in sessionStorage, don't overwrite
-              shouldSetProductionLines = false;
+              setLocalProductionLines(parsed);
+              console.log('💾 [Process Dashboard] Restored production lines from sessionStorage (fresh fetch path)');
+            } else {
+              populateDefaultLines();
             }
-          } catch (e) {
-            console.log('Error parsing saved production lines:', e);
+          } else {
+            populateDefaultLines();
           }
+        } catch (e) {
+          console.log('⚠️ [Process Dashboard] Error restoring production lines from sessionStorage:', e);
+          populateDefaultLines();
         }
 
-        if (shouldSetProductionLines) {
+        // Helper function for robust auto-fill (replicated from cached path for consistency)
+        function populateDefaultLines() {
           if (initialProductionLines && initialProductionLines.length > 0) {
-            // Use provided production lines from wrapper
             setLocalProductionLines(initialProductionLines);
-          } else if (availableCalls.length > 1) {
-            // Multi-call mode (more than 1 call): create empty rows for each available call
-            // All dropdowns start empty, user must select manually
-            setLocalProductionLines(availableCalls.map((_, idx) => ({
-              lineNumber: idx + 1,
-              icNumber: '',
-              poNumber: '',
-              rawMaterialICs: '',
-              productType: ''
-            })));
           } else {
-            // Single call mode or no calls: create one empty production line
-            // Dropdown starts empty with "Select Call Number" placeholder
-            // User must manually select the call number to fetch data
-            setLocalProductionLines([{
-              lineNumber: 1,
-              icNumber: '',
-              poNumber: '',
-              rawMaterialICs: '',
-              productType: ''
-            }]);
+            // Recalculate unique calls to check for single call scenario
+            const callMap = new Map();
+            if (availableCalls && Array.isArray(availableCalls)) {
+              availableCalls.forEach(c => {
+                if (c?.call_no) callMap.set(c.call_no, c);
+              });
+            }
+            if (call?.call_no && !callMap.has(call.call_no)) {
+              callMap.set(call.call_no, {
+                call_no: call.call_no,
+                po_no: call.po_no,
+                productType: call.erc_type || call.product_type || 'ERC Process'
+              });
+            }
+            const uniqueCallList = Array.from(callMap.values());
+
+            if (uniqueCallList.length === 1) {
+              // Always use the main call for auto-fill
+              const mainCall = uniqueCallList.find(c => c.call_no === call?.call_no) || uniqueCallList[0];
+              setLocalProductionLines([{
+                lineNumber: 1,
+                icNumber: mainCall.call_no || '',
+                poNumber: mainCall.po_no || mainCall.poNumber || '',
+                rawMaterialICs: mainCall.rawMaterialICs || '',
+                productType: mainCall.product_type || mainCall.productType || ''
+              }]);
+              console.log('💾 [Process Dashboard] Auto-filled production line for single available call (fresh fetch path)');
+            } else if (uniqueCallList.length > 1) {
+              setLocalProductionLines(uniqueCallList.map((_, idx) => ({
+                lineNumber: idx + 1,
+                icNumber: '',
+                poNumber: '',
+                rawMaterialICs: '',
+                productType: ''
+              })));
+              console.log('💾 [Process Dashboard] Created empty production lines for multiple available calls (fresh fetch path)');
+            } else {
+              setLocalProductionLines([{
+                lineNumber: 1,
+                icNumber: '',
+                poNumber: '',
+                rawMaterialICs: '',
+                productType: ''
+              }]);
+              console.log('💾 [Process Dashboard] Created default single production line (fresh fetch path)');
+            }
           }
         }
 
@@ -1662,22 +2032,27 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     // Only run if we have production lines and not currently loading
     // Also check if any line has a call number selected (don't run on initial empty state)
-    const hasCallNumbers = localProductionLines.some(line => line.icNumber);
+    const hasCallNumbers = localProductionLines.some(line => line?.icNumber);
     if (!isLoading && localProductionLines.length > 0 && hasCallNumbers) {
       fetchMissingData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localProductionLines.length, isLoading, localProductionLines.map(l => l.icNumber).join(',')]); // Trigger when lines are added, loading completes, or call numbers change
+  }, [localProductionLines.length, isLoading, localProductionLines.map(l => l?.icNumber).join(',')]); // Trigger when lines are added, loading completes, or call numbers change
 
-  // Selected line tab - persisted in sessionStorage
+  // Selected line tab - persisted in sessionStorage - scoped to call number
   const [selectedLine, setSelectedLine] = useState(() => {
-    return sessionStorage.getItem('processSelectedLineTab') || 'Line-1';
+    const callNoForScoping = call?.call_no;
+    if (!callNoForScoping) return 'Line-1';
+    return sessionStorage.getItem(`processSelectedLineTab_${callNoForScoping}`) || 'Line-1';
   });
 
   // Track selected lot number for each production line (line-specific)
   // This prevents cross-line interference when selecting lots
+  // Persisted in sessionStorage - scoped to call number
   const [selectedLotByLine, setSelectedLotByLine] = useState(() => {
-    const saved = sessionStorage.getItem('processSelectedLotByLine');
+    const callNoForScoping = call?.call_no;
+    if (!callNoForScoping) return {};
+    const saved = sessionStorage.getItem(`processSelectedLotByLine_${callNoForScoping}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -1709,17 +2084,19 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     console.log(`📋 [Lot Display] All lot selections:`, selectedLotByLine);
   }, [selectedLine, selectedLotForDisplay, selectedLotByLine]);
 
-  // Persist selected line tab
+  // Persist selected line tab - scoped to call number
   useEffect(() => {
-    sessionStorage.setItem('processSelectedLineTab', selectedLine);
-  }, [selectedLine]);
-
-  // Persist selected lot by line
-  useEffect(() => {
-    if (Object.keys(selectedLotByLine).length > 0) {
-      sessionStorage.setItem('processSelectedLotByLine', JSON.stringify(selectedLotByLine));
+    if (call?.call_no) {
+      sessionStorage.setItem(`processSelectedLineTab_${call.call_no}`, selectedLine);
     }
-  }, [selectedLotByLine]);
+  }, [selectedLine, call?.call_no]);
+
+  // Persist selected lot by line - scoped to call number
+  useEffect(() => {
+    if (call?.call_no && Object.keys(selectedLotByLine).length > 0) {
+      sessionStorage.setItem(`processSelectedLotByLine_${call.call_no}`, JSON.stringify(selectedLotByLine));
+    }
+  }, [selectedLotByLine, call?.call_no]);
 
   // Listen for lot selection events from toggle tab buttons
   useEffect(() => {
@@ -1802,8 +2179,11 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   // (removed) refresh trigger for recalculating rejected quantities — unused
 
   // Final Inspection Results - Remarks (manual entry, required)
+  // Persisted in sessionStorage - scoped to call number
   const [finalInspectionRemarks, setFinalInspectionRemarks] = useState(() => {
-    return sessionStorage.getItem('processFinalInspectionRemarks') || '';
+    const callNoForScoping = call?.call_no;
+    if (!callNoForScoping) return '';
+    return sessionStorage.getItem(`processFinalInspectionRemarks_${callNoForScoping}`) || '';
   });
   // App-level notification state
   const [notification, setNotification] = useState({ type: '', message: '', autoClose: true });
@@ -1836,14 +2216,41 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const resetProductionLinesState = useCallback(() => {
     console.log('🔄 Resetting production lines state...');
 
-    // Reset production lines to empty
-    setLocalProductionLines([{
-      lineNumber: 1,
-      icNumber: '',
-      poNumber: '',
-      rawMaterialICs: '',
-      productType: ''
-    }]);
+    // Reset production lines to empty, or auto-fill if only one call available across all sources
+    const callMap = new Map();
+    if (availableCalls && Array.isArray(availableCalls)) {
+      availableCalls.forEach(c => {
+        if (c?.call_no) callMap.set(c.call_no, c);
+      });
+    }
+    if (call?.call_no && !callMap.has(call.call_no)) {
+      callMap.set(call.call_no, {
+        call_no: call.call_no,
+        po_no: call.po_no,
+        productType: call.erc_type || call.product_type || 'ERC Process'
+      });
+    }
+    const uniqueCallList = Array.from(callMap.values());
+
+    if (uniqueCallList.length === 1) {
+      // Always use the main call for auto-fill
+      const mainCall = uniqueCallList.find(c => c.call_no === call?.call_no) || uniqueCallList[0];
+      setLocalProductionLines([{
+        lineNumber: 1,
+        icNumber: mainCall.call_no || '',
+        poNumber: mainCall.po_no || mainCall.poNumber || '',
+        rawMaterialICs: mainCall.rawMaterialICs || '',
+        productType: mainCall.product_type || mainCall.productType || ''
+      }]);
+    } else {
+      setLocalProductionLines([{
+        lineNumber: 1,
+        icNumber: '',
+        poNumber: '',
+        rawMaterialICs: '',
+        productType: ''
+      }]);
+    }
 
     // Reset call initiation data cache
     setCallInitiationDataCache({});
@@ -1861,7 +2268,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     setManufacturedQtyByLine({});
 
     console.log('✅ Production lines state reset complete');
-  }, []);
+  }, [availableCalls, call]);
 
   // Detect call number changes and reset state
   useEffect(() => {
@@ -1883,10 +2290,12 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     currentCallRef.current = call?.call_no;
   }, [call?.call_no, resetProductionLinesState]);
 
-  // Persist final inspection remarks
+  // Persist final inspection remarks - scoped to call number
   useEffect(() => {
-    sessionStorage.setItem('processFinalInspectionRemarks', finalInspectionRemarks);
-  }, [finalInspectionRemarks]);
+    if (call?.call_no) {
+      sessionStorage.setItem(`processFinalInspectionRemarks_${call.call_no}`, finalInspectionRemarks);
+    }
+  }, [finalInspectionRemarks, call?.call_no]);
 
   // Reset session control when dashboard mounts (new inspection)
   useEffect(() => {
@@ -2418,7 +2827,6 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       const inspectionCallNo = lineIcNumber || call?.call_no || '';
 
       console.log(`📋 [All Selected Lots] Getting all lots for: ${targetLine}`, { poNo, inspectionCallNo, lineIcNumber });
-
       // Get all process data from localStorage
       const allData = getAllProcessData(inspectionCallNo, poNo, targetLine);
 
@@ -2595,9 +3003,10 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     console.log(`📋 [${submoduleName}] Calculating rejected for selected lot:`, selectedLot);
 
+
     const totalRejected = calculateRejectedForSpecificLot(submoduleName, selectedLot, selectedLine, rejectedField);
 
-    console.log(`📋 [${submoduleName}] Total rejected for selected lot (${selectedLot}):`, totalRejected);
+
     return totalRejected;
   }, [selectedLine, selectedLotForDisplay, getSelectedLotForCurrentLine, calculateRejectedForSpecificLot]);
 
@@ -2737,6 +3146,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const rejectedQty = useMemo(() => {
     console.log(`📊 [Rejected Qty] Computing for line: ${selectedLine}, lot: ${selectedLotForDisplay || getSelectedLotForCurrentLine()}`);
 
+
     const visualCheckRejected = calculateFinalCheckRejected('visual'); // Surface Defect + Embossing Defect + Marking
     const dimensionsCheckRejected = calculateFinalCheckRejected('dimensions'); // Box Gauge + Flat Bearing Area + Falling Gauge
     const hardnessCheckRejected = calculateFinalCheckRejected('hardness'); // Tempering Hardness
@@ -2784,7 +3194,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         testingFinishingRejected
     };
 
-    console.log(`📊 [Rejected Qty] Result:`, result);
+
     return result;
   }, [calculateRejectedFromSubmodule, calculateFinalCheckRejected, selectedLine, selectedLotForDisplay, getSelectedLotForCurrentLine, getModuleTotalRejected]);
 
@@ -3088,18 +3498,10 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           lotNumbers = [mainLotNumber];
           heatMap = { [mainLotNumber]: mainHeatNumber };
           offeredQtyMap = { [mainLotNumber]: currentLineInitiationData.offeredQty || 0 };
-          console.log('✅ [Lot Numbers] Using main lot number:', mainLotNumber, 'with heat:', mainHeatNumber);
-        } else {
-          console.log('⚠️ [Lot Numbers] No lot number in cached initiation data');
         }
       }
-    } else {
-      console.log('⚠️ [Lot Numbers] No cached initiation data available for this call');
     }
 
-    console.log('📋 [Lot Numbers] Final lot numbers array:', lotNumbers);
-    console.log('📋 [Lot Numbers] Final heat numbers map:', heatMap);
-    console.log('📋 [Lot Numbers] Final offered quantities map:', offeredQtyMap);
 
     return { lineLotNumbers: lotNumbers, lineHeatNumbersMap: heatMap, lotOfferedQtyMap: offeredQtyMap };
   }, [currentLineInitiationData]);
@@ -3594,9 +3996,63 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       const allLots = Array.from(lotsSet);
       console.log(`🔍 [Validation] Found ${allLots.length} lots in ${lineNo}:`, allLots);
 
-      // VALIDATION FIX: Fail if no data entered for this line
-      if (allLots.length === 0) {
-        validationErrors.set(`${lineNo}|General`, [`No production data entered for ${lineNo}`]);
+      // VALIDATION FIX: Check EACH section independently for "No Production" vs empty data
+      // This fixes the issue where user unchecks No Production for one section but doesn't fill data
+      modules.forEach((moduleName) => {
+        const sectionData = allData?.[moduleName];
+
+        if (!sectionData || !Array.isArray(sectionData) || sectionData.length === 0) {
+          // No data for this section at all - this is OK if other sections have data
+          return;
+        }
+
+        // Check this specific section
+        let sectionHasLots = false;
+        let sectionHasNoProduction = false;
+        let sectionHasAnyData = false;
+
+        sectionData.forEach((hourData) => {
+          if (hourData && Object.keys(hourData).length > 0) {
+            sectionHasAnyData = true;
+
+            // Check if this hour has a lot number
+            if (hourData.lotNo && hourData.lotNo.trim()) {
+              sectionHasLots = true;
+            }
+
+            // Check if this hour is marked as No Production
+            if (hourData.noProduction === true) {
+              sectionHasNoProduction = true;
+            }
+          }
+        });
+
+        console.log(`🔍 [Validation] ${lineNo} - ${moduleName}: hasData=${sectionHasAnyData}, hasLots=${sectionHasLots}, hasNoProduction=${sectionHasNoProduction}`);
+
+        // Validation for this section:
+        // FAIL if: Has data entries BUT no lot numbers AND no "No Production" marked
+        if (sectionHasAnyData && !sectionHasLots && !sectionHasNoProduction) {
+          const sectionName = moduleName.replace('Data', '').replace(/([A-Z])/g, ' $1').trim();
+          validationErrors.set(`${lineNo}|${sectionName}`, [
+            `${sectionName} section has incomplete data. Please either:\n` +
+            `  - Enter lot numbers and production data for all hours, OR\n` +
+            `  - Mark the section as "No Production"`
+          ]);
+          console.log(`❌ [Validation] ${lineNo} - ${moduleName} FAILED - has data but no lots and no "No Production"`);
+        }
+      });
+
+      // Also check if NO sections have any data at all
+      let hasAnyDataInAnySection = false;
+      modules.forEach((moduleName) => {
+        if (allData?.[moduleName] && Array.isArray(allData[moduleName]) && allData[moduleName].length > 0) {
+          hasAnyDataInAnySection = true;
+        }
+      });
+
+      if (!hasAnyDataInAnySection) {
+        validationErrors.set(`${lineNo}|General`, [`No production data entered for ${lineNo}. Please complete all required sections before finishing inspection.`]);
+        console.log(`❌ [Validation] ${lineNo} FAILED - no data in any section`);
       }
 
       // Validate each lot
@@ -5730,111 +6186,6 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         </div>
       )}
 
-      {/* Add New Call Number Modal */}
-      {showAddCallModal && (
-        <div className="modal-overlay" onClick={() => setShowAddCallModal(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Add New Call Number</h3>
-              <button className="modal-close" onClick={() => setShowAddCallModal(false)}>×</button>
-            </div>
-
-            <div className="modal-body">
-              <p style={{ marginBottom: '16px', color: '#64748b' }}>
-                Select a call number that is not already added to the production lines:
-              </p>
-
-              {/* Filter out call numbers that are already selected in production lines */}
-              {(() => {
-                const selectedCallNumbers = localProductionLines.map(line => line.icNumber).filter(Boolean);
-                const availableCallNumbers = allProcessCalls.filter(
-                  callOption => !selectedCallNumbers.includes(callOption.call_no)
-                );
-
-                console.log('🔍 Modal Debug:');
-                console.log('  - allProcessCalls:', allProcessCalls);
-                console.log('  - selectedCallNumbers:', selectedCallNumbers);
-                console.log('  - availableCallNumbers:', availableCallNumbers);
-
-                if (availableCallNumbers.length === 0) {
-                  return (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>
-                      {isLoadingProcessCalls ? (
-                        <>
-                          <p>⏳ Loading call numbers...</p>
-                          <p style={{ fontSize: '12px', marginTop: '8px' }}>
-                            Please wait while we fetch the latest data.
-                          </p>
-                        </>
-                      ) : allProcessCalls.length === 0 ? (
-                        <>
-                          <p>No process calls found.</p>
-                          <p style={{ fontSize: '12px', marginTop: '8px' }}>
-                            You may not have any process calls assigned to you.
-                          </p>
-                        </>
-                      ) : (
-                        'No available call numbers. All calls have been added to production lines.'
-                      )}
-                    </div>
-                  );
-                }
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {availableCallNumbers.map((callOption) => (
-                      <button
-                        key={callOption.call_no}
-                        onClick={() => handleSelectNewCall(callOption.call_no)}
-                        style={{
-                          padding: '12px 16px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '6px',
-                          backgroundColor: '#fff',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f8fafc';
-                          e.currentTarget.style.borderColor = '#0d9488';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#fff';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: '600', color: '#0f172a' }}>{callOption.call_no}</div>
-                          {callOption.po_no && (
-                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                              PO: {callOption.po_no}
-                            </div>
-                          )}
-                        </div>
-                        <span style={{ color: '#0d9488', fontSize: '18px' }}>→</span>
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn-secondary modal-actions__btn"
-                onClick={() => setShowAddCallModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Initiation Form Modal */}
       {showInitiationForm && selectedNewCall && (
@@ -5865,7 +6216,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   {/* Render the full initiation form */}
                   <InspectionInitiationFormContent
                     call={{
-                      id: selectedNewCall,
+                      workflowTransitionId: selectedNewCallTransitionId || selectedNewCall,
+                      id: selectedNewCallTransitionId || selectedNewCall,
                       call_no: selectedNewCall,
                       po_no: selectedNewCallData.poNo,
                       po_date: selectedNewCallData.poDate,
@@ -5889,6 +6241,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                     onFormDataChange={handleNewCallFormDataChange}
                     showSectionA={true}
                     showSectionB={true}
+                    showSectionC={false}
                   />
                 </div>
               ) : (
@@ -5995,6 +6348,210 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         </div>
       )}
 
+      {/* Extracted Modals */}
+      <AddNewCallModal
+        isOpen={showAddCallModal}
+        onClose={() => setShowAddCallModal(false)}
+        availableCalls={availableCallNumbersForModal}
+        onStart={(row) => handleSelectNewCall(row.call_no)}
+        onResume={(row, isResume) => {
+          if (isResume) {
+            // "RESUME" action for active calls - add directly to dashboard without modal
+            console.log(`⏩ [Process Dashboard] Direct RESUME for call ${row.call_no} (skipping modal)`);
+            handleSelectNewCall(row.call_no, true, row);
+            setShowAddCallModal(false);
+            showNotification('success', `Call ${row.call_no} has been resumed!`);
+          } else {
+            // "ENTER SHIFT DETAILS" action for paused calls - show shift details modal
+            setResumeCallData(row);
+            setIsResumeFlow(isResume);
+            setShowResumeCallModal(true);
+          }
+        }}
+        onWithheld={(row) => {
+          setSelectedNewCall(row.call_no);
+          handleOpenNewCallActionModal('WITHHELD');
+        }}
+        onCancel={(row) => {
+          setSelectedNewCall(row.call_no);
+          handleOpenNewCallActionModal('CANCELLED');
+        }}
+        onSchedule={(row, isReschedule) => handleOpenScheduleModal(row, isReschedule)}
+        onShowInfo={(type) => showNotification('info', `${type} is managed from the Landing Page.`)}
+        isLoading={isLoadingProcessCalls}
+      />
+
+      {/* Scheduling Modal */}
+      <Modal
+        isOpen={showScheduleModal}
+        onClose={() => !isScheduling && setShowScheduleModal(false)}
+        title={isReschedule ? `Reschedule Inspection - ${selectedCallForSchedule?.call_no}` : `Schedule Inspection - ${selectedCallForSchedule?.call_no}`}
+        footer={
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowScheduleModal(false)}
+              disabled={isScheduling}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleScheduleSubmit}
+              disabled={isScheduling}
+            >
+              {isScheduling ? (isReschedule ? 'Rescheduling...' : 'Scheduling...') : (isReschedule ? 'Reschedule' : 'Schedule')}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Show previous schedule info when rescheduling */}
+          {isReschedule && previousSchedule && (
+            <div style={{
+              padding: '12px',
+              background: '#fff8e1',
+              borderRadius: '8px',
+              border: '1px solid #ffcc02',
+              fontSize: '14px'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '8px', color: '#b8860b' }}>
+                Previous Schedule Details
+              </div>
+              <div style={{ display: 'flex', gap: '24px' }}>
+                <div>
+                  <span style={{ color: '#64748b' }}>Scheduled Date: </span>
+                  <span style={{ fontWeight: '500' }}>
+                    {previousSchedule.scheduleDate ? new Date(previousSchedule.scheduleDate).toLocaleDateString('en-IN') : '-'}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Previous Remark: </span>
+                  <span style={{ fontWeight: '500' }}>{previousSchedule.reason || '-'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontWeight: '500', color: '#1e293b' }}>
+              {isReschedule ? 'New Schedule Date' : 'Schedule Date'} <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="date"
+              style={{
+                padding: '10px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                fontSize: '14px',
+                width: '100%'
+              }}
+              value={scheduleDate}
+              onChange={(e) => setScheduleDate(e.target.value)}
+              disabled={isScheduling}
+              min={selectedCallForSchedule?.desired_inspection_date || ''}
+            />
+            {selectedCallForSchedule?.desired_inspection_date && (
+              <small style={{ color: '#64748b' }}>
+                Minimum Date: {new Date(selectedCallForSchedule.desired_inspection_date).toLocaleDateString('en-IN')} (Desired Inspection Date)
+              </small>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontWeight: '500', color: '#1e293b' }}>
+              {isReschedule ? 'Reason for Reschedule' : 'Remarks'}
+            </label>
+            <textarea
+              style={{
+                padding: '10px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                fontSize: '14px',
+                width: '100%',
+                minHeight: '100px',
+                resize: 'vertical'
+              }}
+              value={scheduleRemarks}
+              onChange={(e) => setScheduleRemarks(e.target.value)}
+              placeholder={isReschedule ? "Enter reason for rescheduling..." : "Enter remarks for scheduling..."}
+              disabled={isScheduling}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <ResumeCallModal
+        isOpen={showResumeCallModal}
+        onClose={() => setShowResumeCallModal(false)}
+        call={resumeCallData}
+        onConfirm={async ({ shift, date }) => {
+          setIsResumingCall(true);
+          try {
+            // Store shift/date in session storage as the dashboard expects
+            sessionStorage.setItem('processShift', shift);
+            sessionStorage.setItem('inspectionShift', shift);
+            sessionStorage.setItem('inspectionDate', date);
+            sessionStorage.setItem('shiftCode', (shift || 'A').charAt(0).toUpperCase());
+
+            // Handle workflow transition if this is "ENTER SHIFT DETAILS" (isResumeFlow === false)
+            if (!isResumeFlow) {
+              console.log('🔄 ENTER SHIFT DETAILS flow - performing workflow transition');
+
+              const currentUser = getStoredUser();
+              const userId = currentUser?.userId || 0;
+
+              // Fetch latest transition ID
+              let transitionId = resumeCallData?.workflowTransitionId || resumeCallData?.id;
+              try {
+                const latestTransition = await fetchLatestWorkflowTransition(resumeCallData.call_no);
+                if (latestTransition && latestTransition.workflowTransitionId) {
+                  transitionId = latestTransition.workflowTransitionId;
+                }
+              } catch (err) {
+                console.warn('Failed to fetch latest transition, using current:', err);
+              }
+
+              const action = resumeCallData?.status === 'INSPECTION_PAUSED'
+                ? 'INSPECTION_PAUSED'
+                : 'ENTER_SHIFT_DETAILS_AND_START_INSPECTION';
+
+              const workflowActionData = {
+                workflowTransitionId: transitionId,
+                requestId: resumeCallData.call_no,
+                action: action,
+                remarks: `Shift details entered - Shift: ${shift}, Date: ${date}`,
+                actionBy: userId,
+                pincode: resumeCallData.pincode || '560001',
+                materialAvailable: 'YES',
+                shiftCode: (shift || 'A').charAt(0).toUpperCase()
+              };
+
+              await performTransitionAction(workflowActionData);
+              console.log('✅ Workflow transition successful');
+            } else {
+              console.log('⏭️ RESUME flow - skipping workflow transition');
+            }
+
+            // Add the call to production lines
+            await handleSelectNewCall(resumeCallData.call_no, true, resumeCallData); // Pass row data to skip fetch
+
+            setShowResumeCallModal(false);
+            setShowAddCallModal(false);
+            showNotification('success', `Call ${resumeCallData.call_no} has been ${isResumeFlow ? 'resumed' : 'initiated'}!`);
+          } catch (error) {
+            console.error('Error in onResumeConfirm:', error);
+            showNotification('error', `Failed to ${isResumeFlow ? 'resume' : 'initiate'} call: ` + (error.message || 'Unknown error'));
+          } finally {
+            setIsResumingCall(false);
+          }
+        }}
+        isSubmitting={isResumingCall}
+        isResume={isResumeFlow}
+        initialShift={sessionStorage.getItem('inspectionShift') || ''}
+        isShiftReadOnly={!isResumeFlow} // Shift is readonly for ENTER SHIFT DETAILS (paused calls)
+      />
+
       {/* Initiate Inspection Modal for New Call */}
       {showNewCallInitiateModal && (
         <div className="modal-overlay" onClick={handleCloseNewCallInitiateModal}>
@@ -6013,6 +6570,12 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   onChange={(e) => {
                     setNewCallShift(e.target.value);
                     setNewCallInitiateError('');
+                  }}
+                  disabled={true}
+                  style={{
+                    backgroundColor: '#f1f5f9',
+                    cursor: 'not-allowed',
+                    opacity: 0.7
                   }}
                 >
                   <option value="">Select Shift</option>
@@ -6055,3 +6618,5 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 };
 
 export default ProcessDashboard;
+
+

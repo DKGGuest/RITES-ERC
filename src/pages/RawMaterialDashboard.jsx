@@ -1347,8 +1347,6 @@ const RawMaterialDashboard = ({ call, onBack, onNavigateToSubModule, onHeatsChan
           materialTest: 'Pending',
           packing: 'Pending'
         };
-        const hasNotOk = Object.values(heatStatuses).some(s => s === 'NOT OK');
-        const allOk = Object.values(heatStatuses).every(s => s === 'OK');
         const dimensionalNotOk = heatStatuses.dimensional === 'NOT OK';
         const materialTestNotOk = heatStatuses.materialTest === 'NOT OK';
         const weight = heat.weight; // Already aggregated in consolidatedHeats

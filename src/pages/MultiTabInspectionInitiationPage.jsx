@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import InspectionInitiationFormContent from '../components/InspectionInitiationFormContent';
 import { saveInspectionInitiation } from '../services/vendorInspectionService';
 import { getStoredUser } from '../services/authService';
@@ -30,18 +30,23 @@ const responsiveStyles = `
   }
 `;
 
-// Helper to get date options for Shift C (today and yesterday)
-const getDateOptions = () => {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  return [
-    { value: today.toISOString().split('T')[0], label: `Today (${today.toLocaleDateString('en-GB')})` },
-    { value: yesterday.toISOString().split('T')[0], label: `Yesterday (${yesterday.toLocaleDateString('en-GB')})` },
-  ];
-};
 
 const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
+  // Calculate latest desired date among all calls for batch restriction
+  const latestDesiredDate = useMemo(() => {
+    if (!calls || calls.length === 0) return null;
+    return calls.reduce((latest, call) => {
+      const desiredDateStr = call.desired_inspection_date || call.desiredInspectionDate;
+      if (!desiredDateStr) return latest;
+      const current = new Date(desiredDateStr);
+      if (!latest || current > latest) return current;
+      return latest;
+    }, null);
+  }, [calls]);
+
+  const latestDesiredDateStr = latestDesiredDate ? latestDesiredDate.toISOString().split('T')[0] : '';
+  const latestDesiredDateFormatted = latestDesiredDate ? latestDesiredDate.toLocaleDateString('en-GB') : '-';
+
   const [activeCallIndex, setActiveCallIndex] = useState(0);
   const [formDataByCall, setFormDataByCall] = useState(() => {
     const initialData = {};
@@ -542,9 +547,8 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
                   value={initiateShift}
                   onChange={(e) => {
                     setInitiateShift(e.target.value);
-                    setInitiateError('');
-                    if (e.target.value && e.target.value !== 'C') {
-                      setInitiateDate(new Date().toISOString().split('T')[0]);
+                    if (e.target.value) {
+                      setInitiateError('');
                     }
                   }}
                 >
@@ -557,27 +561,27 @@ const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
               </div>
 
               <div className="modal-field">
+                <label className="modal-label">Latest Desired Inspection Date</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={latestDesiredDateFormatted}
+                  disabled
+                />
+              </div>
+
+              <div className="modal-field">
                 <label className="modal-label">Date of Inspection <span className="required">*</span></label>
-                {initiateShift === 'C' ? (
-                  <select
-                    className="modal-select"
-                    value={initiateDate}
-                    onChange={(e) => { setInitiateDate(e.target.value); setInitiateError(''); }}
-                  >
-                    {getDateOptions().map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    className="modal-input"
-                    value={initiateDate ? new Date(initiateDate).toLocaleDateString('en-GB') : ''}
-                    disabled
-                  />
-                )}
+                <input
+                  type="date"
+                  className="modal-input"
+                  value={initiateDate}
+                  min={latestDesiredDateStr}
+                  max={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => { setInitiateDate(e.target.value); setInitiateError(''); }}
+                />
                 <span className="modal-hint">
-                  {initiateShift === 'C' ? 'Shift C: Select today or yesterday' : 'Auto-set to today for shifts A, B, General'}
+                  Select a date between the latest desired date and today
                 </span>
               </div>
 

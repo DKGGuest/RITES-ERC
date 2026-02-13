@@ -908,23 +908,33 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
   // The manual SaveAll handler was removed (not used in UI).
 
   // Compute 8 one-hour labels based on shift
-  const SHIFT_STARTS = { A: { h: 6, m: 0 }, B: { h: 14, m: 0 }, C: { h: 22, m: 0 }, G: { h: 9, m: 0 } };
+  const SHIFT_STARTS = {
+    A: { h: 6, m: 0 },
+    B: { h: 14, m: 0 },
+    C: { h: 22, m: 0 },
+    G: { h: 9, m: 0 },
+    GENERAL: { h: 9, m: 0 }  // General shift: 9 AM - 5 PM
+  };
   const pad = (n) => n.toString().padStart(2, '0');
   const format = (h, m) => `${((h % 12) || 12)}:${pad(m)} ${h < 12 ? 'AM' : 'PM'}`;
   const addHours = (h, m, dh) => ({ h: (h + dh) % 24, m });
+
+  // Normalize shift to uppercase for consistent lookup (handles "General" vs "GENERAL")
+  const normalizedShift = (shift || 'A').toString().trim().toUpperCase();
+
   const shiftLabel = (() => {
-    const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
+    const s = SHIFT_STARTS[normalizedShift] || SHIFT_STARTS.A;
     const end = addHours(s.h, s.m, 8);
     return `${shift} (${format(s.h, s.m)} - ${format(end.h, end.m)})`;
   })();
 
   const currentHourIndex = (() => {
     const now = new Date();
-    const s = SHIFT_STARTS[shift] || SHIFT_STARTS.A;
+    const s = SHIFT_STARTS[normalizedShift] || SHIFT_STARTS.A;
     const base = new Date(now);
     base.setHours(s.h, s.m, 0, 0);
     // For C shift (22:00-06:00 next day), if now is after midnight but before 06:00, treat base as yesterday 22:00
-    if (shift === 'C' && now.getHours() < 6) {
+    if (normalizedShift === 'C' && now.getHours() < 6) {
       base.setDate(base.getDate() - 1);
     }
     let diffMs = now.getTime() - base.getTime();

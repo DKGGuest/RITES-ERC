@@ -406,6 +406,8 @@ const IssuanceOfICTab = ({ calls, setSelectedCall, setCurrentPage }) => {
             selectable
             selectedRows={selectedRows}
             onSelectionChange={handleSelectionChange}
+            initialPageSize={10}
+            hidePageSize={true}
           />
         </>
       )}

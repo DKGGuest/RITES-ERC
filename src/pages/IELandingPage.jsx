@@ -16,7 +16,7 @@ import { markAsScheduled, isCallInitiated, getCallStatusData } from '../services
 import { fetchCompletedCallsForIC, getCurrentUserId } from '../services/workflowApiService';
 // import { fetchRawMaterialCallsByStatus } from '../services/rawMaterial/rawMaterialApiService';
 
-const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setCurrentPage, initialTab = 'pending', setInspectionShift, setInspectionDate, setProcessShift }) => {
+const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelectedCall, setContextSelectedCalls, setCurrentPage, initialTab = 'pending', setInspectionShift, setInspectionDate, setProcessShift }) => {
   // Restore active tab from sessionStorage on page load, fallback to initialTab
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = sessionStorage.getItem('ie_landing_active_tab');
@@ -333,19 +333,7 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       // Clear workflow cache to force fresh data on next fetch
       clearWorkflowCache();
 
-      // Refresh the schedule list
-      if (refreshCallback) {
-        refreshCallback();
-      }
-
-      // Refresh the pending calls list to update status immediately (force refresh to bypass cache)
-      await fetchPendingData(true);
-
-      // Clear selection in landing page and child components (force reset)
-      setSelectedCalls([]);
-      setSelectionResetKey(k => k + 1);
-
-      // Reset modal state
+      // Reset modal state immediately for prompt UI response
       setShowScheduleModal(false);
       setScheduleDate('');
       setRemarks('');
@@ -353,6 +341,17 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       setSelectedCalls([]);
       setIsBulkSchedule(false);
       setIsReschedule(false);
+
+      // Clear selection in landing page and child components (force reset)
+      setSelectionResetKey(k => k + 1);
+
+      // Refresh the schedule list
+      if (refreshCallback) {
+        refreshCallback();
+      }
+
+      // Refresh the pending calls list in background (force refresh to bypass cache)
+      await fetchPendingData(true);
     } catch (error) {
       showNotification(error.message || 'Failed to schedule inspection', 'error');
     } finally {
@@ -484,6 +483,9 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
 
       // Set the selected call first
       setSelectedCall(call);
+      if (typeof setContextSelectedCalls === 'function') {
+        setContextSelectedCalls([call]);
+      }
       // console.log('✅ setSelectedCall called');
 
       // Then navigate based on product type (handle both formats)
@@ -675,6 +677,9 @@ const IELandingPage = ({ onStartInspection, onStartMultipleInspections, setSelec
       // console.log('🚀 Navigating to dashboard for product type:', productType);
 
       setSelectedCall(shiftDetailsCall);
+      if (typeof setContextSelectedCalls === 'function') {
+        setContextSelectedCalls([shiftDetailsCall]);
+      }
 
       const productTypeLower = productType?.toLowerCase() || '';
       if (productTypeLower.includes('raw') || productType === 'ERC-RAW MATERIAL') {

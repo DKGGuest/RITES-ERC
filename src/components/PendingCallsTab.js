@@ -1408,6 +1408,8 @@ const PendingCallsTab = ({ calls, onSchedule, onReschedule, onStart, onBulkSched
             selectable={true}
             selectedRows={selectedRows}
             onSelectionChange={handleSelectionChange}
+            initialPageSize={10}
+            hidePageSize={true}
           />
         )}
       </div>

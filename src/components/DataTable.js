@@ -5,8 +5,8 @@ const isDateLike = (str) => {
   if (!str) return false;
   // Check for common date formats: DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY, etc.
   return /^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}$/.test(str) ||
-         /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str) ||
-         /^\d{4}-\d{1,2}-\d{1,2}$/.test(str);
+    /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str) ||
+    /^\d{4}-\d{1,2}-\d{1,2}$/.test(str);
 };
 
 // Helper function to normalize date for comparison
@@ -71,12 +71,12 @@ const deepSearch = (obj, searchText) => {
   return Object.values(obj).some(val => deepSearch(val, searchText));
 };
 
-const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRows, onSelectionChange, hideSearch = false, emptyMessage = 'No data available' }) => {
+const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRows, onSelectionChange, hideSearch = false, hidePageSize = false, initialPageSize = 5, emptyMessage = 'No data available' }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(initialPageSize);
 
   // Helper function to get rendered text from a column
   const getRenderedText = (row, column) => {
@@ -199,76 +199,78 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         )}
-        <select
-          className="form-control"
-          style={{ width: '120px' }}
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-        >
-          <option value={10}>10 / page</option>
-          <option value={25}>25 / page</option>
-          <option value={50}>50 / page</option>
-          <option value={100}>100 / page</option>
-        </select>
+        {!hidePageSize && (
+          <select
+            className="form-control"
+            style={{ width: '120px' }}
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+          >
+            <option value={5}>5 / page</option>
+            <option value={10}>10 / page</option>
+            <option value={15}>15 / page</option>
+            <option value={20}>20 / page</option>
+          </select>
+        )}
       </div>
 
       <div className="data-table-container">
         <table className="data-table">
-        <thead>
-          <tr>
-            {selectable && (
-              <th style={{ width: '50px' }}>
-                <input
-                  type="checkbox"
-                  checked={isAllSelected}
-                  onChange={handleSelectAll}
-                />
-              </th>
-            )}
-            {columns.map(col => (
-              <th key={col.key} onClick={() => handleSort(col.key)}>
-                {col.label} {sortColumn === col.key && (sortDirection === 'asc' ? '↑' : '↓')}
-              </th>
-            ))}
-            {actions && <th>Actions</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {paginatedData.map((row, idx) => {
-            const isSelected = selectable && selectedRows.includes(row.id);
-            return (
-              <tr
-                key={idx}
-                onClick={(e) => handleRowClick(row, e)}
-                className={isSelected ? 'selected' : ''}
-                style={{ cursor: selectable ? 'pointer' : 'default' }}
-              >
+          <thead>
+            <tr>
               {selectable && (
-                <td onClick={(e) => e.stopPropagation()}>
+                <th style={{ width: '50px' }}>
                   <input
                     type="checkbox"
-                    checked={selectedRows.includes(row.id)}
-                    onChange={() => handleSelectRow(row.id)}
+                    checked={isAllSelected}
+                    onChange={handleSelectAll}
                   />
-                </td>
+                </th>
               )}
               {columns.map(col => (
-                <td key={col.key} data-label={col.label}>
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
+                <th key={col.key} onClick={() => handleSort(col.key)}>
+                  {col.label} {sortColumn === col.key && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
               ))}
-              {actions && <td data-label="Actions">{actions(row)}</td>}
+              {actions && <th>Actions</th>}
             </tr>
-            );
-          })}
-          {paginatedData.length === 0 && (
-            <tr>
-              <td colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
-                {emptyMessage}
-              </td>
-            </tr>
-          )}
-        </tbody>
+          </thead>
+          <tbody>
+            {paginatedData.map((row, idx) => {
+              const isSelected = selectable && selectedRows.includes(row.id);
+              return (
+                <tr
+                  key={idx}
+                  onClick={(e) => handleRowClick(row, e)}
+                  className={isSelected ? 'selected' : ''}
+                  style={{ cursor: selectable ? 'pointer' : 'default' }}
+                >
+                  {selectable && (
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.includes(row.id)}
+                        onChange={() => handleSelectRow(row.id)}
+                      />
+                    </td>
+                  )}
+                  {columns.map(col => (
+                    <td key={col.key} data-label={col.label}>
+                      {col.render ? col.render(row[col.key], row) : row[col.key]}
+                    </td>
+                  ))}
+                  {actions && <td data-label="Actions">{actions(row)}</td>}
+                </tr>
+              );
+            })}
+            {paginatedData.length === 0 && (
+              <tr>
+                <td colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                  {emptyMessage}
+                </td>
+              </tr>
+            )}
+          </tbody>
         </table>
       </div>
 
@@ -277,6 +279,17 @@ const DataTable = ({ columns, data, onRowClick, actions, selectable, selectedRow
           Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} entries
         </div>
         <div className="pagination-controls">
+          <select
+            className="form-control"
+            style={{ width: '110px', height: '34px', padding: '0 10px', fontSize: '13px', minHeight: '34px' }}
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+          >
+            <option value={5}>5 / page</option>
+            <option value={10}>10 / page</option>
+            <option value={15}>15 / page</option>
+            <option value={20}>20 / page</option>
+          </select>
           <button
             className="btn btn-sm btn-outline"
             disabled={currentPage === 1}

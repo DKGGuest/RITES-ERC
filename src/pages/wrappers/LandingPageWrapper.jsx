@@ -61,6 +61,7 @@ const LandingPageWrapper = () => {
       onStartInspection={handleStartInspection}
       onStartMultipleInspections={handleStartMultipleInspections}
       setSelectedCall={setSelectedCall}
+      setContextSelectedCalls={setSelectedCalls}
       setCurrentPage={handleSetCurrentPage}
       initialTab={landingActiveTab}
       onTabChange={setLandingActiveTab}

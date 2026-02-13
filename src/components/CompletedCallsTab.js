@@ -177,6 +177,8 @@ const CompletedCallsTab = ({ calls }) => {
         selectable
         selectedRows={selectedRows}
         onSelectionChange={handleSelectionChange}
+        initialPageSize={10}
+        hidePageSize={true}
       />
     </div>
   );

@@ -7,11 +7,11 @@ import { createStageValidationHandler } from '../utils/stageValidation';
 import { BILLING_STATUS } from '../services/billingService';
 import './BillingStageTab.css';
 
-const BillingStageTab = ({ 
-  calls, 
-  onRaiseBill, 
-  onUpdateStatus, 
-  onApprovePayment 
+const BillingStageTab = ({
+  calls,
+  onRaiseBill,
+  onUpdateStatus,
+  onApprovePayment
 }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectionError, setSelectionError] = useState('');
@@ -20,9 +20,9 @@ const BillingStageTab = ({
 
   // Filter calls that are in billing stage (IC issued but payment not done)
   const billingCalls = useMemo(() => {
-    return calls.filter(c => 
-      c.ic_issued === true && 
-      c.billing_status && 
+    return calls.filter(c =>
+      c.ic_issued === true &&
+      c.billing_status &&
       c.billing_status !== BILLING_STATUS.PAYMENT_DONE
     );
   }, [calls]);
@@ -95,7 +95,7 @@ const BillingStageTab = ({
     if (!selectedRows.includes(row.id)) return null;
 
     const actions = [];
-    
+
     if (row.billing_status === BILLING_STATUS.BILLING_PENDING) {
       actions.push(
         <button key="raise" className="btn btn-sm btn-primary" onClick={() => onRaiseBill?.(row)}>
@@ -103,7 +103,7 @@ const BillingStageTab = ({
         </button>
       );
     }
-    
+
     if (row.billing_status === BILLING_STATUS.BILL_RAISED) {
       actions.push(
         <button key="pending" className="btn btn-sm btn-secondary" onClick={() => onUpdateStatus?.(row, BILLING_STATUS.PAYMENT_PENDING)}>
@@ -111,7 +111,7 @@ const BillingStageTab = ({
         </button>
       );
     }
-    
+
     if (row.billing_status === BILLING_STATUS.PAYMENT_PENDING) {
       actions.push(
         <button key="approve" className="btn btn-sm btn-success" onClick={() => onApprovePayment?.(row)}>
@@ -119,7 +119,7 @@ const BillingStageTab = ({
         </button>
       );
     }
-    
+
     if (row.billing_status === BILLING_STATUS.UNDER_SUSPENSE) {
       actions.push(
         <button key="map" className="btn btn-sm btn-primary" onClick={() => onRaiseBill?.(row)}>
@@ -197,6 +197,8 @@ const BillingStageTab = ({
         onSelectionChange={handleSelectionChange}
         emptyMessage="No calls in billing stage"
         rowActions={getRowActions}
+        initialPageSize={10}
+        hidePageSize={true}
       />
     </div>
   );
