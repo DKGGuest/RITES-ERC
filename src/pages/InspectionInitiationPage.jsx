@@ -422,16 +422,6 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
     }
   };
 
-  // Get date options for Shift C (today and yesterday)
-  const getDateOptions = () => {
-    const today = new Date();
-    const yesterday = new Date(Date.now() - 86400000);
-    return [
-      { value: '', label: 'Select Date' },
-      { value: today.toISOString().split('T')[0], label: `${today.toLocaleDateString('en-GB')} (Today)` },
-      { value: yesterday.toISOString().split('T')[0], label: `${yesterday.toLocaleDateString('en-GB')} (Yesterday)` }
-    ];
-  };
 
   return (
     <div className="inspection-initiation-page">
@@ -570,27 +560,26 @@ const InspectionInitiationPage = ({ call, onProceed, onBack, onShiftChange, onSe
               </div>
 
               <div className="modal-field">
+                <label className="modal-label">Desired Inspection Date</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={call.desired_inspection_date ? new Date(call.desired_inspection_date).toLocaleDateString('en-GB') : '-'}
+                  disabled
+                />
+              </div>
+
+              <div className="modal-field">
                 <label className="modal-label">Date of Inspection <span className="required">*</span></label>
-                {shiftOfInspection === 'C' ? (
-                  <select
-                    className="modal-select"
-                    value={dateOfInspection}
-                    onChange={(e) => { setDateOfInspection(e.target.value); setInitiateError(''); }}
-                  >
-                    {getDateOptions().map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    className="modal-input"
-                    value={dateOfInspection ? new Date(dateOfInspection).toLocaleDateString('en-GB') : ''}
-                    disabled
-                  />
-                )}
+                <input
+                  type="date"
+                  className="modal-input"
+                  value={dateOfInspection}
+                  min={call.desired_inspection_date ? new Date(call.desired_inspection_date).toISOString().split('T')[0] : ''}
+                  onChange={(e) => { setDateOfInspection(e.target.value); setInitiateError(''); }}
+                />
                 <span className="modal-hint">
-                  {shiftOfInspection === 'C' ? 'Shift C: Select today or yesterday' : 'Auto-set to today for shifts A, B, General'}
+                  Select a date from the desired date onwards
                 </span>
               </div>
 
