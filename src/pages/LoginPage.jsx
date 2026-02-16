@@ -71,6 +71,9 @@ const LoginPage = () => {
       } else if (userData.roleName === 'Finance') {
         // Finance user - redirect to Finance Dashboard
         redirectPath = ROUTES.FINANCE;
+      } else if (userData.roleName === 'SLEEPER') {
+        // Sleeper user - redirect to Sleeper Dashboard
+        redirectPath = ROUTES.SLEEPER;
       } else {
         // IE user - redirect to landing page or intended destination
         redirectPath = location.state?.from?.pathname || ROUTES.LANDING;

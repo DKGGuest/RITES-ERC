@@ -50,6 +50,7 @@ import { CMDashboardWrapper } from './pages/wrappers/CMWrappers';
 import { CallDeskDashboardWrapper } from './pages/wrappers/CallDeskWrapper';
 import { FinanceDashboardWrapper } from './pages/wrappers/FinanceWrapper';
 import { RailwayBoardDashboardWrapper } from './pages/wrappers/RailwayBoardWrapper';
+import SleeperMain from './sleeper/SleeperMain';
 
 /**
  * Role-based redirect component
@@ -188,7 +189,18 @@ const App = () => {
 
             {/* Railway Board Routes */}
             <Route path={ROUTES.RAILWAY_BOARD_DASHBOARD} element={<RailwayBoardDashboardWrapper />} />
+
           </Route>
+
+          {/* Sleeper Route - Outside AppLayout to use its own layout */}
+          <Route
+            path={`${ROUTES.SLEEPER}/*`}
+            element={
+              <ProtectedRoute>
+                <SleeperMain />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Catch-all redirect - role-based */}
           <Route path="*" element={<RoleBasedRedirect />} />

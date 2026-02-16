@@ -44,6 +44,15 @@ const HARDCODED_USERS = {
       roleName: 'RAILWAY_BOARD',
       token: 'railwayboard-mock-token-' + Date.now()
     }
+  },
+  'Sleeper': {
+    password: 'password',
+    userData: {
+      userId: 'Sleeper',
+      userName: 'Sleeper Process User',
+      roleName: 'SLEEPER',
+      token: 'sleeper-mock-token-' + Date.now()
+    }
   }
 };
 
@@ -77,7 +86,7 @@ export const loginUser = async (userId, password) => {
         password: password,
       }),
     });
-  
+
     const data = await response.json();
 
     if (!response.ok) {
