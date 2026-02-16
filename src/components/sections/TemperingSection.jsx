@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './TemperingSection.css';
+import { getToleranceStyle, checkTolerance } from '../../utils/toleranceValidation';
 
 const TemperingSection = ({
   data,
@@ -9,7 +10,8 @@ const TemperingSection = ({
   visibleRows,
   showAll,
   onToggleShowAll,
-  finalCheckData
+  finalCheckData,
+  productType
 }) => {
   const [expanded] = useState(true);
 
@@ -98,6 +100,25 @@ const TemperingSection = ({
   // Check if all hours are marked as "No Production"
   const allNoProduction = data.every(row => row.noProduction);
 
+  // Helper to determine if rejection input should be enabled
+  const isRejectionEnabled = (row, field) => {
+    if (row.noProduction || !row.lotNo) return false;
+
+    if (field === 'temperingTemperature') {
+      return row.temperingTemperature?.some(val => {
+        const { isValid, isApplicable } = checkTolerance('temperingTemperature', val, productType);
+        return isApplicable && !isValid;
+      });
+    }
+
+    if (field === 'temperingDuration') {
+      // No validation rule for duration, so keep enabled (or default behavior)
+      return true;
+    }
+
+    return false;
+  };
+
   return (
     <div className="tempering-section">
       <div className="tempering-section__header">
@@ -139,7 +160,7 @@ const TemperingSection = ({
                       <th className="tempering-th tempering-th--time">Time Range</th>
                       <th className="tempering-th tempering-th--checkbox">No Production</th>
                       <th className="tempering-th tempering-th--lot">Lot No.</th>
-                      <th className="tempering-th tempering-th--temp">Tempering Temp.</th>
+                      <th className="tempering-th tempering-th--temp">Tempering Temp. (°C)</th>
                       <th className="tempering-th tempering-th--duration">Tempering Duration</th>
                       <th className="tempering-th tempering-th--total-rejection">Total Rejection at Tempering Section</th>
                     </tr>
@@ -178,6 +199,7 @@ const TemperingSection = ({
                           value={row.temperingTemperature[0] || ''}
                           onChange={e => updateData(idx, 'temperingTemperature', e.target.value, 0)}
                           disabled={row.noProduction || !row.lotNo}
+                          style={getToleranceStyle('temperingTemperature', row.temperingTemperature[0], productType)}
                         />
                       </td>
                       <td className="tempering-td tempering-td--duration-input">
@@ -206,6 +228,7 @@ const TemperingSection = ({
                           value={row.temperingTemperature[1] || ''}
                           onChange={e => updateData(idx, 'temperingTemperature', e.target.value, 1)}
                           disabled={row.noProduction || !row.lotNo}
+                          style={getToleranceStyle('temperingTemperature', row.temperingTemperature[1], productType)}
                         />
                       </td>
                       <td className="tempering-td tempering-td--duration-input">
@@ -232,7 +255,7 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingTemperatureRejected || ''}
                           onChange={e => updateData(idx, 'temperingTemperatureRejected', e.target.value)}
-                          disabled={row.noProduction || !row.lotNo}
+                          disabled={!isRejectionEnabled(row, 'temperingTemperature')}
                         />
                       </td>
                       <td className="tempering-td tempering-td--rejected-input">
@@ -242,7 +265,7 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingDurationRejected || ''}
                           onChange={e => updateData(idx, 'temperingDurationRejected', e.target.value)}
-                          disabled={row.noProduction || !row.lotNo}
+                          disabled={!isRejectionEnabled(row, 'temperingDuration')}
                         />
                       </td>
                     </tr>
@@ -303,7 +326,7 @@ const TemperingSection = ({
                       </div>
                     </div>
                     <div className="tempering-mobile-field">
-                      <span className="tempering-mobile-field__label">Tempering Temp.</span>
+                      <span className="tempering-mobile-field__label">Tempering Temp. (°C)</span>
                       <div className="tempering-mobile-field__value tempering-mobile-field__value--multi">
                         {[0, 1].map(sampleIdx => (
                           <input
@@ -314,6 +337,7 @@ const TemperingSection = ({
                             value={row.temperingTemperature[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'temperingTemperature', e.target.value, sampleIdx)}
                             disabled={row.noProduction || !row.lotNo}
+                            style={getToleranceStyle('temperingTemperature', row.temperingTemperature[sampleIdx], productType)}
                           />
                         ))}
                       </div>
@@ -342,7 +366,7 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingTemperatureRejected || ''}
                           onChange={e => updateData(idx, 'temperingTemperatureRejected', e.target.value)}
-                          disabled={row.noProduction || !row.lotNo}
+                          disabled={!isRejectionEnabled(row, 'temperingTemperature')}
                         />
                       </div>
                     </div>
@@ -354,7 +378,7 @@ const TemperingSection = ({
                           placeholder="0"
                           value={row.temperingDurationRejected || ''}
                           onChange={e => updateData(idx, 'temperingDurationRejected', e.target.value)}
-                          disabled={row.noProduction || !row.lotNo}
+                          disabled={!isRejectionEnabled(row, 'temperingDuration')}
                         />
                       </div>
                     </div>

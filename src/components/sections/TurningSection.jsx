@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './TurningSection.css';
+import { getToleranceStyle, checkTolerance } from '../../utils/toleranceValidation';
 
 const TurningSection = ({
   data,
@@ -8,7 +9,8 @@ const TurningSection = ({
   hourLabels,
   visibleRows,
   showAll,
-  onToggleShowAll
+  onToggleShowAll,
+  productType
 }) => {
   const [expanded] = useState(true);
 
@@ -65,6 +67,31 @@ const TurningSection = ({
   // Check if all hours are marked as "No Production"
   const allNoProduction = data.every(row => row.noProduction);
 
+  // Helper to determine if rejection input should be enabled
+  const isRejectionEnabled = (row, type) => {
+    if (row.noProduction || !row.lotNo) return false;
+
+    switch (type) {
+      case 'parallel': // Column 4: Parallel Length
+        return row.parallelLength?.some(val => {
+          const { isValid, isApplicable } = checkTolerance('parallelLength', val, productType);
+          return isApplicable && !isValid;
+        });
+      case 'full': // Column 5: Full Turning Length
+        return row.fullTurningLength?.some(val => {
+          const { isValid, isApplicable } = checkTolerance('fullLength', val, productType);
+          return isApplicable && !isValid;
+        });
+      case 'dia': // Column 6: Turning Dia
+        return row.turningDia?.some(val => {
+          const { isValid, isApplicable } = checkTolerance('turningDia', val, productType);
+          return isApplicable && !isValid;
+        });
+      default:
+        return false;
+    }
+  };
+
   return (
     <div className="turning-section">
       <div className="turning-section__header">
@@ -103,9 +130,9 @@ const TurningSection = ({
                     <th className="turning-th turning-th--time">Time Range</th>
                     <th className="turning-th turning-th--checkbox">No Production</th>
                     <th className="turning-th turning-th--lot">Lot No.</th>
-                    <th className="turning-th turning-th--parallel">Parallel Length</th>
-                    <th className="turning-th turning-th--full">Full Turning Length</th>
-                    <th className="turning-th turning-th--dia">Turning Dia</th>
+                    <th className="turning-th turning-th--parallel">Parallel Length (mm)</th>
+                    <th className="turning-th turning-th--full">Full Turning Length (mm)</th>
+                    <th className="turning-th turning-th--dia">Turning Dia (mm)</th>
                   </tr>
                   {/* Row 1: First sample */}
                   <tr className={`turning-row${row.noProduction ? ' no-production' : ''}`}>
@@ -142,6 +169,7 @@ const TurningSection = ({
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
                         placeholder="float"
+                        style={getToleranceStyle('parallelLength', row.parallelLength[0], productType)}
                       />
                     </td>
                     <td className="turning-td turning-td--full-input">
@@ -152,7 +180,8 @@ const TurningSection = ({
                         value={row.fullTurningLength[0] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('fullLength', row.fullTurningLength[0], productType)}
                       />
                     </td>
                     <td className="turning-td turning-td--dia-input">
@@ -163,7 +192,8 @@ const TurningSection = ({
                         value={row.turningDia[0] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('turningDia', row.turningDia[0], productType)}
                       />
                     </td>
                   </tr>
@@ -177,7 +207,8 @@ const TurningSection = ({
                         value={row.parallelLength[1] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('parallelLength', row.parallelLength[1], productType)}
                       />
                     </td>
                     <td className="turning-td turning-td--full-input">
@@ -188,7 +219,8 @@ const TurningSection = ({
                         value={row.fullTurningLength[1] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('fullLength', row.fullTurningLength[1], productType)}
                       />
                     </td>
                     <td className="turning-td turning-td--dia-input">
@@ -199,7 +231,8 @@ const TurningSection = ({
                         value={row.turningDia[1] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('turningDia', row.turningDia[1], productType)}
                       />
                     </td>
                   </tr>
@@ -213,7 +246,8 @@ const TurningSection = ({
                         value={row.parallelLength[2] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 2)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('parallelLength', row.parallelLength[2], productType)}
                       />
                     </td>
                     <td className="turning-td turning-td--full-input">
@@ -224,7 +258,8 @@ const TurningSection = ({
                         value={row.fullTurningLength[2] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 2)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('fullLength', row.fullTurningLength[2], productType)}
                       />
                     </td>
                     <td className="turning-td turning-td--dia-input">
@@ -235,7 +270,8 @@ const TurningSection = ({
                         value={row.turningDia[2] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 2)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('turningDia', row.turningDia[2], productType)}
                       />
                     </td>
                   </tr>
@@ -250,7 +286,7 @@ const TurningSection = ({
                         className="form-control turning-input turning-input--rejected"
                         value={row.rejectedQty[0] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'parallel')}
                       />
                     </td>
                     <td className="turning-td turning-td--rejected-input">
@@ -259,7 +295,7 @@ const TurningSection = ({
                         className="form-control turning-input turning-input--rejected"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'full')}
                       />
                     </td>
                     <td className="turning-td turning-td--rejected-input">
@@ -268,7 +304,7 @@ const TurningSection = ({
                         className="form-control turning-input turning-input--rejected"
                         value={row.rejectedQty[2] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'dia')}
                       />
                     </td>
                   </tr>
@@ -322,7 +358,7 @@ const TurningSection = ({
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Parallel Length (S1)</span>
+                    <span className="turning-mobile-field__label">Parallel Length (S1) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -330,12 +366,12 @@ const TurningSection = ({
                         value={row.parallelLength[0] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Parallel Length (S2)</span>
+                    <span className="turning-mobile-field__label">Parallel Length (S2) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -343,12 +379,12 @@ const TurningSection = ({
                         value={row.parallelLength[1] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Parallel Length (S3)</span>
+                    <span className="turning-mobile-field__label">Parallel Length (S3) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -356,12 +392,12 @@ const TurningSection = ({
                         value={row.parallelLength[2] || ''}
                         onChange={e => updateData(idx, 'parallelLength', e.target.value, 2)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Full Turning Length (S1)</span>
+                    <span className="turning-mobile-field__label">Full Turning Length (S1) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -374,7 +410,7 @@ const TurningSection = ({
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Full Turning Length (S2)</span>
+                    <span className="turning-mobile-field__label">Full Turning Length (S2) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -382,12 +418,12 @@ const TurningSection = ({
                         value={row.fullTurningLength[1] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Full Turning Length (S3)</span>
+                    <span className="turning-mobile-field__label">Full Turning Length (S3) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -395,12 +431,12 @@ const TurningSection = ({
                         value={row.fullTurningLength[2] || ''}
                         onChange={e => updateData(idx, 'fullTurningLength', e.target.value, 2)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turning Dia (S1)</span>
+                    <span className="turning-mobile-field__label">Turning Dia (S1) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -408,12 +444,12 @@ const TurningSection = ({
                         value={row.turningDia[0] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turning Dia (S2)</span>
+                    <span className="turning-mobile-field__label">Turning Dia (S2) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -421,12 +457,12 @@ const TurningSection = ({
                         value={row.turningDia[1] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
                   <div className="turning-mobile-field">
-                    <span className="turning-mobile-field__label">Turning Dia (S3)</span>
+                    <span className="turning-mobile-field__label">Turning Dia (S3) (mm)</span>
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
@@ -434,7 +470,7 @@ const TurningSection = ({
                         value={row.turningDia[2] || ''}
                         onChange={e => updateData(idx, 'turningDia', e.target.value, 2)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
                       />
                     </div>
                   </div>
@@ -456,7 +492,7 @@ const TurningSection = ({
                         type="number"
                         value={row.rejectedQty[0] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'parallel')}
                       />
                     </div>
                   </div>
@@ -467,7 +503,7 @@ const TurningSection = ({
                         type="number"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'full')}
                       />
                     </div>
                   </div>
@@ -478,7 +514,7 @@ const TurningSection = ({
                         type="number"
                         value={row.rejectedQty[2] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'dia')}
                       />
                     </div>
                   </div>

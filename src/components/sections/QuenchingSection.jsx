@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './QuenchingSection.css';
+import { getToleranceStyle } from '../../utils/toleranceValidation';
 
 const QuenchingSection = ({
   data,
@@ -8,7 +9,8 @@ const QuenchingSection = ({
   hourLabels,
   visibleRows,
   showAll,
-  onToggleShowAll
+  onToggleShowAll,
+  productType
 }) => {
   const [expanded] = useState(true);
 
@@ -71,6 +73,26 @@ const QuenchingSection = ({
   // Check if all hours are marked as "No Production"
   const allNoProduction = data.every(row => row.noProduction);
 
+  // Helper to determine if rejection input should be enabled
+  const isRejectionEnabled = (row, field) => {
+    if (row.noProduction || !row.lotNo) return false;
+
+    if (field === 'quenchingTemperature') {
+      // User requested to disable rejection for Quenching Temp
+      return false;
+    }
+
+    // For fields without validation rules
+    if (field === 'quenchingDuration') return false; // Disabled per user request
+    if (field === 'quenchingHardness') return true;  // Enabled per user request
+
+    // For dropdowns (OK/NOT OK)
+    // Fields: boxGauge, flatBearingArea, fallingGauge
+    return row[field]?.some(val => val === 'NOT OK');
+  };
+
+
+
   return (
     <div className="quenching-section">
       <div className="quenching-section__header">
@@ -109,9 +131,9 @@ const QuenchingSection = ({
                     <th className="quenching-th quenching-th--time">Time Range</th>
                     <th className="quenching-th quenching-th--checkbox">No Production</th>
                     <th className="quenching-th quenching-th--lot">Lot No.</th>
-                    <th className="quenching-th quenching-th--temp">Quenching Temp.</th>
+                    <th className="quenching-th quenching-th--temp">Quenching Temp. (°C)</th>
                     <th className="quenching-th quenching-th--duration">Quenching Duration</th>
-                    <th className="quenching-th quenching-th--hardness">Quenching Hardness</th>
+                    <th className="quenching-th quenching-th--hardness">Quenching Hardness (HRC)</th>
                     <th className="quenching-th quenching-th--box-gauge">Box Gauge</th>
                     <th className="quenching-th quenching-th--flat-bearing">Flat Bearing Area</th>
                     <th className="quenching-th quenching-th--falling-gauge">Falling Gauge</th>
@@ -146,10 +168,11 @@ const QuenchingSection = ({
                       <input
                         type="number"
                         className="form-control quenching-input"
-                        placeholder="Float"
+                        placeholder="°C"
                         value={row.quenchingTemperature[0] || ''}
                         onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
+                        style={getToleranceStyle('quenchingTemperature', row.quenchingTemperature[0], productType)}
                       />
                     </td>
                     <td className="quenching-td quenching-td--duration-input">
@@ -215,10 +238,11 @@ const QuenchingSection = ({
                       <input
                         type="number"
                         className="form-control quenching-input"
-                        placeholder="Float"
+                        placeholder="°C"
                         value={row.quenchingTemperature[1] || ''}
                         onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
+                        style={getToleranceStyle('quenchingTemperature', row.quenchingTemperature[1], productType)}
                       />
                     </td>
                     <td className="quenching-td quenching-td--duration-input">
@@ -284,22 +308,22 @@ const QuenchingSection = ({
                       <span className="quenching-rejected-label">Rejected No.</span>
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.quenchingTemperatureRejected || ''} onChange={e => updateData(idx, 'quenchingTemperatureRejected', e.target.value)} disabled />
+                      <input type="number" value={row.quenchingTemperatureRejected || ''} onChange={e => updateData(idx, 'quenchingTemperatureRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingTemperature')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.quenchingDurationRejected || ''} onChange={e => updateData(idx, 'quenchingDurationRejected', e.target.value)} disabled />
+                      <input type="number" value={row.quenchingDurationRejected || ''} onChange={e => updateData(idx, 'quenchingDurationRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingDuration')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.quenchingHardnessRejected || ''} onChange={e => updateData(idx, 'quenchingHardnessRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.quenchingHardnessRejected || ''} onChange={e => updateData(idx, 'quenchingHardnessRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingHardness')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.boxGaugeRejected || ''} onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.boxGaugeRejected || ''} onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'boxGauge')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.flatBearingAreaRejected || ''} onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.flatBearingAreaRejected || ''} onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'flatBearingArea')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.fallingGaugeRejected || ''} onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.fallingGaugeRejected || ''} onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'fallingGauge')} />
                     </td>
                   </tr>
                   {/* Row 4: Remarks */}
@@ -354,14 +378,15 @@ const QuenchingSection = ({
                   {[0, 1].map(sampleIdx => (
                     <div key={sampleIdx}>
                       <div className="quenching-mobile-field">
-                        <span className="quenching-mobile-field__label">Quenching Temp. (S{sampleIdx + 1})</span>
+                        <span className="quenching-mobile-field__label">Quenching Temp. (S{sampleIdx + 1}) (°C)</span>
                         <div className="quenching-mobile-field__value">
                           <input
                             type="number"
-                            placeholder="Float"
+                            placeholder="°C"
                             value={row.quenchingTemperature[sampleIdx] || ''}
                             onChange={e => updateData(idx, 'quenchingTemperature', e.target.value, sampleIdx)}
                             disabled={row.noProduction || !row.lotNo}
+                            style={getToleranceStyle('quenchingTemperature', row.quenchingTemperature[sampleIdx], productType)}
                           />
                         </div>
                       </div>
@@ -378,7 +403,7 @@ const QuenchingSection = ({
                         </div>
                       </div>
                       <div className="quenching-mobile-field">
-                        <span className="quenching-mobile-field__label">Quenching Hardness (S{sampleIdx + 1})</span>
+                        <span className="quenching-mobile-field__label">Quenching Hardness (S{sampleIdx + 1}) (HRC)</span>
                         <div className="quenching-mobile-field__value">
                           <input
                             type="number"

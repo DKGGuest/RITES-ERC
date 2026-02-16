@@ -11,7 +11,8 @@
 .turning-table .no-production td,
 .turning-table .no-production th,
 .turning-mobile-card.no-production {
-  background-color: #f9cf99; /* light orange */
+  background-color: #f9cf99;
+  /* light orange */
 }
 
 .turning-table .no-production td {
@@ -191,6 +192,14 @@
   font-size: 12px;
 }
 
+/* Disabled state for rejected input */
+.turning-input--rejected:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
 /* Remarks row styling */
 .turning-row--remarks {
   background-color: #f5f5f5;
@@ -236,7 +245,8 @@
   /* Keep table visible on mobile with horizontal scroll */
   .turning-table {
     display: table;
-    min-width: 800px; /* Ensure table is wide enough to require scrolling */
+    min-width: 800px;
+    /* Ensure table is wide enough to require scrolling */
   }
 
   /* Hide mobile card layout */

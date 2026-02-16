@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './TestingFinishingSection.css';
+import { getToleranceStyle, checkTolerance } from '../../utils/toleranceValidation';
 
 const TestingFinishingSection = ({
   data,
@@ -8,7 +9,8 @@ const TestingFinishingSection = ({
   hourLabels,
   visibleRows,
   showAll,
-  onToggleShowAll
+  onToggleShowAll,
+  productType
 }) => {
   const [expanded] = useState(true);
 
@@ -61,6 +63,28 @@ const TestingFinishingSection = ({
 
   // Check if all hours are marked as "No Production"
   const allNoProduction = data.every(row => row.noProduction);
+
+  // Helper to determine if rejection input should be enabled
+  const isRejectionEnabled = (row, field) => {
+    if (row.noProduction || !row.lotNo) return false;
+
+    if (field === 'toeLoad') {
+      return row.toeLoad?.some(val => {
+        const { isValid, isApplicable } = checkTolerance('toeLoad', val, productType);
+        return isApplicable && !isValid;
+      });
+    }
+    if (field === 'weight') {
+      return row.weight?.some(val => {
+        const { isValid, isApplicable } = checkTolerance('weight', val, productType);
+        return isApplicable && !isValid;
+      });
+    }
+
+    // For dropdowns (OK/not ok)
+    // Fields: paintIdentification, ercCoating
+    return row[field]?.some(val => val === 'not ok' || val === 'NOT OK');
+  };
 
   return (
     <div className="testing-finishing-section">
@@ -139,6 +163,7 @@ const TestingFinishingSection = ({
                         value={row.toeLoad[0] || ''}
                         onChange={e => updateData(idx, 'toeLoad', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
+                        style={getToleranceStyle('toeLoad', row.toeLoad[0], productType)}
                       />
                     </td>
 
@@ -151,6 +176,7 @@ const TestingFinishingSection = ({
                         value={row.weight[0] || ''}
                         onChange={e => updateData(idx, 'weight', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
+                        style={getToleranceStyle('weight', row.weight[0], productType)}
                       />
                     </td>
 
@@ -191,6 +217,7 @@ const TestingFinishingSection = ({
                         value={row.toeLoad[1] || ''}
                         onChange={e => updateData(idx, 'toeLoad', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
+                        style={getToleranceStyle('toeLoad', row.toeLoad[1], productType)}
                       />
                     </td>
 
@@ -203,6 +230,7 @@ const TestingFinishingSection = ({
                         value={row.weight[1] || ''}
                         onChange={e => updateData(idx, 'weight', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
+                        style={getToleranceStyle('weight', row.weight[1], productType)}
                       />
                     </td>
 
@@ -238,16 +266,16 @@ const TestingFinishingSection = ({
                       <span className="testing-finishing-rejected-label">Rejected No.</span>
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.toeLoadRejected || ''} onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.toeLoadRejected || ''} onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'toeLoad')} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.weightRejected || ''} onChange={e => updateData(idx, 'weightRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.weightRejected || ''} onChange={e => updateData(idx, 'weightRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'weight')} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.paintIdentificationRejected || ''} onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.paintIdentificationRejected || ''} onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'paintIdentification')} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.ercCoatingRejected || ''} onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)} disabled={row.noProduction || !row.lotNo} />
+                      <input type="number" value={row.ercCoatingRejected || ''} onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'ercCoating')} />
                     </td>
                   </tr>
 
@@ -315,6 +343,7 @@ const TestingFinishingSection = ({
                           value={row.toeLoad[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'toeLoad', e.target.value, sampleIdx)}
                           disabled={row.noProduction || !row.lotNo}
+                          style={getToleranceStyle('toeLoad', row.toeLoad[sampleIdx], productType)}
                         />
                       ))}
                     </div>
@@ -332,6 +361,7 @@ const TestingFinishingSection = ({
                           value={row.weight[sampleIdx] || ''}
                           onChange={e => updateData(idx, 'weight', e.target.value, sampleIdx)}
                           disabled={row.noProduction || !row.lotNo}
+                          style={getToleranceStyle('weight', row.weight[sampleIdx], productType)}
                         />
                       ))}
                     </div>
@@ -380,7 +410,7 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.toeLoadRejected || ''}
                         onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'toeLoad')}
                       />
                     </div>
                   </div>
@@ -392,7 +422,7 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.weightRejected || ''}
                         onChange={e => updateData(idx, 'weightRejected', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'weight')}
                       />
                     </div>
                   </div>
@@ -404,7 +434,7 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.paintIdentificationRejected || ''}
                         onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'paintIdentification')}
                       />
                     </div>
                   </div>
@@ -416,7 +446,7 @@ const TestingFinishingSection = ({
                         type="number"
                         value={row.ercCoatingRejected || ''}
                         onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'ercCoating')}
                       />
                     </div>
                   </div>

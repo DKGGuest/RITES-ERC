@@ -20,6 +20,7 @@ import ResumeCallModal from '../components/ResumeCallModal';
 import Modal from '../components/Modal';
 import { scheduleInspection, rescheduleInspection, getScheduleByCallNo, validateScheduleLimit, MAX_CALLS_PER_DAY } from '../services/scheduleService';
 import { clearWorkflowCache } from '../services/workflowService';
+import { checkTolerance } from '../utils/toleranceValidation';
 
 // Reason options for withheld/cancel call
 const WITHHELD_REASONS = [
@@ -696,11 +697,7 @@ const staticDataStyles = `
       width: auto;
     }
   }
-
 `;
-
-
-
 
 const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines: initialProductionLines = [], availableCalls = [] }) => {
   // State for fetched data from backend
@@ -734,7 +731,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     if (!callNoForScoping) return [{ lineNumber: 1, icNumber: '', poNumber: '', rawMaterialICs: '', productType: '' }];
 
     // First check sessionStorage for persisted data
-    const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNoForScoping}`);
+    const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNoForScoping} `);
     if (savedLines) {
       try {
         const parsed = JSON.parse(savedLines);
@@ -764,7 +761,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         callMap.set(call.call_no, {
           call_no: call.call_no,
           po_no: call.po_no,
-          rawMaterialICs: call.rm_heat_tc_mapping?.map(m => m.subPoNumber).filter(Boolean).join(', ') || '',
+          rawMaterialICs: (Array.isArray(call.rm_heat_tc_mapping) ? call.rm_heat_tc_mapping.map(m => m.subPoNumber).filter(Boolean).join(', ') : '') || '',
           productType: call.erc_type || call.product_type || 'ERC Process'
         });
       }
@@ -908,14 +905,14 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   // Persist production lines to sessionStorage whenever they change - scoped to call number
   useEffect(() => {
     if (call?.call_no && localProductionLines && localProductionLines.length > 0) {
-      sessionStorage.setItem(`processProductionLinesData_${call.call_no}`, JSON.stringify(localProductionLines));
+      sessionStorage.setItem(`processProductionLinesData_${call.call_no} `, JSON.stringify(localProductionLines));
     }
   }, [localProductionLines, call?.call_no]);
 
   // Persist additional initiated calls to sessionStorage - scoped to call number
   useEffect(() => {
     if (call?.call_no && additionalInitiatedCalls) {
-      sessionStorage.setItem(`additionalInitiatedCalls_${call.call_no}`, JSON.stringify(additionalInitiatedCalls));
+      sessionStorage.setItem(`additionalInitiatedCalls_${call.call_no} `, JSON.stringify(additionalInitiatedCalls));
     }
   }, [additionalInitiatedCalls, call?.call_no]);
 
@@ -931,7 +928,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const fetchAllProcessCalls = useCallback(async (forceRefresh = false) => {
     try {
       setIsLoadingProcessCalls(true);
-      console.log(`🚀 [Process Dashboard] Fetching all process calls (forceRefresh: ${forceRefresh})...`);
+      console.log(`🚀[Process Dashboard] Fetching all process calls(forceRefresh: ${forceRefresh})...`);
 
       // Get current user info
       const user = getStoredUser();
@@ -1186,7 +1183,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
    * Enforces call-specific uniqueness using the validateLineNumber utility
    */
   const handleLineNumberChange = useCallback((lineIndex, selectedNumber) => {
-    console.log(`🔄 [Line Change] Line ${lineIndex} -> Number ${selectedNumber}`);
+    console.log(`🔄[Line Change] Line ${lineIndex} -> Number ${selectedNumber} `);
 
     // Validate uniqueness per call
     const { isValid, error } = validateLineNumber(localProductionLines, lineIndex, selectedNumber);
@@ -1487,7 +1484,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         const scheduledDateObj = new Date(scheduleDate);
         const desiredDateObj = new Date(selectedCallForSchedule.desired_inspection_date);
         if (scheduledDateObj < desiredDateObj) {
-          showNotification('error', `Scheduled date cannot be before the Desired Inspection Date (${selectedCallForSchedule.desired_inspection_date}).`);
+          showNotification('error', `Scheduled date cannot be before the Desired Inspection Date(${selectedCallForSchedule.desired_inspection_date}).`);
           setIsScheduling(false);
           return;
         }
@@ -1497,7 +1494,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       if (!isReschedule) {
         const validation = await validateScheduleLimit(scheduleDate, 1);
         if (!validation.canSchedule) {
-          showNotification('error', `Maximum ${MAX_CALLS_PER_DAY} calls allowed per day. Currently ${validation.currentCount} scheduled.`);
+          showNotification('error', `Maximum ${MAX_CALLS_PER_DAY} calls allowed per day.Currently ${validation.currentCount} scheduled.`);
           setIsScheduling(false);
           return;
         }
@@ -1550,7 +1547,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     setIsNewCallSaving(true);
     try {
-      console.log(`🔴 ${newCallActionType} call:`, selectedNewCall);
+      console.log(`🔴 ${newCallActionType} call: `, selectedNewCall);
       console.log('Reason:', newCallActionReason);
       console.log('Remarks:', newCallActionRemarks);
 
@@ -1688,7 +1685,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
       // Reset fetch flag if call changes
       if (currentCallRef.current !== callNo) {
-        console.log(`🔄 [Process Dashboard] Call changed from ${currentCallRef.current} to ${callNo} - Resetting fetch flags and clearing state`);
+        console.log(`🔄[Process Dashboard] Call changed from ${currentCallRef.current} to ${callNo} - Resetting fetch flags and clearing state`);
         hasFetchedRef.current = false;
         hasLoadedDraftRef.current = false;
         currentCallRef.current = callNo;
@@ -1700,7 +1697,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         setSelectedLine('Line-1'); // Reset to first line
         setIsLoading(true);
 
-        console.log(`🧹 [Process Dashboard] Cleared state for previous call, ready to fetch data for ${callNo}`);
+        console.log(`🧹[Process Dashboard] Cleared state for previous call, ready to fetch data for ${callNo}`);
       }
 
       // Prevent duplicate API calls (especially in React StrictMode and when navigating back)
@@ -1752,7 +1749,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
         // Restore production lines from sessionStorage if present to preserve user selections
         try {
-          const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNo}`);
+          const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNo} `);
           if (savedLines) {
             const parsed = JSON.parse(savedLines);
             if (parsed && parsed.length > 0) {
@@ -1869,7 +1866,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
         // Restore production lines from sessionStorage if present to preserve user selections
         try {
-          const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNo}`);
+          const savedLines = sessionStorage.getItem(`processProductionLinesData_${callNo} `);
           if (savedLines) {
             const parsed = JSON.parse(savedLines);
             if (parsed && parsed.length > 0) {
@@ -1973,7 +1970,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         return;
       }
 
-      console.log(`🔄 Auto-fetching data for ${linesToFetch.length} production line(s)`);
+      console.log(`🔄 Auto - fetching data for ${linesToFetch.length} production line(s)`);
 
       // Fetch data for all lines that need it (batched parallel fetch)
       try {
@@ -1995,9 +1992,9 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           results.forEach(res => {
             if (res && res.data) {
               newCacheUpdates[res.callNo] = res.data;
-              console.log(`✅ API Response for ${res.callNo}:`, res.data);
+              console.log(`✅ API Response for ${res.callNo}: `, res.data);
             } else {
-              console.warn(`⚠️ Failed to fetch data for ${res.callNo}:`, res.err || 'unknown error');
+              console.warn(`⚠️ Failed to fetch data for ${res.callNo}: `, res.err || 'unknown error');
             }
           });
 
@@ -2012,6 +2009,9 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           linesToFetch.forEach(({ index, callNo }) => {
             const data = callInitiationDataCache[callNo] || newCacheUpdates[callNo] || null;
             if (data) {
+              // Guard against line being removed while fetch was pending
+              if (!updated[index]) return;
+
               if (!updated[index].rawMaterialICs || !updated[index].productType) {
                 updated[index] = {
                   ...updated[index],
@@ -2019,7 +2019,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   productType: data.typeOfErc || '',
                   poNumber: data.poNo || updated[index].poNumber
                 };
-                console.log(`✅ Updated line ${index + 1}:`, updated[index]);
+                console.log(`✅ Updated line ${index + 1}: `, updated[index]);
               }
             }
           });
@@ -2043,7 +2043,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const [selectedLine, setSelectedLine] = useState(() => {
     const callNoForScoping = call?.call_no;
     if (!callNoForScoping) return 'Line-1';
-    return sessionStorage.getItem(`processSelectedLineTab_${callNoForScoping}`) || 'Line-1';
+    return sessionStorage.getItem(`processSelectedLineTab_${callNoForScoping} `) || 'Line-1';
   });
 
   // Track selected lot number for each production line (line-specific)
@@ -2052,7 +2052,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const [selectedLotByLine, setSelectedLotByLine] = useState(() => {
     const callNoForScoping = call?.call_no;
     if (!callNoForScoping) return {};
-    const saved = sessionStorage.getItem(`processSelectedLotByLine_${callNoForScoping}`);
+    const saved = sessionStorage.getItem(`processSelectedLotByLine_${callNoForScoping} `);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -2080,21 +2080,21 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
   // Debug logging for lot selection
   useEffect(() => {
-    console.log(`📋 [Lot Display] Current line: ${selectedLine}, Selected lot: ${selectedLotForDisplay}`);
-    console.log(`📋 [Lot Display] All lot selections:`, selectedLotByLine);
+    console.log(`📋[Lot Display] Current line: ${selectedLine}, Selected lot: ${selectedLotForDisplay} `);
+    console.log(`📋[Lot Display] All lot selections: `, selectedLotByLine);
   }, [selectedLine, selectedLotForDisplay, selectedLotByLine]);
 
   // Persist selected line tab - scoped to call number
   useEffect(() => {
     if (call?.call_no) {
-      sessionStorage.setItem(`processSelectedLineTab_${call.call_no}`, selectedLine);
+      sessionStorage.setItem(`processSelectedLineTab_${call.call_no} `, selectedLine);
     }
   }, [selectedLine, call?.call_no]);
 
   // Persist selected lot by line - scoped to call number
   useEffect(() => {
     if (call?.call_no && Object.keys(selectedLotByLine).length > 0) {
-      sessionStorage.setItem(`processSelectedLotByLine_${call.call_no}`, JSON.stringify(selectedLotByLine));
+      sessionStorage.setItem(`processSelectedLotByLine_${call.call_no} `, JSON.stringify(selectedLotByLine));
     }
   }, [selectedLotByLine, call?.call_no]);
 
@@ -2163,13 +2163,13 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       // If no stored selection for this line, or stored selection is no longer present,
       // auto-select the first available lot
       if (!currentStored || (currentStored && !allLots.includes(currentStored))) {
-        console.log(`📋 [Auto-Select] Setting selected lot for ${selectedLine} to:`, allLots[0]);
+        console.log(`📋[Auto - Select] Setting selected lot for ${selectedLine} to: `, allLots[0]);
         setSelectedLotByLine(prev => ({
           ...prev,
           [selectedLine]: allLots[0]
         }));
       } else {
-        console.log(`📋 [Auto-Select] Existing selected lot for ${selectedLine} is valid:`, currentStored);
+        console.log(`📋[Auto - Select] Existing selected lot for ${selectedLine} is valid: `, currentStored);
       }
     }
   }, [selectedLine, localProductionLines, selectedLotByLine, call?.call_no]);
@@ -2183,7 +2183,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const [finalInspectionRemarks, setFinalInspectionRemarks] = useState(() => {
     const callNoForScoping = call?.call_no;
     if (!callNoForScoping) return '';
-    return sessionStorage.getItem(`processFinalInspectionRemarks_${callNoForScoping}`) || '';
+    return sessionStorage.getItem(`processFinalInspectionRemarks_${callNoForScoping} `) || '';
   });
   // App-level notification state
   const [notification, setNotification] = useState({ type: '', message: '', autoClose: true });
@@ -2280,7 +2280,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     // Detect call number change (new inspection started)
     if (call?.call_no && currentCallRef.current !== call.call_no) {
-      console.log(`🔄 Call number changed: ${currentCallRef.current} → ${call.call_no}`);
+      console.log(`🔄 Call number changed: ${currentCallRef.current} → ${call.call_no} `);
 
       // Reset production lines state for new inspection
       resetProductionLinesState();
@@ -2293,7 +2293,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   // Persist final inspection remarks - scoped to call number
   useEffect(() => {
     if (call?.call_no) {
-      sessionStorage.setItem(`processFinalInspectionRemarks_${call.call_no}`, finalInspectionRemarks);
+      sessionStorage.setItem(`processFinalInspectionRemarks_${call.call_no} `, finalInspectionRemarks);
     }
   }, [finalInspectionRemarks, call?.call_no]);
 
@@ -2307,7 +2307,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   // Derive manufacturing lines from production lines table (moved up for use in callbacks)
   const manufacturingLines = useMemo(() => {
     return localProductionLines.length > 0
-      ? localProductionLines.map((_, idx) => `Line-${idx + 1}`)
+      ? localProductionLines.map((_, idx) => `Line - ${idx + 1} `)
       : ['Line-1'];
   }, [localProductionLines]);
 
@@ -2339,11 +2339,11 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       };
 
       // Save to localStorage with inspection call number as key
-      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo}`;
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo} `;
       localStorage.setItem(storageKey, JSON.stringify(draftData));
 
       // Show success message
-      setDraftSaveMessage({ type: 'success', text: `Draft saved successfully at ${new Date().toLocaleTimeString()}` });
+      setDraftSaveMessage({ type: 'success', text: `Draft saved successfully at ${new Date().toLocaleTimeString()} ` });
 
       // Clear message after 3 seconds
       draftMessageTimeoutRef.current = setTimeout(() => {
@@ -2352,7 +2352,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     } catch (error) {
       console.error('Error saving draft:', error);
-      setDraftSaveMessage({ type: 'error', text: `Failed to save draft: ${error.message}` });
+      setDraftSaveMessage({ type: 'error', text: `Failed to save draft: ${error.message} ` });
 
       // Clear error message after 5 seconds
       draftMessageTimeoutRef.current = setTimeout(() => {
@@ -2369,7 +2369,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     if (!inspectionCallNo) return;
 
     try {
-      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo}`;
+      const storageKey = `${DASHBOARD_DRAFT_KEY}${inspectionCallNo} `;
       const savedDraft = localStorage.getItem(storageKey);
 
       if (savedDraft) {
@@ -2435,7 +2435,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     manufacturingLines.forEach((line, lineIdx) => {
       const prodLine = localProductionLines[lineIdx];
       if (!prodLine || !prodLine.icNumber) {
-        console.warn(`⚠️ [Group Lines] No IC number for ${line}`);
+        console.warn(`⚠️[Group Lines] No IC number for ${line}`);
         return;
       }
 
@@ -2617,7 +2617,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     try {
       const allMfgQty = {};
       localProductionLines.forEach((prodLine, lineIndex) => {
-        const lineNo = `Line-${lineIndex + 1}`;
+        const lineNo = `Line - ${lineIndex + 1} `;
         const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
         const inspectionCallNo = call?.call_no || '';
 
@@ -2647,7 +2647,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
               if (lineFinalResult.temperingManufactured) mfgData.tempering = String(lineFinalResult.temperingManufactured);
 
               allMfgQty[lineNo][lotNo] = mfgData;
-              console.log(`📋 [Load] Loaded manufactured quantities for ${lineNo}, Lot ${lotNo}:`, allMfgQty[lineNo][lotNo]);
+              console.log(`📋[Load] Loaded manufactured quantities for ${lineNo}, Lot ${lotNo}: `, allMfgQty[lineNo][lotNo]);
             }
           });
         }
@@ -2778,7 +2778,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     // If user enters a value less than rejected, show alert and clear the field
     if (value !== '' && numValue < numRejected) {
-      showNotification('error', `Manufactured quantity (${numValue}) cannot be less than rejected quantity (${numRejected})`);
+      showNotification('error', `Manufactured quantity(${numValue}) cannot be less than rejected quantity(${numRejected})`);
       setManufacturedQtyByLine(prev => ({
         ...prev,
         [selectedLine]: {
@@ -2826,7 +2826,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       const lineIcNumber = prodLine.icNumber || '';
       const inspectionCallNo = lineIcNumber || call?.call_no || '';
 
-      console.log(`📋 [All Selected Lots] Getting all lots for: ${targetLine}`, { poNo, inspectionCallNo, lineIcNumber });
+      console.log(`📋[All Selected Lots] Getting all lots for: ${targetLine} `, { poNo, inspectionCallNo, lineIcNumber });
       // Get all process data from localStorage
       const allData = getAllProcessData(inspectionCallNo, poNo, targetLine);
 
@@ -2852,7 +2852,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           const initData = callInitiationDataCache[lineIcNumber] || null;
           const initLots = initData?.lotDetailsList ? initData.lotDetailsList.map(l => l.lotNumber) : [];
           if (initLots && initLots.length > 0) {
-            console.log(`ℹ️ [All Selected Lots] Falling back to initiation data lots for ${targetLine}:`, initLots);
+            console.log(`ℹ️[All Selected Lots] Falling back to initiation data lots for ${targetLine}: `, initLots);
             allLots = initLots.map(l => l.trim()).sort();
           }
         } catch (e) {
@@ -2860,7 +2860,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
         }
       }
 
-      console.log(`✅ [All Selected Lots] All unique lots found for ${targetLine}:`, allLots);
+      console.log(`✅[All Selected Lots] All unique lots found for ${targetLine}: `, allLots);
       return allLots;
     } catch (error) {
       return [];
@@ -2872,7 +2872,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const calculateRejectedForSpecificLot = useCallback((submoduleName, specificLot, lineNo, rejectedField = null) => {
     // Check if production lines are initialized
     if (!localProductionLines || localProductionLines.length === 0) {
-      console.log(`📊 [Rejected Calc] Production lines not initialized yet for ${submoduleName}`);
+      console.log(`📊[Rejected Calc] Production lines not initialized yet for ${submoduleName}`);
       return 0;
     }
 
@@ -2883,7 +2883,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     // Ensure we have valid production line data
     if (!prodLine || !prodLine.icNumber) {
-      console.log(`📊 [Rejected Calc] No production line data for ${targetLine}`);
+      console.log(`📊[Rejected Calc] No production line data for ${targetLine}`);
       return 0;
     }
 
@@ -2940,7 +2940,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     }
 
     if (totalRejected > 0) {
-      console.log(`✅ [Rejected Calc] ${submoduleName} | Lot: ${specificLot} | Line: ${targetLine} | Rejections: ${totalRejected}`);
+      console.log(`✅[Rejected Calc] ${submoduleName} | Lot: ${specificLot} | Line: ${targetLine} | Rejections: ${totalRejected} `);
     }
     return totalRejected;
   }, [call?.call_no, selectedLine, localProductionLines, getAllSelectedLotsForCurrentLine]);
@@ -3001,7 +3001,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       selectedLot = getSelectedLotForCurrentLine();
     }
 
-    console.log(`📋 [${submoduleName}] Calculating rejected for selected lot:`, selectedLot);
+    console.log(`📋[${submoduleName}] Calculating rejected for selected lot: `, selectedLot);
 
 
     const totalRejected = calculateRejectedForSpecificLot(submoduleName, selectedLot, selectedLine, rejectedField);
@@ -3015,7 +3015,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const calculateFinalCheckRejected = useCallback((checkType, lineNo = null) => {
     // Check if production lines are initialized
     if (!localProductionLines || localProductionLines.length === 0) {
-      console.log(`📊 [Final Check] Production lines not initialized yet for ${checkType}`);
+      console.log(`📊[Final Check] Production lines not initialized yet for ${checkType}`);
       return 0;
     }
 
@@ -3025,7 +3025,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     // Ensure we have valid production line data
     if (!prodLine || !prodLine.icNumber) {
-      console.log(`📊 [Final Check] No production line data for ${targetLine}`);
+      console.log(`📊[Final Check] No production line data for ${targetLine}`);
       return 0;
     }
 
@@ -3045,7 +3045,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     if (!selectedLot) {
       selectedLot = getSelectedLotForCurrentLine();
     }
-    console.log(`📋 [Final Check] Calculating ${checkType} rejected for selected lot:`, selectedLot);
+    console.log(`📋[Final Check] Calculating ${checkType} rejected for selected lot: `, selectedLot);
 
     const finalCheckData = allData.finalCheckData;
     let totalRejected = 0;
@@ -3089,7 +3089,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
   const getTotalRejectedForLot = useCallback((lotNo, lineNo = null) => {
     // Check if production lines are initialized
     if (!localProductionLines || localProductionLines.length === 0) {
-      console.log(`📦 [Lot Wise] Production lines not initialized yet for lot ${lotNo}`);
+      console.log(`📦[Lot Wise] Production lines not initialized yet for lot ${lotNo}`);
       return 0;
     }
 
@@ -3099,7 +3099,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
     // Ensure we have valid production line data
     if (!prodLine || !prodLine.icNumber) {
-      console.log(`📦 [Lot Wise] No production line data for ${targetLine}`);
+      console.log(`📦[Lot Wise] No production line data for ${targetLine}`);
       return 0;
     }
 
@@ -3108,7 +3108,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     const lineIcNumber = prodLine.icNumber || '';
     const inspectionCallNo = lineIcNumber || call?.call_no || '';
 
-    console.log(`📦 [Lot Wise] Loading lineFinalResult for lot ${lotNo}, IC: ${inspectionCallNo}, PO: ${poNo}, Line: ${targetLine}`);
+    console.log(`📦[Lot Wise] Loading lineFinalResult for lot ${lotNo}, IC: ${inspectionCallNo}, PO: ${poNo}, Line: ${targetLine} `);
 
 
     // Fallback: compute rejected totals directly
@@ -3129,10 +3129,10 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       fallbackTotal += calculateFinalCheckRejected('dimensions', targetLine);
       fallbackTotal += calculateFinalCheckRejected('hardness', targetLine);
 
-      console.log(`📦 [Lot Wise] Fallback total rejected for ${lotNo} on ${targetLine}:`, fallbackTotal);
+      console.log(`📦[Lot Wise] Fallback total rejected for ${lotNo} on ${targetLine}: `, fallbackTotal);
       return fallbackTotal;
     } catch (e) {
-      console.warn(`📦 [Lot Wise] Fallback rejected calc failed for ${lotNo}:`, e);
+      console.warn(`📦[Lot Wise] Fallback rejected calc failed for ${lotNo}: `, e);
       return 0;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3144,7 +3144,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
   // Calculate rejected quantities for each section
   const rejectedQty = useMemo(() => {
-    console.log(`📊 [Rejected Qty] Computing for line: ${selectedLine}, lot: ${selectedLotForDisplay || getSelectedLotForCurrentLine()}`);
+    console.log(`📊[Rejected Qty] Computing for line: ${selectedLine}, lot: ${selectedLotForDisplay || getSelectedLotForCurrentLine()} `);
 
 
     const visualCheckRejected = calculateFinalCheckRejected('visual'); // Surface Defect + Embossing Defect + Marking
@@ -3235,7 +3235,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
    
       // Iterate through all production lines
       localProductionLines.forEach((prodLine, lineIndex) => {
-        const lineNo = `Line-${lineIndex + 1}`;
+        const lineNo = `Line - ${ lineIndex + 1 } `;
         const poNo = prodLine.poNumber || prodLine.po_no || call?.po_no || '';
         const inspectionCallNo = call?.call_no || '';
    
@@ -3263,36 +3263,36 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           const lineMfgQtyByLot = (manufacturedQtyByLine[lineNo] && manufacturedQtyByLine[lineNo][lot]) || {};
           const lotManufactured = parseInt(lineMfgQtyByLot.shearing) || 0;
    
-          console.log(`📦 [Final Results] Line ${lineIndex + 1}, Lot ${lot}: lineMfgQtyByLot=`, lineMfgQtyByLot, 'Shearing Manufactured=`, lotManufactured);
-   
-          // Calculate rejected for this lot from all modules (shearing, turning, mpi, forging, quenching, tempering)
-          // Use the helper function to properly filter by lot
-          let lotRejected = 0;
-          const modules = ['shearingData', 'turningData', 'mpiData', 'forgingData', 'quenchingData', 'temperingData'];
-          modules.forEach((moduleName) => {
-            lotRejected += calculateRejectedForSpecificLot(moduleName, lot, lineNo);
-          });
-   
-          // Calculate accepted for this lot (Manufactured - Total Rejected from all stages)
-          const lotAccepted = Math.max(0, lotManufactured - lotRejected);
-   
-          totalManufactured += lotManufactured;
-          totalAccepted += lotAccepted;
-   
-          console.log(`📦 [Final Results] Line ${lineIndex + 1}, Lot ${lot}: Manufactured=${lotManufactured}, Rejected=${lotRejected}, Accepted=${lotAccepted}`);
+          console.log(`📦[Final Results] Line ${ lineIndex + 1 }, Lot ${ lot }: lineMfgQtyByLot = `, lineMfgQtyByLot, 'Shearing Manufactured=`, lotManufactured);
+
+// Calculate rejected for this lot from all modules (shearing, turning, mpi, forging, quenching, tempering)
+// Use the helper function to properly filter by lot
+let lotRejected = 0;
+const modules = ['shearingData', 'turningData', 'mpiData', 'forgingData', 'quenchingData', 'temperingData'];
+modules.forEach((moduleName) => {
+  lotRejected += calculateRejectedForSpecificLot(moduleName, lot, lineNo);
+});
+
+// Calculate accepted for this lot (Manufactured - Total Rejected from all stages)
+const lotAccepted = Math.max(0, lotManufactured - lotRejected);
+
+totalManufactured += lotManufactured;
+totalAccepted += lotAccepted;
+
+console.log(`📦 [Final Results] Line ${lineIndex + 1}, Lot ${lot}: Manufactured=${lotManufactured}, Rejected=${lotRejected}, Accepted=${lotAccepted}`);
         });
       });
-   
-      console.log(`📊 [Final Results] TOTAL: Manufactured=${totalManufactured}, Accepted=${totalAccepted}`);
-   
-      return {
-        processManufactured: totalManufactured,
-        processInspectionAccepted: totalAccepted
-      };
+
+console.log(`📊 [Final Results] TOTAL: Manufactured=${totalManufactured}, Accepted=${totalAccepted}`);
+
+return {
+  processManufactured: totalManufactured,
+  processInspectionAccepted: totalAccepted
+};
     } catch (error) {
-      console.error('❌ [Final Results] Error:', error);
-      return { processManufactured: 0, processInspectionAccepted: 0 };
-    }
+  console.error('❌ [Final Results] Error:', error);
+  return { processManufactured: 0, processInspectionAccepted: 0 };
+}
   }, [localProductionLines, call?.call_no, call?.po_no, manufacturedQtyByLine, calculateRejectedForSpecificLot]);
   */
 
@@ -3888,25 +3888,50 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           return fieldList.some(f => !isEmpty(hourData[f]));
         };
 
+        const validateTolerance = (fieldMap) => {
+          Object.entries(fieldMap).forEach(([ruleName, fieldKeys]) => {
+            const keys = Array.isArray(fieldKeys) ? fieldKeys : [fieldKeys];
+            keys.forEach(key => {
+              if (!isEmpty(hourData[key])) {
+                const { isValid, isApplicable } = checkTolerance(ruleName, hourData[key], productType);
+                if (isApplicable && !isValid) {
+                  missingFields.push(`${key} out of tolerance`);
+                }
+              }
+            });
+          });
+        };
+
         // Define required fields per module
         if (moduleName === 'shearingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['qualityDia', 'qualityDia1'])) missingFields.push('Quality Dia');
           if (!check(['lengthCutBar', 'lengthCutBar1'])) missingFields.push('Length Cut Bar');
-          if (!check(['rejectedQty', 'rejectedQty1'])) missingFields.push('Rejected Qty');
+          else validateTolerance({ lengthCutBar: ['lengthCutBar', 'lengthCutBar1'] });
+
+          if (!check(['qualityDia', 'qualityDia1'])) missingFields.push('Quality Dia');
+          // Removed invalid tolerance check for Quality Dia (it's a dropdown)
+          // Removed mandatory Rejected Qty check as strict validation blocks disabled inputs
+
         } else if (moduleName === 'turningData') {
           if (!check('lotNo')) missingFields.push('Lot No');
           if (!check(['turningDia', 'dia', 'dia1'])) missingFields.push('Turning Dia');
+          else validateTolerance({ turningDia: ['turningDia', 'dia', 'dia1'] });
+
           if (!check(['turningLength', 'parallelLength', 'straightLength', 'straightLength1'])) missingFields.push('Turning Length');
+          else validateTolerance({ parallelLength: ['turningLength', 'parallelLength', 'straightLength', 'straightLength1'] });
+
           if (!check(['fullTurningLength', 'taperLength', 'taperLength1'])) missingFields.push('Full Turning Length');
-          if (!check(['rejectedQty', 'rejectedQty1'])) missingFields.push('Rejected Qty');
+          else validateTolerance({ fullLength: ['fullTurningLength', 'taperLength', 'taperLength1'] });
+          // Removed mandatory Rejected Qty check
+
         } else if (moduleName === 'mpiData') {
           if (!check('lotNo')) missingFields.push('Lot No');
           if (!check(['mpiTestingResult', 'testResults', 'testResult1'])) missingFields.push('MPI Result');
-          if (!check(['rejectedQty', 'rejectedQty1'])) missingFields.push('Rejected Qty');
+          // Removed mandatory Rejected Qty check
         } else if (moduleName === 'forgingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
           if (!check(['forgingTemperature', 'forgingTemp1'])) missingFields.push('Forging Temp');
+          else validateTolerance({ forgingTemperature: ['forgingTemperature', 'forgingTemp1'] });
           if (!check(['forgingStabilisation', 'forgingStabilisationRejection1'])) missingFields.push('Stabilisation');
           if (!check(['improperForging', 'improperForging1'])) missingFields.push('Improper Forging');
           if (!check(['forgingDefect', 'forgingDefect1'])) missingFields.push('Forging Defect');
@@ -3917,9 +3942,11 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           if (!check(['boxGauge', 'boxGauge1'])) missingFields.push('Box Gauge');
           if (!check(['flatBearingArea', 'flatBearingArea1'])) missingFields.push('Flat Bearing Area');
           if (!check(['fallingGauge', 'fallingGauge1'])) missingFields.push('Falling Gauge');
+          validateTolerance({ quenchingTemperature: ['quenchingTemperature', 'quenchingTemp1', 'bathTemp', 'oilTemp'] });
         } else if (moduleName === 'temperingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
           if (!check(['temperingTemperature', 'temperingTemperature1'])) missingFields.push('Tempering Temp');
+          else validateTolerance({ temperingTemperature: ['temperingTemperature', 'temperingTemperature1'] });
           if (!check(['temperingDuration', 'temperingDuration1'])) missingFields.push('Tempering Duration');
         } else if (moduleName === 'finalCheckData') {
           if (!check('lotNo')) missingFields.push('Lot No');
@@ -3930,10 +3957,14 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
           if (!check(['flatBearingArea', 'flatBearingArea1'])) missingFields.push('Flat Bearing Area');
           if (!check(['fallingGauge', 'fallingGauge1'])) missingFields.push('Falling Gauge');
           if (!check(['temperingHardness', 'temperingHardness1'])) missingFields.push('Tempering Hardness');
+          else validateTolerance({ temperingHardness: ['temperingHardness', 'temperingHardness1'] });
         } else if (moduleName === 'testingFinishingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
           if (!check(['toeLoad', 'toeLoad1'])) missingFields.push('Toe Load');
+          else validateTolerance({ toeLoad: ['toeLoad', 'toeLoad1'] });
+
           if (!check(['weight', 'weight1'])) missingFields.push('Weight');
+          else validateTolerance({ weight: ['weight', 'weight1'] });
           if (!check(['paintIdentification', 'paintIdentification1'])) missingFields.push('Paint ID');
           if (!check(['ercCoating', 'ercCoating1'])) missingFields.push('ERC Coating');
         }
@@ -4110,7 +4141,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       const linesData = [];
       // Initial save logic: gather data for all relevant lines
       // We process ALL lines that have an IC number or PO number
-      const linesToSave = localProductionLines.filter(line => line.icNumber || line.poNumber);
+      const linesToSave = localProductionLines.filter(line => line && (line.icNumber || line.poNumber));
 
       for (const line of linesToSave) {
         // Use the line's specific IC number if available, otherwise fall back to main call number
@@ -4244,6 +4275,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       // Iterate through all production lines to collect lot-wise data
       for (let lineIndex = 0; lineIndex < localProductionLines.length; lineIndex++) {
         const prodLine = localProductionLines[lineIndex];
+        if (!prodLine) continue; // Skip if line is undefined
+
         const lineNo = `Line-${lineIndex + 1}`;
         const callNo = prodLine.icNumber;
         const poNo = prodLine.poNumber || prodLine.po_no || '';
@@ -4446,6 +4479,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
       if (!selectedCalls || selectedCalls.length === 0) {
         // If no calls selected explicitly, try to use all available
         const allCalls = localProductionLines
+          .filter(l => l)
           .map(l => l.icNumber)
           .filter(Boolean);
 
@@ -4459,7 +4493,7 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
 
       const linesData = [];
       const linesToProcess = localProductionLines.filter(line =>
-        (line.icNumber || line.poNumber) && selectedCalls.includes(line.icNumber)
+        line && (line.icNumber || line.poNumber) && selectedCalls.includes(line.icNumber)
       );
 
       for (const line of linesToProcess) {
@@ -4608,8 +4642,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     // STEP 1: Validate 8-hour grid data for selected calls only
     console.log('🔍 [Finish] Starting validation for selected calls...');
 
-    // Filter production lines to only those with selected call numbers
-    const linesToValidate = localProductionLines.filter((prodLine) => {
+    // Filter production lines to only those with selected call numbers (and are valid objects)
+    const linesToValidate = localProductionLines.filter(l => l && typeof l === 'object').filter((prodLine) => {
       const callNo = prodLine.icNumber;
       return selectedCallsToFinish.includes(callNo);
     });
@@ -4836,6 +4870,8 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
     }
   }, [selectedCallsToFinish, executeFinishInspection, localProductionLines, call, callInitiationDataCache, manufacturedQtyByLine, allCallOptions, validateAllLots, rejectedQty.totalRejected]);
 
+
+
   // Use current line's PO data from cached initiation data (live from backend)
   // Priority: 1) currentLineInitiationData, 2) fetchedPoData, 3) currentCallData
   // Extract manufacturer from rmIcHeatInfoList (first entry) - same as Raw Material Dashboard
@@ -4975,100 +5011,103 @@ const ProcessDashboard = ({ call, onBack, onNavigateToSubModule, productionLines
                   </tr>
                 </thead>
                 <tbody>
-                  {localProductionLines.map((line, idx) => (
-                    <tr key={idx}>
-                      <td data-label="Line Number">
-                        <select
-                          className="form-input"
-                          value={line.lineNumber || ''}
-                          onChange={(e) => handleLineNumberChange(idx, parseInt(e.target.value))}
-                          disabled={!line.icNumber}
-                          style={{
-                            width: '100px',
-                            backgroundColor: !line.icNumber ? '#f3f4f6' : '#white',
-                            borderColor: lineNumberErrors[idx] ? '#dc2626' : '#d1d5db',
-                            fontWeight: '500'
-                          }}
-                        >
-                          <option value="" disabled>Select</option>
-                          {[1, 2, 3, 4, 5].map(num => (
-                            <option key={num} value={num}>{num}</option>
-                          ))}
-                        </select>
-                        {lineNumberErrors[idx] && (
-                          <div style={{ color: '#dc2626', fontSize: '10px', marginTop: '4px', maxWidth: '100px', lineHeight: '1.2' }}>
-                            {lineNumberErrors[idx]}
-                          </div>
-                        )}
-                      </td>
-                      <td data-label="Inspection Call Number">
-                        <select
-                          className="form-input"
-                          value={line.icNumber || ''}
-                          onChange={(e) => handleCallNumberChange(idx, e.target.value)}
-                          style={{
-                            minWidth: '180px',
-                            backgroundColor: '#fff',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            padding: '8px 12px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="">Select Call Number</option>
-                          {allCallOptions.map((opt, optIdx) => (
-                            <option key={optIdx} value={opt.call_no}>{opt.call_no}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td data-label="PO Number">
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={line.poNumber || ''}
-                          readOnly
-                          disabled
-                          style={{ minWidth: '120px', backgroundColor: '#f3f4f6' }}
-                        />
-                      </td>
-                      <td data-label="Raw Material IC">
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={line.rawMaterialICs || '-'}
-                          readOnly
-                          disabled
-                          style={{ minWidth: '150px', backgroundColor: '#f3f4f6' }}
-                        />
-                      </td>
-                      <td data-label="Product Type">
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={line.productType || ''}
-                          readOnly
-                          disabled
-                          style={{ minWidth: '100px', backgroundColor: '#f3f4f6' }}
-                        />
-                      </td>
-                      <td data-label="Actions">
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => handleRemoveProductionLine(idx)}
-                          style={{
-                            padding: '6px 16px',
-                            fontSize: '13px',
-                            color: '#dc2626',
-                            borderColor: '#dc2626',
-                            backgroundColor: '#fff'
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {localProductionLines.map((line, idx) => {
+                    if (!line || typeof line !== 'object') return null;
+                    return (
+                      <tr key={idx}>
+                        <td data-label="Line Number">
+                          <select
+                            className="form-input"
+                            value={line.lineNumber || ''}
+                            onChange={(e) => handleLineNumberChange(idx, parseInt(e.target.value))}
+                            disabled={!line.icNumber}
+                            style={{
+                              width: '100px',
+                              backgroundColor: !line.icNumber ? '#f3f4f6' : '#white',
+                              borderColor: lineNumberErrors[idx] ? '#dc2626' : '#d1d5db',
+                              fontWeight: '500'
+                            }}
+                          >
+                            <option value="" disabled>Select</option>
+                            {[1, 2, 3, 4, 5].map(num => (
+                              <option key={num} value={num}>{num}</option>
+                            ))}
+                          </select>
+                          {lineNumberErrors[idx] && (
+                            <div style={{ color: '#dc2626', fontSize: '10px', marginTop: '4px', maxWidth: '100px', lineHeight: '1.2' }}>
+                              {lineNumberErrors[idx]}
+                            </div>
+                          )}
+                        </td>
+                        <td data-label="Inspection Call Number">
+                          <select
+                            className="form-input"
+                            value={line.icNumber || ''}
+                            onChange={(e) => handleCallNumberChange(idx, e.target.value)}
+                            style={{
+                              minWidth: '180px',
+                              backgroundColor: '#fff',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              padding: '8px 12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="">Select Call Number</option>
+                            {allCallOptions.map((opt, optIdx) => (
+                              <option key={optIdx} value={opt.call_no}>{opt.call_no}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td data-label="PO Number">
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={line.poNumber || ''}
+                            readOnly
+                            disabled
+                            style={{ minWidth: '120px', backgroundColor: '#f3f4f6' }}
+                          />
+                        </td>
+                        <td data-label="Raw Material IC">
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={line.rawMaterialICs || '-'}
+                            readOnly
+                            disabled
+                            style={{ minWidth: '150px', backgroundColor: '#f3f4f6' }}
+                          />
+                        </td>
+                        <td data-label="Product Type">
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={line.productType || ''}
+                            readOnly
+                            disabled
+                            style={{ minWidth: '100px', backgroundColor: '#f3f4f6' }}
+                          />
+                        </td>
+                        <td data-label="Actions">
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={() => handleRemoveProductionLine(idx)}
+                            style={{
+                              padding: '6px 16px',
+                              fontSize: '13px',
+                              color: '#dc2626',
+                              borderColor: '#dc2626',
+                              backgroundColor: '#fff'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

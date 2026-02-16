@@ -59,6 +59,13 @@ const MpiSection = ({
     onDataChange(newData);
   };
 
+  // Helper to determine if rejection input should be enabled
+  const isRejectionEnabled = (row) => {
+    if (row.noProduction || !row.lotNo) return false;
+    // Enable if any test result is 'NOT OK'
+    return row.testResults?.some(val => val === 'NOT OK');
+  };
+
   // Check if all hours are marked as "No Production"
   const allNoProduction = data.every(row => row.noProduction);
 
@@ -182,7 +189,7 @@ const MpiSection = ({
                         className="form-control mpi-input mpi-input--rejected"
                         value={row.rejectedQty || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row)}
                       />
                     </td>
                   </tr>
@@ -269,7 +276,7 @@ const MpiSection = ({
                         type="number"
                         value={row.rejectedQty || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row)}
                       />
                     </div>
                   </div>

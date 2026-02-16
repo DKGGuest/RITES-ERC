@@ -71,20 +71,9 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
     return null;
   }, [currentProductionLine, callInitiationDataCache]);
 
-  // Determine if Turning Section should be hidden (for ERC Mk-III)
-  const shouldHideTurningSection = useMemo(() => {
-    // Debug: Log all available data sources
-    console.log('🔍 [Turning Section Debug] All data sources:', {
-      currentCallData,
-      currentLineInitiationData,
-      call,
-      currentProductionLine,
-      productionLines
-    });
-
-    // Try multiple field names where ERC type might be stored
-    // Priority order: production line data > call data > initiation data > call prop
-    const ercType = currentProductionLine?.productType ||
+  // Determine product type for tolerance validation and turning section visibility
+  const productType = useMemo(() => {
+    const type = currentProductionLine?.productType ||
       currentCallData?.productType ||
       currentCallData?.ercType ||
       currentLineInitiationData?.typeOfErc ||
@@ -94,20 +83,23 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       call?.product_type ||
       '';
 
-    const ercTypeLower = String(ercType).toLowerCase().trim();
-    console.log('🔍 [Turning Section] ERC Type found:', ercType, '| Normalized:', ercTypeLower);
+    console.log('🔍 [Grid Page] Resolved productType:', type);
+    return type;
+  }, [currentProductionLine, currentCallData, currentLineInitiationData, call]);
+
+  // Determine if Turning Section should be hidden (for ERC Mk-III)
+  const shouldHideTurningSection = useMemo(() => {
+    const ercTypeLower = String(productType).toLowerCase().trim();
 
     // Hide turning section ONLY for Mk-III (exact match, case-insensitive)
-    // Match patterns: "mk-iii", "mk-3", "mkiii", "mk3" (but NOT "mk-v" or other variants)
     const isMkIII = ercTypeLower === 'mk-iii' ||
       ercTypeLower === 'mk-3' ||
       ercTypeLower === 'mkiii' ||
       ercTypeLower === 'mk3';
 
     console.log('🔍 [Turning Section] Should hide turning section:', isMkIII);
-    console.log('🔍 [Turning Section] Rendering TurningSection:', !isMkIII);
     return isMkIII;
-  }, [currentCallData, currentLineInitiationData, call, currentProductionLine, productionLines]);
+  }, [productType]);
 
   // Get lot numbers for active line - ONLY use cached initiation data (same source as Pre-Inspection)
   const availableLotNumbers = useMemo(() => {
@@ -1149,6 +1141,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         visibleRows={visibleRows}
         showAll={showAllShearing}
         onToggleShowAll={() => setShowAllShearing(v => !v)}
+        productType={productType}
       />
 
       {/* Debug indicator for turning section visibility */}
@@ -1168,6 +1161,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
           visibleRows={visibleRows}
           showAll={showAllTurning}
           onToggleShowAll={() => setShowAllTurning(v => !v)}
+          productType={productType}
         />
       )}
 
@@ -1191,6 +1185,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         visibleRows={visibleRows}
         showAll={showAllForging}
         onToggleShowAll={() => setShowAllForging(v => !v)}
+        productType={productType}
       />
 
       {/* Quenching Section - 8 Hour Grid */}
@@ -1202,6 +1197,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         visibleRows={visibleRows}
         showAll={showAllQuenching}
         onToggleShowAll={() => setShowAllQuenching(v => !v)}
+        productType={productType}
       />
 
       {/* Tempering Section - 8 Hour Grid */}
@@ -1214,6 +1210,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         showAll={showAllTempering}
         onToggleShowAll={() => setShowAllTempering(v => !v)}
         finalCheckData={finalCheckData}
+        productType={productType}
       />
 
       {/* Final Check Section - 8 Hour Grid */}
@@ -1225,6 +1222,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         visibleRows={visibleRows}
         showAll={showAllDimension}
         onToggleShowAll={() => setShowAllDimension(v => !v)}
+        productType={productType}
       />
 
       {/* Testing & Finishing Section - 8 Hour Grid */}
@@ -1236,6 +1234,7 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
         visibleRows={visibleRows}
         showAll={showAllTestingFinishing}
         onToggleShowAll={() => setShowAllTestingFinishing(v => !v)}
+        productType={productType}
       />
 
       {isLoading && (

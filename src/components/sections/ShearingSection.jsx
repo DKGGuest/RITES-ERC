@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './ShearingSection.css';
+import { getToleranceStyle, checkTolerance } from '../../utils/toleranceValidation';
 
 const ShearingSection = ({
   data,
@@ -8,7 +9,8 @@ const ShearingSection = ({
   hourLabels = [],
   visibleRows,
   showAll,
-  onToggleShowAll
+  onToggleShowAll,
+  productType
 }) => {
   const [expanded] = useState(true);
 
@@ -73,6 +75,27 @@ const ShearingSection = ({
   // Check if all hours are marked as "No Production"
   const allNoProduction = data.every(row => row.noProduction);
 
+  // Helper to determine if rejection input should be enabled
+  const isRejectionEnabled = (row, type) => {
+    if (row.noProduction || !row.lotNo) return false;
+
+    switch (type) {
+      case 'length': // Column 1: Length of Cut Bar
+        return row.lengthCutBar?.some(val => {
+          const { isValid, isApplicable } = checkTolerance('lengthCutBar', val, productType);
+          return isApplicable && !isValid;
+        });
+      case 'quality': // Column 2: Quality / Improper Dia
+        return row.qualityDia?.some(val => val === 'NOT OK');
+      case 'sharpEdges': // Column 3: Sharp Edges
+        return row.sharpEdges?.some(val => val === 'NOT OK');
+      case 'crackedEdges': // Column 4: Cracked Edges
+        return row.crackedEdges?.some(val => val === 'NOT OK');
+      default:
+        return false;
+    }
+  };
+
   return (
     <div className="card shearing-section">
       <div className="card-header shearing-section__header">
@@ -113,7 +136,7 @@ const ShearingSection = ({
                     <th className="shearing-th shearing-th--time">Time Range</th>
                     <th className="shearing-th shearing-th--checkbox">No Production</th>
                     <th className="shearing-th shearing-th--lot">Lot No.</th>
-                    <th className="shearing-th shearing-th--length">Length of Cut Bar</th>
+                    <th className="shearing-th shearing-th--length">Length of Cut Bar (mm)</th>
                     <th className="shearing-th shearing-th--quality">Quality / Improper Dia at end</th>
                     <th className="shearing-th shearing-th--edges">Sharp Edges</th>
                     <th className="shearing-th shearing-th--cracked">Cracked Edges</th>
@@ -152,7 +175,8 @@ const ShearingSection = ({
                         value={row.lengthCutBar[0] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 0)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('lengthCutBar', row.lengthCutBar[0], productType)}
                       />
                     </td>
                     <td className="shearing-td shearing-td--quality-input">
@@ -203,7 +227,8 @@ const ShearingSection = ({
                         value={row.lengthCutBar[1] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 1)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('lengthCutBar', row.lengthCutBar[1], productType)}
                       />
                     </td>
                     <td className="shearing-td shearing-td--quality-input">
@@ -253,7 +278,8 @@ const ShearingSection = ({
                         value={row.lengthCutBar[2] || ''}
                         onChange={e => updateData(idx, 'lengthCutBar', e.target.value, 2)}
                         disabled={row.noProduction || !row.lotNo}
-                        placeholder="float"
+                        placeholder="mm"
+                        style={getToleranceStyle('lengthCutBar', row.lengthCutBar[2], productType)}
                       />
                     </td>
                     <td className="shearing-td shearing-td--quality-input">
@@ -304,7 +330,8 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[0] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'length')}
+                        title={!isRejectionEnabled(row, 'length') ? "Reject enabled only if Length is out of tolerance" : ""}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -313,7 +340,8 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[1] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'quality')}
+                        title={!isRejectionEnabled(row, 'quality') ? "Reject enabled only if Quality is NOT OK" : ""}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -322,7 +350,8 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[2] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'sharpEdges')}
+                        title={!isRejectionEnabled(row, 'sharpEdges') ? "Reject enabled only if Sharp Edge is NOT OK" : ""}
                       />
                     </td>
                     <td className="shearing-td shearing-td--rejected-input">
@@ -331,7 +360,8 @@ const ShearingSection = ({
                         className="form-control shearing-input shearing-input--rejected"
                         value={row.rejectedQty[3] || ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 3)}
-                        disabled={row.noProduction || !row.lotNo}
+                        disabled={!isRejectionEnabled(row, 'crackedEdges')}
+                        title={!isRejectionEnabled(row, 'crackedEdges') ? "Reject enabled only if Cracked Edge is NOT OK" : ""}
                       />
                     </td>
                   </tr>
@@ -397,8 +427,9 @@ const ShearingSection = ({
                               className="form-control"
                               value={row.rejectedQty[sampleIdx] || ''}
                               onChange={e => updateData(idx, 'rejectedQty', e.target.value, sampleIdx)}
-                              disabled={row.noProduction || !row.lotNo}
+                              disabled={!isRejectionEnabled(row, sampleIdx === 0 ? 'length' : 'quality')}
                               placeholder={`Qty ${sampleIdx + 1}`}
+                              title={!isRejectionEnabled(row, sampleIdx === 0 ? 'length' : 'quality') ? "Reject enabled only if out of tolerance/NOT OK" : ""}
                             />
                           </div>
                         ))}
@@ -406,7 +437,7 @@ const ShearingSection = ({
                     </div>
                   </div>
                   <div className="shearing-mobile-field">
-                    <div className="shearing-mobile-field__label">Length of Cut Bar</div>
+                    <div className="shearing-mobile-field__label">Length of Cut Bar (mm)</div>
                     <div className="shearing-mobile-field__value">
                       <div className="shearing-mobile-length-inputs">
                         {[0, 1, 2].map(sampleIdx => (
