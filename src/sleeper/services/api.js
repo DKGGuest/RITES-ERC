@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8080/sleeper-backend/api';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE_URL = isLocal
+    ? 'http://localhost:8080/sleeper-backend/api'
+    : 'https://sarthibackendservice-bfe2eag3byfkbsa6.canadacentral-01.azurewebsites.net/sleeper-backend/api';
 
 const api = axios.create({
     baseURL: BASE_URL,
