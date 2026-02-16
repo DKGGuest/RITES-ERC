@@ -30,7 +30,6 @@ const responsiveStyles = `
   }
 `;
 
-
 const MultiTabInspectionInitiationPage = ({ calls, onProceed, onBack }) => {
   // Calculate latest desired date among all calls for batch restriction
   const latestDesiredDate = useMemo(() => {

@@ -10,6 +10,7 @@ import KPIGrid from '../components/railway-board/KPIGrid';
 import { Level1Row } from '../components/railway-board/LevelRows';
 import Pagination from '../components/Pagination';
 import DashboardGraph from '../components/railway-board/DashboardGraph';
+import ProfessionalCardSection from '../components/railway-board/ProfessionalCardSection';
 
 const RailwayBoardDashboard = () => {
     // State for Drill-down (Accordion Style) with Persistence
@@ -131,6 +132,74 @@ const RailwayBoardDashboard = () => {
         );
     }
 
+    // Capture the existing PO table as a prop
+    const poTable = (
+        <div className="content-card-integrated">
+            <div className="table-responsive">
+                <table className="data-table main-table level-1-table">
+                    <thead>
+                        <tr>
+                            <th style={{ width: '40px' }}></th>
+                            <th>Sl No.</th>
+                            <th>Rly</th>
+                            <th>PO No.</th>
+                            <th>PO Date</th>
+                            <th>Vendor</th>
+                            <th>Region</th>
+                            <th>PO Qty</th>
+                            <th>Acc Qty</th>
+                            <th>Bal Qty</th>
+                            <th>RM %</th>
+                            <th>Proc %</th>
+                            <th>Final %</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {paginatedData.map((po, index) => (
+                            <Level1Row
+                                key={po.poNo || po.id}
+                                po={po}
+                                index={(page * rowsPerPage) + index}
+                                expandedPo={expandedPo}
+                                togglePo={togglePo}
+                                expandedSerial={expandedSerial}
+                                toggleSerial={toggleSerial}
+                                expandedCall={expandedCall}
+                                toggleCall={toggleCall}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Level 1 Pagination - Only show if no PO is expanded */}
+            {!expandedPo && (
+                <Pagination
+                    currentPage={page}
+                    totalPages={Math.ceil(count / rowsPerPage)}
+                    start={page * rowsPerPage}
+                    end={Math.min((page + 1) * rowsPerPage, count)}
+                    totalCount={count}
+                    onPageChange={handleChangePage}
+                    rows={rowsPerPage}
+                    onRowsChange={handleChangeRowsPerPage}
+                />
+            )}
+        </div>
+    );
+
+    // Capture the existing graph as a prop
+    const poGraph = <DashboardGraph liveData={reportData} />;
+
+    // Capture the existing KPI grid as a prop
+    const kpiGrid = (
+        <KPIGrid
+            activeKpi={activeKpi}
+            setActiveKpi={setActiveKpi}
+        />
+    );
+
     return (
         <div className="railway-dashboard-container">
             <DashboardHeader />
@@ -152,74 +221,15 @@ const RailwayBoardDashboard = () => {
                 setToDate={setToDate}
             />
 
-            <KPIGrid
-                activeKpi={activeKpi}
-                setActiveKpi={setActiveKpi}
+            {/* Integration of ProfessionalCardSection without losing functionality */}
+            <ProfessionalCardSection
+                poTable={poTable}
+                poGraph={poGraph}
+                kpiGrid={kpiGrid}
             />
-
-            {/* Main Content Area */}
-            <div className="content-card">
-                <div className="table-responsive">
-                    <table className="data-table main-table level-1-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: '40px' }}></th>
-                                <th>Sl No.</th>
-                                <th>Rly</th>
-                                <th>PO No.</th>
-                                <th>PO Date</th>
-                                <th>Vendor</th>
-                                <th>Region</th>
-                                <th>PO Qty</th>
-                                <th>Acc Qty</th>
-                                <th>Bal Qty</th>
-                                <th>RM %</th>
-                                <th>Proc %</th>
-                                <th>Final %</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {paginatedData.map((po, index) => (
-                                <Level1Row
-                                    key={po.poNo || po.id}
-                                    po={po}
-                                    index={(page * rowsPerPage) + index}
-                                    expandedPo={expandedPo}
-                                    togglePo={togglePo}
-                                    expandedSerial={expandedSerial}
-                                    toggleSerial={toggleSerial}
-                                    expandedCall={expandedCall}
-                                    toggleCall={toggleCall}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Level 1 Pagination - Only show if no PO is expanded */}
-                {!expandedPo && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={Math.ceil(count / rowsPerPage)}
-                        start={page * rowsPerPage}
-                        end={Math.min((page + 1) * rowsPerPage, count)}
-                        totalCount={count}
-                        onPageChange={handleChangePage}
-                        rows={rowsPerPage}
-                        onRowsChange={handleChangeRowsPerPage}
-                    />
-                )}
-            </div>
-
-            {/* Charts Section */}
-            <DashboardGraph liveData={reportData} />
         </div>
     );
 };
 
+
 export default RailwayBoardDashboard;
-
-
-
-
