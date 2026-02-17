@@ -7,7 +7,7 @@ export const CalibrationList = ({ onEdit, onDelete, onCreateNew, onUploadCertifi
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+    const [pageSize] = useState(DEFAULT_PAGE_SIZE);
 
     const statuses = ['Valid', 'Expired', 'Pending'];
 
@@ -129,7 +129,7 @@ export const CalibrationList = ({ onEdit, onDelete, onCreateNew, onUploadCertifi
                                     <td>{cal.calibrationCertificate}</td>
                                     <td>
                                         <span className={`badge badge-${cal.status === 'Valid' ? 'success' :
-                                                cal.status === 'Expired' ? 'danger' : 'warning'
+                                            cal.status === 'Expired' ? 'danger' : 'warning'
                                             }`}>
                                             {cal.status}
                                         </span>

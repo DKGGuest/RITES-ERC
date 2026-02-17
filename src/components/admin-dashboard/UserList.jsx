@@ -8,7 +8,7 @@ export const UserList = ({ onEdit, onDelete, onChangeRole, onChangeRegion, onCre
     const [filterRole, setFilterRole] = useState('');
     const [filterRegion, setFilterRegion] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+    const [pageSize] = useState(DEFAULT_PAGE_SIZE);
 
     const filteredUsers = useMemo(() => {
         let result = mockUsers;

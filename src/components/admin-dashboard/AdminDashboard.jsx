@@ -143,38 +143,7 @@ export const AdminDashboard = () => {
         }
     };
 
-    const getModuleTitle = () => {
-        switch (activeModule) {
-            case 'users': return 'User Management';
-            case 'masters': return 'Master Data';
-            case 'calibration': return 'Calibration';
-            case 'mapping': return 'IE Mapping';
-            default: return 'Admin Module';
-        }
-    };
 
-    const getModuleDescription = () => {
-        switch (activeModule) {
-            case 'users': return 'Manage system users and their roles';
-            case 'masters': return 'Manage master data including vendors, items, and plants';
-            case 'calibration': return 'Manage calibration records and certificates';
-            case 'mapping': return 'Manage IE to CM and IE to POI mappings';
-            default: return '';
-        }
-    };
-
-    const getCurrentDateTime = () => {
-        const now = new Date();
-        return now.toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true
-        });
-    };
 
     return (
         <div className="admin-container">
@@ -188,40 +157,40 @@ export const AdminDashboard = () => {
                 </div>
                 <ul className="nav-menu">
                     <li className="nav-item">
-                        <a
+                        <button
                             className={`nav-link ${activeModule === 'users' ? 'active' : ''}`}
                             onClick={() => setActiveModule('users')}
                         >
                             <span>👥</span>
                             <span>User Management</span>
-                        </a>
+                        </button>
                     </li>
                     <li className="nav-item">
-                        <a
+                        <button
                             className={`nav-link ${activeModule === 'masters' ? 'active' : ''}`}
                             onClick={() => setActiveModule('masters')}
                         >
                             <span>📋</span>
                             <span>Master Data</span>
-                        </a>
+                        </button>
                     </li>
                     <li className="nav-item">
-                        <a
+                        <button
                             className={`nav-link ${activeModule === 'calibration' ? 'active' : ''}`}
                             onClick={() => setActiveModule('calibration')}
                         >
                             <span>🔧</span>
                             <span>Calibration</span>
-                        </a>
+                        </button>
                     </li>
                     <li className="nav-item">
-                        <a
+                        <button
                             className={`nav-link ${activeModule === 'mapping' ? 'active' : ''}`}
                             onClick={() => setActiveModule('mapping')}
                         >
                             <span>🗺️</span>
                             <span>IE Mapping</span>
-                        </a>
+                        </button>
                     </li>
                 </ul>
             </aside>

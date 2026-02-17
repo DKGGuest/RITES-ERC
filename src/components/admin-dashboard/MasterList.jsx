@@ -8,7 +8,7 @@ export const MasterList = ({ onEdit, onDelete, onCreateNew, onApprove }) => {
     const [filterType, setFilterType] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+    const [pageSize] = useState(DEFAULT_PAGE_SIZE);
 
     const masterTypes = ['Vendor', 'BPO', 'Consignee', 'Item', 'Plant', 'Instrument'];
     const statuses = ['Active', 'Inactive', 'Pending Approval'];
@@ -147,7 +147,7 @@ export const MasterList = ({ onEdit, onDelete, onCreateNew, onApprove }) => {
                                     <td>{master.vendor}</td>
                                     <td>
                                         <span className={`badge badge-${master.status === 'Active' ? 'success' :
-                                                master.status === 'Pending Approval' ? 'warning' : 'danger'
+                                            master.status === 'Pending Approval' ? 'warning' : 'danger'
                                             }`}>
                                             {master.status}
                                         </span>
