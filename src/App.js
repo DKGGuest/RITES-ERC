@@ -50,6 +50,7 @@ import { CMDashboardWrapper } from './pages/wrappers/CMWrappers';
 import { CallDeskDashboardWrapper } from './pages/wrappers/CallDeskWrapper';
 import { FinanceDashboardWrapper } from './pages/wrappers/FinanceWrapper';
 import { RailwayBoardDashboardWrapper } from './pages/wrappers/RailwayBoardWrapper';
+import { AdminDashboardWrapper } from './pages/wrappers/AdminDashboardWrapper';
 
 /**
  * Role-based redirect component
@@ -188,6 +189,9 @@ const App = () => {
 
             {/* Railway Board Routes */}
             <Route path={ROUTES.RAILWAY_BOARD_DASHBOARD} element={<RailwayBoardDashboardWrapper />} />
+
+            {/* Admin Dashboard Route */}
+            <Route path={ROUTES.ADMIN_DASHBOARD} element={<AdminDashboardWrapper />} />
           </Route>
 
           {/* Catch-all redirect - role-based */}

@@ -63,6 +63,9 @@ export const ROUTES = {
 
   // Railway Board Routes
   RAILWAY_BOARD_DASHBOARD: '/railway-board',
+
+  // Admin Route
+  ADMIN_DASHBOARD: '/admin',
 };
 
 /**
@@ -149,4 +152,5 @@ export const ROLE_LANDING_ROUTE = {
   'RIO Help Desk': ROUTES.CALL_DESK,
   Finance: ROUTES.FINANCE,
   RAILWAY_BOARD: ROUTES.RAILWAY_BOARD_DASHBOARD,
+  ADMIN: ROUTES.ADMIN_DASHBOARD,
 };
