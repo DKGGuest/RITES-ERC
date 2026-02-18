@@ -3888,13 +3888,26 @@ return {
           return fieldList.some(f => !isEmpty(hourData[f]));
         };
 
-        const validateTolerance = (fieldMap) => {
+        const validateTolerance = (fieldMap, rejectionCheck = null) => {
           Object.entries(fieldMap).forEach(([ruleName, fieldKeys]) => {
             const keys = Array.isArray(fieldKeys) ? fieldKeys : [fieldKeys];
             keys.forEach(key => {
               if (!isEmpty(hourData[key])) {
                 const { isValid, isApplicable } = checkTolerance(ruleName, hourData[key], productType);
-                if (isApplicable && !isValid) {
+
+                // CHECK IF REJECTED
+                let isRejected = false;
+                if (rejectionCheck !== null) {
+                  if (typeof rejectionCheck === 'function') {
+                    isRejected = rejectionCheck(hourData);
+                  } else if (typeof rejectionCheck === 'number' && Array.isArray(hourData.rejectedQty)) {
+                    isRejected = Number(hourData.rejectedQty[rejectionCheck]) > 0;
+                  } else if (typeof rejectionCheck === 'string') {
+                    isRejected = Number(hourData[rejectionCheck]) > 0;
+                  }
+                }
+
+                if (isApplicable && !isValid && !isRejected) {
                   missingFields.push(`${key} out of tolerance`);
                 }
               }
@@ -3902,76 +3915,182 @@ return {
           });
         };
 
+        const validateBadValue = (fieldKeys, badValue, rejectionCheck = null, label) => {
+          const keys = Array.isArray(fieldKeys) ? fieldKeys : [fieldKeys];
+          keys.forEach(key => {
+            if (!isEmpty(hourData[key])) {
+              const val = String(hourData[key]);
+              const isBad = val === badValue || val.toUpperCase() === badValue.toUpperCase();
+
+              if (isBad) {
+                // CHECK IF REJECTED
+                let isRejected = false;
+                if (rejectionCheck !== null) {
+                  if (typeof rejectionCheck === 'string') {
+                    isRejected = Number(hourData[rejectionCheck]) > 0;
+                  }
+                }
+
+                if (!isRejected) {
+                  missingFields.push(`${label || key} is ${badValue}`);
+                }
+              }
+            }
+          });
+        };
+
         // Define required fields per module
         if (moduleName === 'shearingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['lengthCutBar', 'lengthCutBar1'])) missingFields.push('Length Cut Bar');
-          else validateTolerance({ lengthCutBar: ['lengthCutBar', 'lengthCutBar1'] });
 
-          if (!check(['qualityDia', 'qualityDia1'])) missingFields.push('Quality Dia');
-          // Removed invalid tolerance check for Quality Dia (it's a dropdown)
-          // Removed mandatory Rejected Qty check as strict validation blocks disabled inputs
+          const lengthFields = ['lengthCutBar', 'lengthCutBar1', 'lengthCutBar2', 'lengthCutBar3'];
+          if (!check(lengthFields)) missingFields.push('Length Cut Bar');
+          else validateTolerance({ lengthCutBar: lengthFields }, 'rejectedQty1');
+
+          const qualityFields = ['qualityDia', 'improperDia1', 'improperDia2', 'improperDia3'];
+          if (!check(qualityFields)) missingFields.push('Quality Dia');
+          else validateBadValue(qualityFields, 'NOT OK', 'rejectedQty2', 'Quality Dia');
+
+          const sharpFields = ['sharpEdges', 'sharpEdges1', 'sharpEdges2', 'sharpEdges3'];
+          if (!check(sharpFields)) missingFields.push('Sharp Edges');
+          else validateBadValue(sharpFields, 'NOT OK', 'rejectedQty3', 'Sharp Edges');
+
+          const crackedFields = ['crackedEdges', 'crackedEdges1', 'crackedEdges2', 'crackedEdges3'];
+          if (!check(crackedFields)) missingFields.push('Cracked Edges');
+          else validateBadValue(crackedFields, 'NOT OK', 'rejectedQty4', 'Cracked Edges');
 
         } else if (moduleName === 'turningData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['turningDia', 'dia', 'dia1'])) missingFields.push('Turning Dia');
-          else validateTolerance({ turningDia: ['turningDia', 'dia', 'dia1'] });
 
-          if (!check(['turningLength', 'parallelLength', 'straightLength', 'straightLength1'])) missingFields.push('Turning Length');
-          else validateTolerance({ parallelLength: ['turningLength', 'parallelLength', 'straightLength', 'straightLength1'] });
+          const turningDiaFields = ['turningDia', 'dia', 'dia1', 'dia2', 'dia3'];
+          if (!check(turningDiaFields)) missingFields.push('Turning Dia');
+          else validateTolerance({ turningDia: turningDiaFields }, 'rejectedQty3');
 
-          if (!check(['fullTurningLength', 'taperLength', 'taperLength1'])) missingFields.push('Full Turning Length');
-          else validateTolerance({ fullLength: ['fullTurningLength', 'taperLength', 'taperLength1'] });
-          // Removed mandatory Rejected Qty check
+          const turningLenFields = ['turningLength', 'parallelLength', 'straightLength', 'straightLength1', 'straightLength2', 'straightLength3'];
+          if (!check(turningLenFields)) missingFields.push('Turning Length');
+          else validateTolerance({ parallelLength: turningLenFields }, 'rejectedQty1');
+
+          const fullLenFields = ['fullTurningLength', 'taperLength', 'taperLength1', 'taperLength2', 'taperLength3'];
+          if (!check(fullLenFields)) missingFields.push('Full Turning Length');
+          else validateTolerance({ fullLength: fullLenFields }, 'rejectedQty2');
 
         } else if (moduleName === 'mpiData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['mpiTestingResult', 'testResults', 'testResult1'])) missingFields.push('MPI Result');
-          // Removed mandatory Rejected Qty check
+          const mpiFields = ['mpiTestingResult', 'testResults', 'testResult1', 'testResult2', 'testResult3'];
+          if (!check(mpiFields)) missingFields.push('MPI Result');
+          else validateBadValue(mpiFields, 'NOT OK', 'rejectedQty1', 'MPI Result');
+
         } else if (moduleName === 'forgingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['forgingTemperature', 'forgingTemp1'])) missingFields.push('Forging Temp');
-          else validateTolerance({ forgingTemperature: ['forgingTemperature', 'forgingTemp1'] });
-          if (!check(['forgingStabilisation', 'forgingStabilisationRejection1'])) missingFields.push('Stabilisation');
-          if (!check(['improperForging', 'improperForging1'])) missingFields.push('Improper Forging');
-          if (!check(['forgingDefect', 'forgingDefect1'])) missingFields.push('Forging Defect');
-          if (!check(['embossingDefect', 'embossingDefect1'])) missingFields.push('Embossing Defect');
+
+          const forgingTempFields = ['forgingTemperature', 'forgingTemp1', 'forgingTemp2'];
+          if (!check(forgingTempFields)) missingFields.push('Forging Temp');
+          else validateTolerance({ forgingTemperature: forgingTempFields }, 'forgingTemperatureRejected');
+
+          const forgingStabFields = ['forgingStabilisation', 'forgingStabilisationRejection1', 'forgingStabilisationRejection2'];
+          if (!check(forgingStabFields)) missingFields.push('Stabilisation');
+          else validateBadValue(forgingStabFields, 'NOT OK', 'forgingStabilisationRejectionRejected', 'Stabilisation');
+
+          const improperForgingFields = ['improperForging', 'improperForging1', 'improperForging2'];
+          if (!check(improperForgingFields)) missingFields.push('Improper Forging');
+          else validateBadValue(improperForgingFields, 'YES', 'improperForgingRejected', 'Improper Forging');
+
+          const forgingDefectFields = ['forgingDefect', 'forgingDefect1', 'forgingDefect2'];
+          if (!check(forgingDefectFields)) missingFields.push('Forging Defect');
+          else validateBadValue(forgingDefectFields, 'YES', 'forgingDefectRejected', 'Forging Defect');
+
+          const embossingFields = ['embossingDefect', 'embossingDefect1', 'embossingDefect2'];
+          if (!check(embossingFields)) missingFields.push('Embossing Defect');
+          else validateBadValue(embossingFields, 'YES', 'embossingDefectRejected', 'Embossing Defect');
+
         } else if (moduleName === 'quenchingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['quenchingHardness', 'quenchingHardness1'])) missingFields.push('Quenching Hardness');
-          if (!check(['boxGauge', 'boxGauge1'])) missingFields.push('Box Gauge');
-          if (!check(['flatBearingArea', 'flatBearingArea1'])) missingFields.push('Flat Bearing Area');
-          if (!check(['fallingGauge', 'fallingGauge1'])) missingFields.push('Falling Gauge');
-          validateTolerance({ quenchingTemperature: ['quenchingTemperature', 'quenchingTemp1', 'bathTemp', 'oilTemp'] });
+
+          const qHardnessFields = ['quenchingHardness', 'quenchingHardness1', 'quenchingHardness2'];
+          if (!check(qHardnessFields)) missingFields.push('Quenching Hardness');
+          else validateTolerance({ quenchingHardness: qHardnessFields }, 'quenchingHardnessRejected');
+
+          const boxGaugeFields = ['boxGauge', 'boxGauge1', 'boxGauge2'];
+          if (!check(boxGaugeFields)) missingFields.push('Box Gauge');
+          else validateBadValue(boxGaugeFields, 'NOT OK', 'boxGaugeRejected', 'Box Gauge');
+
+          const flatFields = ['flatBearingArea', 'flatBearingArea1', 'flatBearingArea2'];
+          if (!check(flatFields)) missingFields.push('Flat Bearing Area');
+          else validateBadValue(flatFields, 'NOT OK', 'flatBearingAreaRejected', 'Flat Bearing Area');
+
+          const fallingFields = ['fallingGauge', 'fallingGauge1', 'fallingGauge2'];
+          if (!check(fallingFields)) missingFields.push('Falling Gauge');
+          else validateBadValue(fallingFields, 'NOT OK', 'fallingGaugeRejected', 'Falling Gauge');
+
+          validateTolerance({ quenchingTemperature: ['quenchingTemperature', 'quenchingTemperature1', 'quenchingTemperature2'] }, 'quenchingTemperatureRejected');
+          validateTolerance({ quenchingDuration: ['quenchingDuration', 'quenchingDuration1', 'quenchingDuration2'] }, 'quenchingDurationRejected');
+
         } else if (moduleName === 'temperingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['temperingTemperature', 'temperingTemperature1'])) missingFields.push('Tempering Temp');
-          else validateTolerance({ temperingTemperature: ['temperingTemperature', 'temperingTemperature1'] });
-          if (!check(['temperingDuration', 'temperingDuration1'])) missingFields.push('Tempering Duration');
+
+          const tTempFields = ['temperingTemperature', 'temperingTemperature1', 'temperingTemperature2'];
+          if (!check(tTempFields)) missingFields.push('Tempering Temp');
+          else validateTolerance({ temperingTemperature: tTempFields }, 'temperingTemperatureRejected');
+
+          const tDurFields = ['temperingDuration', 'temperingDuration1', 'temperingDuration2'];
+          if (!check(tDurFields)) missingFields.push('Tempering Duration');
+          else validateTolerance({ temperingDuration: tDurFields }, 'temperingDurationRejected');
+
         } else if (moduleName === 'finalCheckData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['surfaceDefect', 'surfaceDefect1'])) missingFields.push('Surface Defect');
-          if (!check(['embossingDefect', 'embossingDefect1'])) missingFields.push('Embossing Defect');
-          if (!check(['marking', 'marking1'])) missingFields.push('Marking');
-          if (!check(['boxGauge', 'boxGauge1'])) missingFields.push('Box Gauge');
-          if (!check(['flatBearingArea', 'flatBearingArea1'])) missingFields.push('Flat Bearing Area');
-          if (!check(['fallingGauge', 'fallingGauge1'])) missingFields.push('Falling Gauge');
-          if (!check(['temperingHardness', 'temperingHardness1'])) missingFields.push('Tempering Hardness');
-          else validateTolerance({ temperingHardness: ['temperingHardness', 'temperingHardness1'] });
+
+          const surfFields = ['surfaceDefect', 'surfaceDefect1', 'surfaceDefect2'];
+          if (!check(surfFields)) missingFields.push('Surface Defect');
+          else validateBadValue(surfFields, 'YES', 'surfaceDefectRejected', 'Surface Defect');
+
+          const embossFields = ['embossingDefect', 'embossingDefect1', 'embossingDefect2'];
+          if (!check(embossFields)) missingFields.push('Embossing Defect');
+          else validateBadValue(embossFields, 'YES', 'embossingDefectRejected', 'Embossing Defect');
+
+          const markFields = ['marking', 'marking1', 'marking2'];
+          if (!check(markFields)) missingFields.push('Marking');
+          else validateBadValue(markFields, 'NOT OK', 'markingRejected', 'Marking');
+
+          const boxFields = ['boxGauge', 'boxGauge1', 'boxGauge2'];
+          if (!check(boxFields)) missingFields.push('Box Gauge');
+          else validateBadValue(boxFields, 'NOT OK', 'boxGaugeRejected', 'Box Gauge');
+
+          const flatFields = ['flatBearingArea', 'flatBearingArea1', 'flatBearingArea2'];
+          if (!check(flatFields)) missingFields.push('Flat Bearing Area');
+          else validateBadValue(flatFields, 'NOT OK', 'flatBearingAreaRejected', 'Flat Bearing Area');
+
+          const fallFields = ['fallingGauge', 'fallingGauge1', 'fallingGauge2'];
+          if (!check(fallFields)) missingFields.push('Falling Gauge');
+          else validateBadValue(fallFields, 'NOT OK', 'fallingGaugeRejected', 'Falling Gauge');
+
+          const tHardFields = ['temperingHardness', 'temperingHardness1', 'temperingHardness2'];
+          if (!check(tHardFields)) missingFields.push('Tempering Hardness');
+          else validateTolerance({ temperingHardness: tHardFields }, 'temperingHardnessRejected');
+
         } else if (moduleName === 'testingFinishingData') {
           if (!check('lotNo')) missingFields.push('Lot No');
-          if (!check(['toeLoad', 'toeLoad1'])) missingFields.push('Toe Load');
-          else validateTolerance({ toeLoad: ['toeLoad', 'toeLoad1'] });
 
-          if (!check(['weight', 'weight1'])) missingFields.push('Weight');
-          else validateTolerance({ weight: ['weight', 'weight1'] });
-          if (!check(['paintIdentification', 'paintIdentification1'])) missingFields.push('Paint ID');
-          if (!check(['ercCoating', 'ercCoating1'])) missingFields.push('ERC Coating');
+          const toeLoadFields = ['toeLoad', 'toeLoad1', 'toeLoad2'];
+          if (!check(toeLoadFields)) missingFields.push('Toe Load');
+          else validateTolerance({ toeLoad: toeLoadFields }, 'toeLoadRejected');
+
+          const weightFields = ['weight', 'weight1', 'weight2'];
+          if (!check(weightFields)) missingFields.push('Weight');
+          else validateTolerance({ weight: weightFields }, 'weightRejected');
+
+          const paintFields = ['paintIdentification', 'paintIdentification1', 'paintIdentification2'];
+          if (!check(paintFields)) missingFields.push('Paint ID');
+          else validateBadValue(paintFields, 'NOT OK', 'paintIdentificationRejected', 'Paint ID');
+
+          const ercFields = ['ercCoating', 'ercCoating1', 'ercCoating2'];
+          if (!check(ercFields)) missingFields.push('ERC Coating');
+          else validateBadValue(ercFields, 'NOT OK', 'ercCoatingRejected', 'ERC Coating');
         }
 
         if (missingFields.length > 0) {
           const sectionLabel = moduleName.replace('Data', '').charAt(0).toUpperCase() + moduleName.replace('Data', '').slice(1);
-          incompleteSections.push(`${sectionLabel} Hour ${hourIndex + 1}: Missing ${missingFields.join(', ')}`);
+          // Removed "Missing " prefix as missingFields may contain specific error messages
+          incompleteSections.push(`${sectionLabel} Hour ${hourIndex + 1}: ${missingFields.join(', ')}`);
         }
       });
     });
@@ -4113,18 +4232,33 @@ return {
 
     if (!validation.isValid) {
       // Build error message
-      let errorMessage = 'Incomplete 8-hour grid data found:\n\n';
+      // Build error message
+      const errorContent = (
+        <div>
+          <strong>Incomplete 8-hour grid data found:</strong>
+          <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '8px', fontSize: '13px' }}>
+            {Array.from(validation.errors.entries()).map(([key, errors]) => {
+              const [lineNo, lotNo] = key.split('|');
+              return (
+                <div key={key} style={{ marginBottom: '8px' }}>
+                  <div style={{ fontWeight: '600', color: '#b91c1c' }}>{lineNo}, {lotNo}:</div>
+                  <ul style={{ paddingLeft: '20px', margin: '4px 0', color: '#b91c1c' }}>
+                    {errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: '8px', fontWeight: '500' }}>
+            Please complete all required sections before proceeding.
+          </div>
+        </div>
+      );
 
-      validation.errors.forEach((errors, key) => {
-        const [lineNo, lotNo] = key.split('|');
-        errorMessage += `${lineNo}, ${lotNo}:\n`;
-        errorMessage += `  ${errors.join('\n  ')}\n\n`;
-      });
-
-      errorMessage += 'Please complete all required sections before proceeding.';
-
-      console.error('🔍 [Shift Completed] Validation failed:', errorMessage);
-      showNotification('error', errorMessage);
+      console.error('🔍 [Shift Completed] Validation failed');
+      showNotification('error', errorContent);
       return;
     }
 
@@ -4654,18 +4788,33 @@ return {
 
     if (!validation.isValid) {
       // Build error message
-      let errorMessage = 'Incomplete 8-hour grid data found for selected calls:\n\n';
+      // Build error message
+      const errorContent = (
+        <div>
+          <strong>Incomplete 8-hour grid data found:</strong>
+          <div style={{ maxHeight: '300px', overflowY: 'auto', marginTop: '8px', fontSize: '13px' }}>
+            {Array.from(validation.errors.entries()).map(([key, errors]) => {
+              const [lineNo, lotNo] = key.split('|');
+              return (
+                <div key={key} style={{ marginBottom: '8px' }}>
+                  <div style={{ fontWeight: '600', color: '#b91c1c' }}>{lineNo}, {lotNo}:</div>
+                  <ul style={{ paddingLeft: '20px', margin: '4px 0', color: '#b91c1c' }}>
+                    {errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: '8px', fontWeight: '500' }}>
+            Please complete all required sections before proceeding.
+          </div>
+        </div>
+      );
 
-      validation.errors.forEach((errors, key) => {
-        const [lineNo, lotNo] = key.split('|');
-        errorMessage += `${lineNo}, ${lotNo}:\n`;
-        errorMessage += `  ${errors.join('\n  ')}\n\n`;
-      });
-
-      errorMessage += 'Please complete all required sections before finishing inspection.';
-
-      console.error('🔍 [Finish] Validation failed:', errorMessage);
-      showNotification('error', errorMessage);
+      console.error('🔍 [Finish] Validation failed');
+      showNotification('error', errorContent);
       return;
     }
 
