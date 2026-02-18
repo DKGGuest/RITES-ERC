@@ -247,8 +247,8 @@
     margin-top: 8px;
 }
 
-/* Buttons */
-.btn {
+/* Buttons - scoped to admin container to avoid conflicts */
+.admin-container .btn {
     padding: 10px 16px;
     border: none;
     border-radius: 4px;
@@ -261,72 +261,72 @@
     gap: 8px;
 }
 
-.btn-primary {
+.admin-container .btn-primary {
     background-color: var(--secondary-color);
     color: var(--white);
 }
 
-.btn-primary:hover {
+.admin-container .btn-primary:hover {
     background-color: #138496;
     box-shadow: var(--shadow-md);
 }
 
-.btn-success {
+.admin-container .btn-success {
     background-color: var(--success-color);
     color: var(--white);
 }
 
-.btn-success:hover {
+.admin-container .btn-success:hover {
     background-color: #218838;
 }
 
-.btn-danger {
+.admin-container .btn-danger {
     background-color: var(--danger-color);
     color: var(--white);
 }
 
-.btn-danger:hover {
+.admin-container .btn-danger:hover {
     background-color: #c0392b;
 }
 
-.btn-warning {
+.admin-container .btn-warning {
     background-color: var(--warning-color);
     color: var(--white);
 }
 
-.btn-warning:hover {
+.admin-container .btn-warning:hover {
     background-color: #e67e22;
 }
 
-.btn-secondary {
+.admin-container .btn-secondary {
     background-color: var(--text-light);
     color: var(--white);
 }
 
-.btn-secondary:hover {
+.admin-container .btn-secondary:hover {
     background-color: #6c7a7d;
 }
 
-.btn-sm {
+.admin-container .btn-sm {
     padding: 6px 12px;
     font-size: 12px;
 }
 
 /* Action Buttons Spacing */
-.table td .btn {
+.admin-container .table td .btn {
     margin-right: 8px;
 }
 
-.table td .btn:last-child {
+.admin-container .table td .btn:last-child {
     margin-right: 0;
 }
 
-/* Forms */
-.form-group {
+/* Forms - scoped to admin container */
+.admin-container .form-group {
     margin-bottom: 18px;
 }
 
-.form-label {
+.admin-container .form-label {
     display: block;
     margin-bottom: 6px;
     font-weight: 500;
@@ -334,7 +334,7 @@
     font-size: 13px;
 }
 
-.form-control {
+.admin-container .form-control {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border-color);
@@ -344,43 +344,43 @@
     background-color: var(--white);
 }
 
-.form-control:focus {
+.admin-container .form-control:focus {
     outline: none;
     border-color: var(--secondary-color);
     box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.1);
 }
 
-.form-control:disabled {
+.admin-container .form-control:disabled {
     background-color: #f5f5f5;
     color: var(--text-muted);
 }
 
-.form-row {
+.admin-container .form-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
 }
 
-/* Tables */
-.table-container {
+/* Tables - scoped to admin container */
+.admin-container .table-container {
     overflow-x: auto;
     background-color: var(--white);
     border-radius: 6px;
     border: 1px solid var(--border-color);
 }
 
-.table {
+.admin-container .table {
     width: 100%;
     border-collapse: collapse;
     margin: 0;
 }
 
-.table thead {
+.admin-container .table thead {
     background-color: #f8f9fa;
     border-bottom: 2px solid var(--border-color);
 }
 
-.table th {
+.admin-container .table th {
     padding: 14px 12px;
     text-align: left;
     font-weight: 600;
@@ -390,26 +390,26 @@
     letter-spacing: 0.5px;
 }
 
-.table td {
+.admin-container .table td {
     padding: 12px;
     border-bottom: 1px solid var(--border-color);
     font-size: 13px;
 }
 
-.table tbody tr {
+.admin-container .table tbody tr {
     transition: background-color 0.2s ease;
 }
 
-.table tbody tr:hover {
+.admin-container .table tbody tr:hover {
     background-color: #f8f9fa;
 }
 
-.table tbody tr:last-child td {
+.admin-container .table tbody tr:last-child td {
     border-bottom: none;
 }
 
-/* Search and Filter */
-.search-filter-bar {
+/* Search and Filter - scoped to admin container */
+.admin-container .search-filter-bar {
     display: flex;
     gap: 12px;
     margin-bottom: 20px;
@@ -421,12 +421,12 @@
     border: 1px solid var(--border-color);
 }
 
-.search-input {
+.admin-container .search-input {
     flex: 1;
     min-width: 200px;
 }
 
-.search-input input {
+.admin-container .search-input input {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border-color);
@@ -434,17 +434,17 @@
     font-size: 13px;
 }
 
-.search-input input:focus {
+.admin-container .search-input input:focus {
     outline: none;
     border-color: var(--secondary-color);
     box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.1);
 }
 
-.filter-select {
+.admin-container .filter-select {
     min-width: 140px;
 }
 
-.filter-select select {
+.admin-container .filter-select select {
     padding: 10px 12px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -453,20 +453,20 @@
     cursor: pointer;
 }
 
-.filter-select select:focus {
+.admin-container .filter-select select:focus {
     outline: none;
     border-color: var(--secondary-color);
 }
 
-.filter-toggle {
+.admin-container .filter-toggle {
     font-size: 12px;
     color: var(--secondary-color);
     cursor: pointer;
     font-weight: 500;
 }
 
-/* Pagination */
-.pagination {
+/* Pagination - scoped to admin container */
+.admin-container .pagination {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -478,18 +478,18 @@
     font-size: 12px;
 }
 
-.pagination-info {
+.admin-container .pagination-info {
     color: var(--text-light);
 }
 
-.pagination-controls {
+.admin-container .pagination-controls {
     display: flex;
     gap: 8px;
     align-items: center;
 }
 
-.pagination button,
-.pagination span {
+.admin-container .pagination button,
+.admin-container .pagination span {
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     background-color: var(--white);
@@ -498,15 +498,15 @@
     transition: all 0.3s ease;
 }
 
-.pagination button:hover,
-.pagination button.active {
+.admin-container .pagination button:hover,
+.admin-container .pagination button.active {
     background-color: var(--secondary-color);
     color: var(--white);
     border-color: var(--secondary-color);
 }
 
-/* Modal */
-.modal-overlay {
+/* Admin Modal - scoped to avoid conflict with Call Desk modal styles */
+.admin-modal-overlay {
     display: none;
     position: fixed;
     top: 0;
@@ -520,7 +520,7 @@
     animation: fadeIn 0.2s ease;
 }
 
-.modal-overlay.active {
+.admin-modal-overlay.active {
     display: flex;
 }
 
@@ -534,7 +534,7 @@
     }
 }
 
-.modal {
+.admin-modal {
     background-color: var(--white);
     border-radius: 6px;
     padding: 28px;
@@ -558,7 +558,7 @@
     }
 }
 
-.modal-header {
+.admin-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -567,23 +567,22 @@
     border-bottom: 1px solid var(--border-color);
 }
 
-.modal-title {
+.admin-modal-title {
     font-size: 18px;
     font-weight: 600;
     color: var(--text-dark);
 }
 
-.modal-close {
+.admin-modal-close {
     background: none;
     border: none;
     font-size: 24px;
     cursor: pointer;
     color: var(--text-light);
     transition: color 0.2s ease;
-    color: var(--text-light);
 }
 
-.modal-footer {
+.admin-modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
