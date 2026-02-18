@@ -73,7 +73,9 @@ const transformToBackendFormat = (data, submodule) => {
   const fieldMappings = {
     shearing: {
       lengthCutBar: ['lengthCutBar1', 'lengthCutBar2', 'lengthCutBar3'],
+      qualityDia: ['improperDia1', 'improperDia2', 'improperDia3'],
       sharpEdges: ['sharpEdges1', 'sharpEdges2', 'sharpEdges3'],
+      crackedEdges: ['crackedEdges1', 'crackedEdges2', 'crackedEdges3'],
       rejectedQty: ['rejectedQty1', 'rejectedQty2', 'rejectedQty3', 'rejectedQty4']
     },
     turning: {
