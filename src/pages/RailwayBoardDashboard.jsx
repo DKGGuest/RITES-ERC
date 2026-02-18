@@ -11,6 +11,7 @@ import { Level1Row } from '../components/railway-board/LevelRows';
 import Pagination from '../components/Pagination';
 import DashboardGraph from '../components/railway-board/DashboardGraph';
 import ProfessionalCardSection from '../components/railway-board/ProfessionalCardSection';
+import ProductToggle from '../components/railway-board/ProductToggle';
 
 const RailwayBoardDashboard = () => {
     // State for Drill-down (Accordion Style) with Persistence
@@ -203,6 +204,11 @@ const RailwayBoardDashboard = () => {
     return (
         <div className="railway-dashboard-container">
             <DashboardHeader />
+
+            <ProductToggle
+                selectedProduct={selectedProduct}
+                setSelectedProduct={setSelectedProduct}
+            />
 
             <FilterBar
                 selectedCategory={selectedCategory}
