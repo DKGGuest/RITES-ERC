@@ -1,14 +1,6 @@
 import React from 'react';
 
 const ProductToggle = ({ selectedProduct, setSelectedProduct }) => {
-    // Products as per requirement + 'all' option for default state
-    const products = [
-        { id: 'all', label: 'All Products' }, // Optional: to allow resetting
-        { id: 'ERC', label: 'ERC' },
-        { id: 'PSC Sleeper', label: 'PSC Sleeper' },
-        { id: 'Rail Pad', label: 'Rail Pad' },
-        { id: 'Elastomeric Pad', label: 'Elastomeric Pad' }
-    ];
 
     // Filter out 'all' if the user only wants specific toggles as per image, 
     // but usually 'All' is needed to clear filters. 
