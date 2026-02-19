@@ -130,11 +130,14 @@ const transformToBackendFormat = (data, submodule) => {
   return data.map((row) => {
     const transformedRow = { ...row };
 
-    // Transform array fields to numbered fields
-    Object.entries(mapping).forEach(([arrayField, numberedFields]) => {
-      if (row[arrayField] && Array.isArray(row[arrayField])) {
-        numberedFields.forEach((numberedField, index) => {
-          const value = row[arrayField][index];
+    // Transform array or single fields to numbered fields
+    Object.entries(mapping).forEach(([dataField, numberedFields]) => {
+      if (row[dataField] !== undefined && row[dataField] !== null) {
+        const values = Array.isArray(row[dataField]) ? row[dataField] : [row[dataField]];
+        const fields = Array.isArray(numberedFields) ? numberedFields : [numberedFields];
+
+        fields.forEach((numberedField, index) => {
+          const value = values[index];
           // Convert value appropriately
           if (value !== '' && value !== null && value !== undefined) {
             // Check if it's a boolean (for sharpEdges)
@@ -149,8 +152,10 @@ const transformToBackendFormat = (data, submodule) => {
             transformedRow[numberedField] = null;
           }
         });
-        // Remove the original array field
-        delete transformedRow[arrayField];
+        // Remove the original field if it was renamed/transformed
+        if (dataField !== numberedFields) {
+          delete transformedRow[dataField];
+        }
       }
     });
 
