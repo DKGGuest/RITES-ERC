@@ -390,7 +390,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     const def1 = (lotData.defects1st || []).filter(v => v === 'NOT OK').length;
     const def2 = (lotData.defects2nd || []).filter(v => v === 'NOT OK').length;
 
-    const totalFailures = micro1 + micro2 + decarb1 + decarb2 + inc1 + inc2 + def1 + def2;
+
 
     // Logic from FinalInclusionRatingPage: Ac1: 0 | Re1: 2 | Cumm: 2
     // Failing if any individual test has R1 > 1 or R1+R2 > 1

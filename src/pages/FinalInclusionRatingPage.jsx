@@ -1653,7 +1653,6 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
 
               const status = rej.lotStatus; // 'ACCEPTED', 'REJECTED', 'PENDING'
               const isAccepted = status === 'ACCEPTED';
-              const isRejected = status === 'REJECTED';
               const isPending = status === 'PENDING';
 
               /* Helper for individual badge styles */
