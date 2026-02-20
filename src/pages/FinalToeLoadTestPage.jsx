@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useInspection } from '../context/InspectionContext';
 import FinalSubmoduleNav from '../components/FinalSubmoduleNav';
 import ExcelImport from '../components/ExcelImport';
@@ -19,7 +19,37 @@ const TOLERANCES = {
   'ERC-J': { min: 650, max: Infinity }
 };
 
+/**
+ * Helper to normalize ERC Type string from backend
+ * Handles variations like: "MK III", "mk-iii", "mark 3", "mk 3", "erc mk iii"
+ */
+const normalizeErcType = (typeStr) => {
+  if (!typeStr) return 'MK-III'; // Default fallback
+
+  const lower = typeStr.toLowerCase().trim();
+
+  // MK-V variations
+  if (lower.includes('mk-v') || lower.includes('mk v') || lower.includes('mark v') || lower.includes('mark 5') || lower.includes('mk 5')) {
+    return 'MK-V';
+  }
+
+  // MK-III variations (default for others)
+  if (lower.includes('mk-iii') || lower.includes('mk iii') || lower.includes('mark iii') || lower.includes('mark 3') || lower.includes('mk 3')) {
+    return 'MK-III';
+  }
+
+  // ERC-J
+  if (lower.includes('erc-j') || lower.includes('erc j') || lower.includes('j-type') || lower.includes('j type') || lower.includes('jtype')) {
+    return 'ERC-J';
+  }
+
+  return 'MK-III'; // Default safe fallback
+};
+
 const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
+  // State for lot selection toggle
+  const [activeLotTab, setActiveLotTab] = useState(0);
+
   // Get live lot data from context
   const { getFpCachedData, selectedCall } = useInspection();
 
@@ -31,7 +61,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
 
   // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
   const lotsFromVendor = useMemo(() => {
-    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    let lots = cachedData?.finalLotDetails || [];
 
     // Fallback: Check sessionStorage directly if context cache is empty
     if (lots.length === 0 && callNo) {
@@ -63,7 +93,12 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
           lotNo,
           heatNo,
           quantity,
-          springType: lot.springType || 'MK-III',
+          // Use fresh ERC type from dashboard data if available
+          // Check multiple paths: dashboardData.inspectionCall, spreading on cachedData, or selectedCall
+          springType: normalizeErcType(cachedData?.dashboardData?.inspectionCall?.ercType) ||
+            normalizeErcType(cachedData?.inspectionCall?.ercType) ||
+            normalizeErcType(selectedCall?.ercType) ||
+            'MK-III',
           sampleSize: aql.n1,
           sampleSize2nd: aql.n2,
           accpNo: aql.ac1,
@@ -72,7 +107,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
           singleSampling: aql.useSingleSampling || false
         };
       }),
-    [lotsFromVendor]
+    [lotsFromVendor, cachedData, selectedCall]
   );
 
   /**
@@ -92,6 +127,18 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
         try {
           const parsed = JSON.parse(persistedData);
           console.log('✅ Loaded persisted data from localStorage on page load');
+
+          // FORCE UPDATE: Ensure springType is always fresh
+          // Prioritize cached dashboard data (fresh API response) over context
+          const freshErcType = cachedData?.dashboardData?.inspectionCall?.ercType || selectedCall?.ercType;
+          const currentSpringType = normalizeErcType(freshErcType);
+
+          Object.keys(parsed).forEach(lotNo => {
+            if (parsed[lotNo]) {
+              parsed[lotNo].springType = currentSpringType || parsed[lotNo].springType || 'MK-III';
+            }
+          });
+
           return parsed;
         } catch (e) {
           console.error('Error parsing persisted data:', e);
@@ -101,7 +148,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
 
     // Fallback: Initialize empty data structure from lotsFromVendor
     // Note: We use lotsFromVendor here because lotsWithSampleSize is not yet computed
-    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    let lots = cachedData?.finalLotDetails || [];
     if (lots.length === 0 && currentCallNo) {
       try {
         const storedCache = sessionStorage.getItem('fpDashboardDataCache');
@@ -118,12 +165,17 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
       (acc, lot) => {
         const lotNo = lot.lotNo || lot.lotNumber;
         const aql = getHardnessToeLoadAQL(lot.lotSize || lot.offeredQty || 0);
+
+        // Use fresh ERC type from dashboard data if available
+        const freshErcType = cachedData?.dashboardData?.inspectionCall?.ercType || selectedCall?.ercType;
+
         return {
           ...acc,
           [lotNo]: {
             toe1st: Array(aql.n1).fill(''),
             toe2nd: Array(aql.n2).fill(''),
-            remarks: ''
+            remarks: '',
+            springType: normalizeErcType(freshErcType) || normalizeErcType(lot.springType) || 'MK-III'
           }
         };
       },
@@ -141,7 +193,8 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
           [lot.lotNo]: {
             toe1st: Array(lot.sampleSize).fill(''),
             toe2nd: Array(lot.sampleSize2nd).fill(''),
-            remarks: ''
+            remarks: '',
+            springType: normalizeErcType(selectedCall?.ercType) || normalizeErcType(lot.springType) || 'MK-III' // Default to MK-III
           }
         }),
         {}
@@ -149,7 +202,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
       setLotData(initialState);
       console.log('✅ Initialized lot data:', initialState);
     }
-  }, [lotsWithSampleSize, lotData]);
+  }, [lotsWithSampleSize, lotData, selectedCall?.ercType]);
 
   // Load data from database or localStorage when page loads
   useEffect(() => {
@@ -177,14 +230,17 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
           console.log('Toe load test data from DB:', dbData);
 
           // Merge database data with initialized lot data
-          const mergedData = { ...lotsWithSampleSize.reduce((acc, lot) => ({
-            ...acc,
-            [lot.lotNo]: {
-              toe1st: Array(lot.sampleSize).fill(''),
-              toe2nd: Array(lot.sampleSize2nd).fill(''),
-              remarks: ''
-            }
-          }), {}) };
+          const mergedData = {
+            ...lotsWithSampleSize.reduce((acc, lot) => ({
+              ...acc,
+              [lot.lotNo]: {
+                toe1st: Array(lot.sampleSize).fill(''),
+                toe2nd: Array(lot.sampleSize2nd).fill(''),
+                remarks: '',
+                springType: lot.springType || 'MK-III'
+              }
+            }), {})
+          };
 
           // Map database records to frontend format
           dbData.forEach(record => {
@@ -219,6 +275,10 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
               }
 
               mergedData[record.lotNo].remarks = record.remarks || '';
+              // Preserve saved springType if available (assuming backend supported it, else default)
+              // Since backend might not have this column yet, we rely on default or state.
+              // If you added springType to backend, map it here:
+              // mergedData[record.lotNo].springType = record.springType || 'MK-III';
             }
           });
 
@@ -235,11 +295,16 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
     }
   }, [callNo, lotsWithSampleSize]);
 
-  // Persist data whenever lotData changes
+  // Persist data whenever lotData changes (debounced)
   useEffect(() => {
-    if (Object.keys(lotData).length > 0 && callNo) {
+    if (Object.keys(lotData).length === 0 || !callNo) return;
+
+    const timeoutId = setTimeout(() => {
       localStorage.setItem(`toeLoadTestData_${callNo}`, JSON.stringify(lotData));
-    }
+      console.log('💾 Persisted toe load data to localStorage (debounced)');
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
   }, [lotData, callNo]);
 
   /* 2nd Sampling visibility state and popup */
@@ -265,20 +330,22 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
   };
 
   /** Helper: is a single toe-load value rejected for given lot? */
-  const isRejectedValue = (lot, raw) => {
+  const isRejectedValue = useCallback((lot, raw) => {
     if (raw === '' || raw === null || raw === undefined) return false;
     const v = parseFloat(String(raw).replace(',', '.'));
     if (Number.isNaN(v)) return false;
 
-    const tol = TOLERANCES[lot.springType] || { min: 0, max: Infinity };
+    // Use spring type from lotData state, fallback to lot prop
+    const currentSpringType = lotData[lot.lotNo]?.springType || lot.springType || 'MK-III';
+    const tol = TOLERANCES[currentSpringType] || { min: 0, max: Infinity };
 
-    if (lot.springType === 'ERC-J') {
+    if (currentSpringType === 'ERC-J') {
       /* ERC-J: value must be > 650, so ≤650 is rejected */
       return !(v > tol.min);
     }
     /* Other types: value must be within min-max band */
     return v < tol.min || v > tol.max;
-  };
+  }, [lotData]);
 
   /* 2nd Sampling auto-show/hide logic with popup */
   useEffect(() => {
@@ -309,7 +376,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
         }
       }
     });
-  }, [lotData, lotsWithSampleSize, popupLot, show2ndSamplingMap]);
+  }, [lotData, lotsWithSampleSize, popupLot, show2ndSamplingMap, isRejectedValue]);
 
   /* Popup handlers */
   const handlePopupYesKeep = () => {
@@ -381,26 +448,31 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
     let result = 'PENDING';
     let color = '#fbbf24';
 
-    const anyEntered = state.toe1st.some(v => v !== '');
+    const isFull1st = state.toe1st.every(v => v !== '');
+    const isFull2nd = state.toe2nd.every(v => v !== '');
 
-    if (!anyEntered) {
-      result = 'PENDING';
-      color = '#fbbf24';
+    if (r1 >= lot.rejNo) {
+      result = 'NOT OK';
+      color = '#dc2626';
     } else if (r1 <= lot.accpNo) {
-      result = 'OK';
-      color = '#16a34a';
-    } else if (r1 > lot.accpNo && r1 < lot.rejNo) {
-      /* 2nd sampling required - check combined */
-      if (total < lot.cummRejNo) {
+      if (isFull1st) {
         result = 'OK';
         color = '#16a34a';
       } else {
+        result = 'PENDING';
+        color = '#fbbf24';
+      }
+    } else if (showSecond) {
+      if (total >= lot.cummRejNo) {
         result = 'NOT OK';
         color = '#dc2626';
+      } else if (isFull1st && isFull2nd) {
+        result = 'OK';
+        color = '#16a34a';
+      } else {
+        result = 'PENDING';
+        color = '#fbbf24';
       }
-    } else if (r1 >= lot.rejNo) {
-      result = 'NOT OK';
-      color = '#dc2626';
     }
 
     return { r1, r2, showSecond, total, result, color };
@@ -438,9 +510,9 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
       {/* Header */}
       <div className="tlp-header">
         <div>
-          <h1 className="tlp-title">Toe Load Test</h1>
+          <h1 className="tlp-title">ERC Final Product Inspection - {callNo}</h1>
           <p className="tlp-sub">
-            Final Product Inspection – Toe load test for each lot (sample size as per IS 2500)
+            Toe Load Test for each lot (sample size as per IS 2500)
           </p>
         </div>
         <button className="tlp-btn tlp-btn-outline" onClick={onBack}>
@@ -454,13 +526,38 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
         onNavigate={onNavigateSubmodule}
       />
 
+      {/* Lot Selector */}
+      {lotsWithSampleSize.length > 0 && (
+        <>
+          {lotsWithSampleSize.length === 1 ? (
+            <div className="lot-single">
+              <span>📦 {lotsWithSampleSize[0].lotNo} | Heat {lotsWithSampleSize[0].heatNo}</span>
+            </div>
+          ) : (
+            <div className="lot-selector">
+              {lotsWithSampleSize.map((lot, idx) => (
+                <button
+                  key={lot.lotNo}
+                  className={`lot-btn ${activeLotTab === idx ? 'active' : ''}`}
+                  onClick={() => setActiveLotTab(idx)}
+                >
+                  Lot {lot.lotNo}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* One section per lot */}
-      {lotsWithSampleSize.map(lot => {
+      {lotsWithSampleSize.map((lot, idx) => {
+        if (activeLotTab !== idx) return null;
         const summary = computeLotSummary(lot);
         const state = lotData[lot.lotNo] || {
           toe1st: Array(lot.sampleSize).fill(''),
           toe2nd: Array(lot.sampleSize2nd).fill(''),
-          remarks: ''
+          remarks: '',
+          springType: lot.springType || 'MK-III'
         };
 
         /* Pagination values for 1st sampling */
@@ -487,8 +584,30 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                 <strong>📦 Lot: {lot.lotNo}</strong> &nbsp; | &nbsp; Heat: {lot.heatNo} &nbsp; | &nbsp;
                 Qty: {lot.quantity}
               </div>
-              <div className="tlp-lot-meta">
-                Sample Size (IS 2500): <strong>{lot.sampleSize}</strong>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <div className="tlp-lot-meta">
+                  Sample Size (IS 2500): <strong>{lot.sampleSize}</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600 }}>Model:</label>
+                  <div
+                    className="tlp-input"
+                    style={{
+                      padding: '4px 12px',
+                      width: 'auto',
+                      backgroundColor: '#f1f5f9',
+                      color: '#475569',
+                      fontWeight: 600,
+                      border: '1px solid #e2e8f0',
+                      cursor: 'default'
+                    }}
+                  >
+                    {state.springType === 'MK-III' ? 'MK-III (850-1100)' :
+                      state.springType === 'MK-V' ? 'MK-V (1200-1500)' :
+                        state.springType === 'ERC-J' ? 'ERC-J (> 650)' :
+                          state.springType}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -517,7 +636,7 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                         className={`tlp-input ${status}`}
                         value={val}
                         onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, false)}
-                        placeholder="0.0"
+                        placeholder=""
                       />
                     </div>
                   );
@@ -563,14 +682,17 @@ const FinalToeLoadTestPage = ({ onBack, onNavigateSubmodule }) => {
                     const actualIndex = start2 + idx;
                     const status = getValueStatus(lot, val);
                     return (
-                      <input
-                        key={actualIndex}
-                        type="number"
-                        step="0.1"
-                        className={`value-input ${status}`}
-                        value={val}
-                        onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, true)}
-                      />
+                      <div key={actualIndex} className="tlp-input-wrapper">
+                        <label className="tlp-input-label">#{actualIndex + 1}</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          className={`tlp-input ${status}`}
+                          value={val}
+                          onChange={(e) => handleToeChange(lot.lotNo, actualIndex, e.target.value, true)}
+                          placeholder=""
+                        />
+                      </div>
                     );
                   })}
                 </div>

@@ -12,6 +12,9 @@ import "./FinalWeightTestPage.css";
 const TOLERANCE = { "MK-III": 904, "MK-V": 1068, "ERC-J": 904 };
 
 export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
+  // State for lot selection toggle
+  const [activeLotTab, setActiveLotTab] = useState(0);
+
   // Get live lot data from context
   const { getFpCachedData, selectedCall } = useInspection();
 
@@ -23,7 +26,7 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
 
   // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
   const lotsFromVendor = useMemo(() => {
-    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    let lots = cachedData?.finalLotDetails || [];
 
     // Fallback: Check sessionStorage directly if context cache is empty
     if (lots.length === 0 && callNo) {
@@ -83,7 +86,7 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
 
     // Fallback: Initialize empty data structure from lotsFromVendor
     // Note: We use lotsFromVendor here because lotsData is not yet computed
-    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    let lots = cachedData?.finalLotDetails || [];
     if (lots.length === 0 && currentCallNo) {
       try {
         const storedCache = sessionStorage.getItem('fpDashboardDataCache');
@@ -159,14 +162,16 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
           console.log('Weight test data from DB:', dbData);
 
           // Merge database data with initialized lot data
-          const mergedData = { ...lotsData.reduce((acc, lot) => ({
-            ...acc,
-            [lot.lotNo]: {
-              weight1st: Array(lot.sampleSize).fill(''),
-              weight2nd: Array(lot.sampleSize2nd).fill(''),
-              remarks: ''
-            }
-          }), {}) };
+          const mergedData = {
+            ...lotsData.reduce((acc, lot) => ({
+              ...acc,
+              [lot.lotNo]: {
+                weight1st: Array(lot.sampleSize).fill(''),
+                weight2nd: Array(lot.sampleSize2nd).fill(''),
+                remarks: ''
+              }
+            }), {})
+          };
 
           // Map database records to frontend format
           dbData.forEach(record => {
@@ -217,11 +222,16 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
     }
   }, [callNo, lotsData]);
 
-  // Persist data whenever lotStates changes
+  // Persist data whenever lotStates changes (debounced)
   useEffect(() => {
-    if (Object.keys(lotStates).length > 0 && callNo) {
+    if (Object.keys(lotStates).length === 0 || !callNo) return;
+
+    const timeoutId = setTimeout(() => {
       localStorage.setItem(`weightTestData_${callNo}`, JSON.stringify(lotStates));
-    }
+      console.log('💾 Persisted weight data to localStorage (debounced)');
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
   }, [lotStates, callNo]);
 
   /* 2nd Sampling visibility state and popup */
@@ -355,19 +365,25 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
     /* Determine result */
     let result = 'PENDING';
     let color = '#f59e0b';
-    const hasInput = state.weight1st.some(v => v !== '');
 
-    if (hasInput) {
-      if (r1 <= lot.accpNo) {
+    const isFull1st = state.weight1st.every(v => v !== '');
+    const isFull2nd = state.weight2nd.every(v => v !== '');
+
+    if (r1 >= lot.rejNo) {
+      result = 'NOT OK'; color = '#dc2626';
+    } else if (r1 <= lot.accpNo) {
+      if (isFull1st) {
         result = 'OK'; color = '#16a34a';
-      } else if (r1 >= lot.rejNo) {
+      } else {
+        result = 'PENDING'; color = '#f59e0b';
+      }
+    } else if (showSecond) {
+      if (total >= lot.cummRejNo) {
         result = 'NOT OK'; color = '#dc2626';
-      } else if (showSecond) {
-        if (total < lot.cummRejNo) {
-          result = 'OK'; color = '#16a34a';
-        } else if (total >= lot.cummRejNo) {
-          result = 'NOT OK'; color = '#dc2626';
-        }
+      } else if (isFull1st && isFull2nd) {
+        result = 'OK'; color = '#16a34a';
+      } else {
+        result = 'PENDING'; color = '#f59e0b';
       }
     }
 
@@ -416,8 +432,32 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
       {/* Submodule Navigation */}
       <FinalSubmoduleNav currentSubmodule="final-weight-test" onNavigate={onNavigateSubmodule} />
 
+      {/* Lot Selector */}
+      {lotsData.length > 0 && (
+        <>
+          {lotsData.length === 1 ? (
+            <div className="lot-single">
+              <span>📦 {lotsData[0].lotNo} | Heat {lotsData[0].heatNo}</span>
+            </div>
+          ) : (
+            <div className="lot-selector">
+              {lotsData.map((lot, idx) => (
+                <button
+                  key={lot.lotNo}
+                  className={`lot-btn ${activeLotTab === idx ? 'active' : ''}`}
+                  onClick={() => setActiveLotTab(idx)}
+                >
+                  Lot {lot.lotNo}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* ALL LOTS */}
-      {lotsData.map(lot => {
+      {lotsData.map((lot, idx) => {
+        if (activeLotTab !== idx) return null;
         const state = lotStates[lot.lotNo] || {
           weight1st: Array(lot.sampleSize).fill(''),
           weight2nd: Array(lot.sampleSize2nd).fill(''),
@@ -481,7 +521,7 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                         className={`wt-input-sm ${status}`}
                         value={val}
                         onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, false)}
-                        placeholder="0.0"
+                        placeholder=""
                       />
                     </div>
                   );
@@ -529,7 +569,7 @@ export default function FinalWeightTestPage({ onBack, onNavigateSubmodule }) {
                           className={`wt-input-sm ${status}`}
                           value={val}
                           onChange={(e) => handleWeightChange(lot.lotNo, actualIdx, e.target.value, true)}
-                          placeholder="0.0"
+                          placeholder=""
                         />
                       </div>
                     );

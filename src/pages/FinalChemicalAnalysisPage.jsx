@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useInspection } from "../context/InspectionContext";
 import FinalSubmoduleNav from "../components/FinalSubmoduleNav";
-import { getChemicalAnalysisByCall } from "../services/finalInspectionSubmoduleService";
+import { getChemicalAnalysisByCall, getLadleValuesByCall } from "../services/finalInspectionSubmoduleService";
 import "./FinalChemicalAnalysisPage.css";
 
 const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
+  // State for lot selection toggle
+  const [activeLotTab, setActiveLotTab] = useState(0);
+
   // Get live lot data from context
   const { getFpCachedData, selectedCall } = useInspection();
 
@@ -13,20 +16,25 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
 
   // Get cached dashboard data with fallback to sessionStorage
   const cachedData = getFpCachedData(callNo);
-  let lotsFromVendor = cachedData?.dashboardData?.finalLotDetails || [];
 
-  // Fallback: Check sessionStorage directly if context cache is empty
-  if (lotsFromVendor.length === 0 && callNo) {
-    try {
-      const storedCache = sessionStorage.getItem('fpDashboardDataCache');
-      if (storedCache) {
-        const cacheData = JSON.parse(storedCache);
-        lotsFromVendor = cacheData[callNo]?.finalLotDetails || [];
+  // Memoize lotsFromVendor
+  const lotsFromVendor = useMemo(() => {
+    let lots = cachedData?.finalLotDetails || [];
+
+    // Fallback: Check sessionStorage directly if context cache is empty
+    if (lots.length === 0 && callNo) {
+      try {
+        const storedCache = sessionStorage.getItem('fpDashboardDataCache');
+        if (storedCache) {
+          const cacheData = JSON.parse(storedCache);
+          lots = cacheData[callNo]?.finalLotDetails || [];
+        }
+      } catch (e) {
+        console.error('Error reading from sessionStorage:', e);
       }
-    } catch (e) {
-      console.error('Error reading from sessionStorage:', e);
     }
-  }
+    return lots;
+  }, [cachedData, callNo]);
 
   // Declare state BEFORE using it in mappings
   const [chemValues, setChemValues] = useState(() => {
@@ -55,15 +63,40 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
     return {};
   });
 
+  const [ladleValues, setLadleValues] = useState(() => {
+    const persistedData = localStorage.getItem(`chemicalAnalysisData_${callNo}`);
+    if (persistedData) {
+      try {
+        const parsed = JSON.parse(persistedData);
+        return parsed.ladleValues || [];
+      } catch (e) {
+        console.error('Error parsing persisted ladle values:', e);
+      }
+    }
+    return [];
+  });
+
   // Map live lot data to component format (after state declarations)
-  // Ladle values are always 0 for all lots
-  const availableLots = lotsFromVendor.map(lot => ({
-    lotNo: lot.lotNo || lot.lotNumber,
-    heatNo: lot.heatNo || lot.heatNumber,
-    quantity: lot.lotSize || lot.offeredQty || 0,
-    // Ladle values always display as 0
-    ladleAnalysis: { c: 0, si: 0, mn: 0, s: 0, p: 0 },
-  }));
+  const availableLots = useMemo(() => lotsFromVendor.map(lot => {
+    const lotNo = lot.lotNo || lot.lotNumber;
+    const heatNo = lot.heatNo || lot.heatNumber;
+
+    // Find ladle values for this lot
+    const ladleData = ladleValues.find(l => l.lotNo === lotNo || l.heatNo === heatNo);
+
+    return {
+      lotNo: lotNo,
+      heatNo: heatNo,
+      quantity: lot.lotSize || lot.offeredQty || 0,
+      ladleAnalysis: {
+        c: ladleData?.percentC || 0,
+        si: ladleData?.percentSi || 0,
+        mn: ladleData?.percentMn || 0,
+        s: ladleData?.percentS || 0,
+        p: ladleData?.percentP || 0
+      },
+    };
+  }), [lotsFromVendor, ladleValues]);
 
   const [expandedLot, setExpandedLot] = useState(availableLots[0]?.lotNo || ""); // Default to first lot
 
@@ -136,15 +169,35 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
     }
   }, [callNo]);
 
-  // Persist data whenever chemValues or remarks change
+  // Fetch ladle values
   useEffect(() => {
     if (callNo) {
+      getLadleValuesByCall(callNo)
+        .then((response) => {
+          const data = response?.responseData || [];
+          console.log('✅ Ladle values fetched:', data);
+          setLadleValues(data);
+        })
+        .catch((error) => {
+          console.error('❌ Error fetching ladle values:', error);
+        });
+    }
+  }, [callNo]);
+
+  useEffect(() => {
+    if (!callNo) return;
+
+    const timeoutId = setTimeout(() => {
       localStorage.setItem(`chemicalAnalysisData_${callNo}`, JSON.stringify({
         chemValues,
-        remarks
+        remarks,
+        ladleValues // Save ladle values for dashboard validation
       }));
-    }
-  }, [chemValues, remarks, callNo]);
+      console.log('💾 Persisted chemical data to localStorage (debounced)');
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [chemValues, remarks, ladleValues, callNo]);
 
   const chemicalFields = [
     { id: "c", label: "% C (Carbon)" },
@@ -195,25 +248,22 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
     const range = elementRanges[element];
     const tolerance = tolerances[element];
 
-    // Rule 1: Check if value is within specification range
-    const withinRange = pVal >= range.min && pVal <= range.max;
-    if (!withinRange) return "fail";
-
-    // Rule 2: Check tolerance from ladle value
-    // For S and P: only positive tolerance (product can be higher than ladle)
-    // For C, Mn, Si: ± tolerance (product can be higher or lower)
-    let withinTolerance = false;
-
-    if (element === 's' || element === 'p') {
-      // S and P: product value should be within ladle to (ladle + tolerance)
-      withinTolerance = pVal >= lVal && pVal <= (lVal + tolerance);
-    } else {
-      // C, Mn, Si: product value should be within (ladle - tolerance) to (ladle + tolerance)
-      const diff = Math.abs(pVal - lVal);
-      withinTolerance = diff <= tolerance;
+    // Special rule for Sulphur and Phosphorus: only upper bound check against ladle
+    if (element === "s" || element === "p") {
+      // anything which is less than equal to Ladle Sulphur/Phosphorus + 0.005 will be acceptable
+      return pVal <= (lVal + tolerance) ? "pass" : "fail";
     }
 
-    return withinTolerance ? "pass" : "fail";
+    // Standard rule for Carbon, Silicon, Manganese (± tolerance)
+    const diff = Math.abs(pVal - lVal);
+    const withinTolerance = diff <= (tolerance + 0.0001);
+
+    // Ensure it's within "Permissible Variation" limits
+    const expandedMin = range.min - tolerance;
+    const expandedMax = range.max + tolerance;
+    const withinExpandedRange = pVal >= (expandedMin - 0.0001) && pVal <= (expandedMax + 0.0001);
+
+    return (withinTolerance && withinExpandedRange) ? "pass" : "fail";
   };
 
   return (
@@ -234,145 +284,173 @@ const FinalChemicalAnalysisPage = ({ onBack, onNavigateSubmodule }) => {
         onNavigate={onNavigateSubmodule}
       />
 
+      {/* Lot Selector */}
+      {availableLots.length > 0 && (
+        <>
+          {availableLots.length === 1 ? (
+            <div className="lot-single">
+              <span>📦 {availableLots[0].lotNo} | Heat {availableLots[0].heatNo}</span>
+            </div>
+          ) : (
+            <div className="lot-selector">
+              {availableLots.map((lot, idx) => (
+                <button
+                  key={lot.lotNo}
+                  className={`lot-btn ${activeLotTab === idx ? 'active' : ''}`}
+                  onClick={() => setActiveLotTab(idx)}
+                >
+                  Lot {lot.lotNo}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* DESKTOP/TABLET VIEW */}
       <div className="desktop-fields">
-        {availableLots.map((lot) => (
-          <div key={lot.lotNo} className="chem-section">
-            <div className="chem-title">
-              📦 Lot: {lot.lotNo} | Heat No: {lot.heatNo}
-            </div>
+        {availableLots.map((lot, idx) => {
+          if (activeLotTab !== idx) return null;
+          return (
+            <div key={lot.lotNo} className="chem-section">
+              <div className="chem-title">
+                📦 Lot: {lot.lotNo} | Heat No: {lot.heatNo}
+              </div>
 
-           <div className="chem-label-grid">
-  <span></span> {/* empty space for label column */}
-  {chemicalFields.map((field) => (
-    <span key={field.id}>{field.label}</span>
-  ))}
-</div>
-
-
-            <div className="chem-row">
-              <div className="chem-row-label">Ladle Values</div>
-              <div className="chem-input-grid">
+              <div className="chem-label-grid">
+                <span></span> {/* empty space for label column */}
                 {chemicalFields.map((field) => (
-                  <div key={field.id} className="ladle-value">
-                    {lot.ladleAnalysis[field.id]?.toFixed(
-                      field.id === "s" || field.id === "p" ? 3 : 2
-                    )}
-                  </div>
+                  <span key={field.id}>{field.label}</span>
                 ))}
               </div>
-            </div>
 
-            <div className="chem-row">
-              <div className="chem-row-label">Product Values</div>
-              <div className="chem-input-grid">
-                {chemicalFields.map((field) => {
-                  const productValue = chemValues[lot.lotNo]?.[field.id] || "";
-                  const ladleValue = lot.ladleAnalysis[field.id];
-                  const status = getValueStatus(field.id, productValue, ladleValue);
 
-                  return (
-                    <input
-                      key={field.id}
-                      type="number"
-                      step="0.001"
-                      className={`product-input ${status}`}
-                      placeholder="Enter value"
-                      value={productValue}
-                      onChange={(e) =>
-                        handleChemChange(lot.lotNo, field.id, e.target.value)
-                      }
-                    />
-                  );
-                })}
+              <div className="chem-row">
+                <div className="chem-row-label">Ladle Values</div>
+                <div className="chem-input-grid">
+                  {chemicalFields.map((field) => (
+                    <div key={field.id} className="ladle-value">
+                      {lot.ladleAnalysis[field.id]?.toFixed(
+                        field.id === "s" || field.id === "p" ? 3 : 2
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="chem-row">
-              <div className="chem-row-label">Remarks</div>
-              <textarea
-                className="remarks-input"
-                placeholder="Enter remarks..."
-                value={remarks[lot.lotNo] || ""}
-                onChange={(e) =>
-                  setRemarks((prev) => ({
-                    ...prev,
-                    [lot.lotNo]: e.target.value,
-                  }))
-                }
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+              <div className="chem-row">
+                <div className="chem-row-label">Product Values</div>
+                <div className="chem-input-grid">
+                  {chemicalFields.map((field) => {
+                    const productValue = chemValues[lot.lotNo]?.[field.id] || "";
+                    const ladleValue = lot.ladleAnalysis[field.id];
+                    const status = getValueStatus(field.id, productValue, ladleValue);
 
-      {/* MOBILE VIEW (COLLAPSIBLE) */}
-      <div className="mobile-fields">
-        {availableLots.map((lot) => (
-          <div
-            key={lot.lotNo}
-            className={`mobile-lot ${
-              expandedLot === lot.lotNo ? "open" : ""
-            }`}
-          >
-            <div
-              className="mobile-lot-header"
-              onClick={() => toggleLot(lot.lotNo)}
-            >
-              <span>
-                📦 {lot.lotNo} | {lot.heatNo}
-              </span>
-              <span className="arrow">{expandedLot === lot.lotNo ? "▲" : "▼"}</span>
-            </div>
-
-            <div className="mobile-lot-body">
-              <div className="mobile-lot-body-content">
-                {chemicalFields.map((field) => {
-                  const productValue = chemValues[lot.lotNo]?.[field.id] || "";
-                  const ladleValue = lot.ladleAnalysis[field.id];
-                  const status = getValueStatus(field.id, productValue, ladleValue);
-
-                  return (
-                    <div key={field.id} className="mobile-field-block">
-                      <div className="mobile-field-label">{field.label}</div>
-                      <div className="mobile-ladle">
-                        <strong>Ladle:</strong>{" "}
-                        {lot.ladleAnalysis[field.id]?.toFixed(
-                          field.id === "s" || field.id === "p" ? 3 : 2
-                        )}
-                      </div>
+                    return (
                       <input
+                        key={field.id}
                         type="number"
                         step="0.001"
-                        className={`mobile-product ${status}`}
-                        placeholder="Enter product value"
+                        className={`product-input ${status}`}
+                        placeholder="Enter value"
                         value={productValue}
                         onChange={(e) =>
                           handleChemChange(lot.lotNo, field.id, e.target.value)
                         }
                       />
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </div>
 
-                <div className="mobile-field-block remarks-block">
-                  <div className="mobile-field-label">Remarks</div>
-                  <textarea
-                    className="remarks-input"
-                    placeholder="Enter remarks..."
-                    value={remarks[lot.lotNo] || ""}
-                    onChange={(e) =>
-                      setRemarks((prev) => ({
-                        ...prev,
-                        [lot.lotNo]: e.target.value,
-                      }))
-                    }
-                  />
+              <div className="chem-row">
+                <div className="chem-row-label">Remarks</div>
+                <textarea
+                  className="remarks-input"
+                  placeholder="Enter remarks..."
+                  value={remarks[lot.lotNo] || ""}
+                  onChange={(e) =>
+                    setRemarks((prev) => ({
+                      ...prev,
+                      [lot.lotNo]: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* MOBILE VIEW (COLLAPSIBLE) */}
+      <div className="mobile-fields">
+        {availableLots.map((lot, idx) => {
+          if (activeLotTab !== idx) return null;
+          return (
+            <div
+              key={lot.lotNo}
+              className={`mobile-lot ${expandedLot === lot.lotNo ? "open" : ""
+                }`}
+            >
+              <div
+                className="mobile-lot-header"
+                onClick={() => toggleLot(lot.lotNo)}
+              >
+                <span>
+                  📦 {lot.lotNo} | {lot.heatNo}
+                </span>
+                <span className="arrow">{expandedLot === lot.lotNo ? "▲" : "▼"}</span>
+              </div>
+
+              <div className="mobile-lot-body">
+                <div className="mobile-lot-body-content">
+                  {chemicalFields.map((field) => {
+                    const productValue = chemValues[lot.lotNo]?.[field.id] || "";
+                    const ladleValue = lot.ladleAnalysis[field.id];
+                    const status = getValueStatus(field.id, productValue, ladleValue);
+
+                    return (
+                      <div key={field.id} className="mobile-field-block">
+                        <div className="mobile-field-label">{field.label}</div>
+                        <div className="mobile-ladle">
+                          <strong>Ladle:</strong>{" "}
+                          {lot.ladleAnalysis[field.id]?.toFixed(
+                            field.id === "s" || field.id === "p" ? 3 : 2
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          step="0.001"
+                          className={`mobile-product ${status}`}
+                          placeholder="Enter product value"
+                          value={productValue}
+                          onChange={(e) =>
+                            handleChemChange(lot.lotNo, field.id, e.target.value)
+                          }
+                        />
+                      </div>
+                    );
+                  })}
+
+                  <div className="mobile-field-block remarks-block">
+                    <div className="mobile-field-label">Remarks</div>
+                    <textarea
+                      className="remarks-input"
+                      placeholder="Enter remarks..."
+                      value={remarks[lot.lotNo] || ""}
+                      onChange={(e) =>
+                        setRemarks((prev) => ({
+                          ...prev,
+                          [lot.lotNo]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* FOOTER */}

@@ -9,6 +9,15 @@ import {
 import "./FinalApplicationDeflectionPage.css";
 
 const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
+  // State for lot selection toggle
+  const [activeLotTab, setActiveLotTab] = useState(0);
+
+  // State to track if 2nd sampling should be SHOWN in UI
+  const [showSubsamplingMap, setShowSubsamplingMap] = useState({});
+
+  // State for Confirmation Popup
+  const [popupLot, setPopupLot] = useState(null); // { lotNo, type: 'dim' | 'defl' }
+
   // Get live lot data from context
   const { getFpCachedData, selectedCall } = useInspection();
 
@@ -114,16 +123,18 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
           console.log('Application deflection data from DB:', deflData);
 
           // Initialize merged data structure - use lotsFromVendor instead of lotsData to avoid dependency
-          const mergedData = { ...lotsFromVendor.reduce((acc, lot) => ({
-            ...acc,
-            [lot.lotNo || lot.lotNumber]: {
-              dimGo1: "", dimNoGo1: "", dimFlat1: "",
-              dimGo2: "", dimNoGo2: "", dimFlat2: "",
-              dimRemarks: "",
-              deflectionR1: "", deflectionR2: "",
-              deflectionRemarks: ""
-            }
-          }), {}) };
+          const mergedData = {
+            ...lotsFromVendor.reduce((acc, lot) => ({
+              ...acc,
+              [lot.lotNo || lot.lotNumber]: {
+                dimGo1: "", dimNoGo1: "", dimFlat1: "",
+                dimGo2: "", dimNoGo2: "", dimFlat2: "",
+                dimRemarks: "",
+                deflectionR1: "", deflectionR2: "",
+                deflectionRemarks: ""
+              }
+            }), {})
+          };
 
           // Map dimensional inspection data (NEW PARENT-CHILD STRUCTURE)
           dimData.forEach(record => {
@@ -195,12 +206,96 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
     }
   }, [callNo, lotsFromVendor]);
 
-  // Persist data whenever lotStates changes
   useEffect(() => {
     if (Object.keys(lotStates).length > 0 && callNo) {
       localStorage.setItem(`deflectionTestData_${callNo}`, JSON.stringify(lotStates));
     }
   }, [lotStates, callNo]);
+
+  // Handle auto-showing 2nd sampling and triggering confirmation popup
+  useEffect(() => {
+    const newShowMap = { ...showSubsamplingMap };
+    let changed = false;
+
+    lotsData.forEach(lot => {
+      const state = lotStates[lot.lotNo];
+      if (!state) return;
+
+      const lotNo = lot.lotNo;
+      if (!newShowMap[lotNo]) newShowMap[lotNo] = { dim: false, defl: false };
+
+      // --- DIMENSION ---
+      const r1Dim = safe(state.dimGo1) + safe(state.dimNoGo1) + safe(state.dimFlat1);
+      const hasR1Dim = state.dimGo1 !== '' || state.dimNoGo1 !== '' || state.dimFlat1 !== '';
+      const shouldShowDim = hasR1Dim && r1Dim > lot.accpNo && r1Dim < lot.rejNo;
+      const hasDataDim = state.dimGo2 !== '' || state.dimNoGo2 !== '' || state.dimFlat2 !== '';
+
+      if (shouldShowDim && !newShowMap[lotNo].dim) {
+        newShowMap[lotNo].dim = true;
+        changed = true;
+      } else if (!shouldShowDim && newShowMap[lotNo].dim && hasDataDim) {
+        // Condition cleared but data exists - trigger popup
+        if (!popupLot || popupLot.lotNo !== lotNo || popupLot.type !== 'dim') {
+          setPopupLot({ lotNo, type: 'dim' });
+        }
+      } else if (!shouldShowDim && !hasDataDim && newShowMap[lotNo].dim) {
+        newShowMap[lotNo].dim = false;
+        changed = true;
+      }
+
+      // --- DEFLECTION ---
+      const r1Defl = state.deflectionR1 === '' ? 0 : parseInt(state.deflectionR1);
+      const hasR1Defl = state.deflectionR1 !== '';
+      const shouldShowDefl = hasR1Defl && r1Defl > lot.accpNo && r1Defl < lot.rejNo;
+      const hasDataDefl = state.deflectionR2 !== '';
+
+      if (shouldShowDefl && !newShowMap[lotNo].defl) {
+        newShowMap[lotNo].defl = true;
+        changed = true;
+      } else if (!shouldShowDefl && newShowMap[lotNo].defl && hasDataDefl) {
+        // Condition cleared but data exists - trigger popup
+        if (!popupLot || popupLot.lotNo !== lotNo || popupLot.type !== 'defl') {
+          setPopupLot({ lotNo, type: 'defl' });
+        }
+      } else if (!shouldShowDefl && !hasDataDefl && newShowMap[lotNo].defl) {
+        newShowMap[lotNo].defl = false;
+        changed = true;
+      }
+    });
+
+    if (changed) setShowSubsamplingMap(newShowMap);
+  }, [lotStates, lotsData, popupLot, showSubsamplingMap]);
+
+  const handlePopupYesHideOnly = () => {
+    if (!popupLot) return;
+    const { lotNo, type } = popupLot;
+    setShowSubsamplingMap(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], [type]: false }
+    }));
+    setPopupLot(null);
+  };
+
+  const handlePopupNoClearHide = () => {
+    if (!popupLot) return;
+    const { lotNo, type } = popupLot;
+
+    setLotStates(prev => {
+      const newState = { ...prev };
+      if (type === 'dim') {
+        newState[lotNo] = { ...newState[lotNo], dimGo2: "", dimNoGo2: "", dimFlat2: "" };
+      } else {
+        newState[lotNo] = { ...newState[lotNo], deflectionR2: "" };
+      }
+      return newState;
+    });
+
+    setShowSubsamplingMap(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], [type]: false }
+    }));
+    setPopupLot(null);
+  };
 
   /* Helper to safely parse number */
   const safe = (val) => {
@@ -262,25 +357,30 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
     const r1 = safe(state.dimGo1) + safe(state.dimNoGo1) + safe(state.dimFlat1);
     const r2 = safe(state.dimGo2) + safe(state.dimNoGo2) + safe(state.dimFlat2);
     const total = r1 + r2;
-    const hasR1Input = state.dimGo1 !== '' || state.dimNoGo1 !== '' || state.dimFlat1 !== '';
+    const isFullR1 = state.dimGo1 !== '' && state.dimNoGo1 !== '' && state.dimFlat1 !== '';
+    const isFullR2 = state.dimGo2 !== '' && state.dimNoGo2 !== '' && state.dimFlat2 !== '';
 
-    /* Show 2nd sampling if R1 > Acceptance No. AND R1 < Rejection No. */
-    const showSecond = hasR1Input && r1 > lot.accpNo && r1 < lot.rejNo;
+    /* Show 2nd sampling based on visibility map */
+    const showSecond = showSubsamplingMap[lot.lotNo]?.dim || false;
 
     let result = 'PENDING';
     let color = '#f59e0b';
 
-    if (hasR1Input) {
-      if (r1 <= lot.accpNo) {
+    if (r1 >= lot.rejNo) {
+      result = 'NOT OK'; color = '#dc2626';
+    } else if (r1 <= lot.accpNo) {
+      if (isFullR1) {
         result = 'OK'; color = '#16a34a';
-      } else if (r1 >= lot.rejNo) {
+      } else {
+        result = 'PENDING'; color = '#f59e0b';
+      }
+    } else if (showSecond) {
+      if (total >= lot.cummRejNo) {
         result = 'NOT OK'; color = '#dc2626';
-      } else if (showSecond && (state.dimGo2 !== '' || state.dimNoGo2 !== '' || state.dimFlat2 !== '')) {
-        if (total < lot.cummRejNo) {
-          result = 'OK'; color = '#16a34a';
-        } else {
-          result = 'NOT OK'; color = '#dc2626';
-        }
+      } else if (isFullR1 && isFullR2) {
+        result = 'OK'; color = '#16a34a';
+      } else {
+        result = 'PENDING'; color = '#f59e0b';
       }
     }
 
@@ -299,25 +399,30 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
     const r1 = state.deflectionR1 === '' ? 0 : parseInt(state.deflectionR1);
     const r2 = state.deflectionR2 === '' ? 0 : parseInt(state.deflectionR2);
     const total = r1 + r2;
-    const hasR1Input = state.deflectionR1 !== '';
+    const isFullR1 = state.deflectionR1 !== '';
+    const isFullR2 = state.deflectionR2 !== '';
 
-    /* Show 2nd sampling if R1 > Acceptance No. AND R1 < Rejection No. */
-    const showSecond = hasR1Input && r1 > lot.accpNo && r1 < lot.rejNo;
+    /* Show 2nd sampling based on visibility map */
+    const showSecond = showSubsamplingMap[lot.lotNo]?.defl || false;
 
     let result = 'PENDING';
     let color = '#f59e0b';
 
-    if (hasR1Input) {
-      if (r1 <= lot.accpNo) {
+    if (r1 >= lot.rejNo) {
+      result = 'NOT OK'; color = '#dc2626';
+    } else if (r1 <= lot.accpNo) {
+      if (isFullR1) {
         result = 'OK'; color = '#16a34a';
-      } else if (r1 >= lot.rejNo) {
+      } else {
+        result = 'PENDING'; color = '#f59e0b';
+      }
+    } else if (showSecond) {
+      if (total >= lot.cummRejNo) {
         result = 'NOT OK'; color = '#dc2626';
-      } else if (showSecond && state.deflectionR2 !== '') {
-        if (total < lot.cummRejNo) {
-          result = 'OK'; color = '#16a34a';
-        } else {
-          result = 'NOT OK'; color = '#dc2626';
-        }
+      } else if (isFullR1 && isFullR2) {
+        result = 'OK'; color = '#16a34a';
+      } else {
+        result = 'PENDING'; color = '#f59e0b';
       }
     }
 
@@ -338,6 +443,29 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
       {/* Submodule Navigation */}
       <FinalSubmoduleNav currentSubmodule="final-application-deflection" onNavigate={onNavigateSubmodule} />
 
+      {/* Lot Selector */}
+      {lotsData.length > 0 && (
+        <>
+          {lotsData.length === 1 ? (
+            <div className="lot-single">
+              <span>📦 {lotsData[0].lotNo} | Heat {lotsData[0].heatNo}</span>
+            </div>
+          ) : (
+            <div className="lot-selector">
+              {lotsData.map((lot, idx) => (
+                <button
+                  key={lot.lotNo}
+                  className={`lot-btn ${activeLotTab === idx ? 'active' : ''}`}
+                  onClick={() => setActiveLotTab(idx)}
+                >
+                  Lot {lot.lotNo}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* TABS */}
       <div className="ad-tabs">
         <button
@@ -357,7 +485,8 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
       {/* TAB CONTENT */}
       {activeTab === 'dimension' && (
         <div className="ad-tab-content">
-          {lotsData.map(lot => {
+          {lotsData.map((lot, idx) => {
+            if (activeLotTab !== idx) return null;
             const state = lotStates[lot.lotNo];
             const summary = getDimSummary(lot);
 
@@ -495,7 +624,8 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
 
       {activeTab === 'deflection' && (
         <div className="ad-tab-content">
-          {lotsData.map(lot => {
+          {lotsData.map((lot, idx) => {
+            if (activeLotTab !== idx) return null;
             const state = lotStates[lot.lotNo];
             const summary = getDeflectionSummary(lot);
 
@@ -617,6 +747,57 @@ const FinalApplicationDeflectionPage = ({ onBack, onNavigateSubmodule }) => {
         <button className="ad-btn ad-btn-outline" onClick={onBack}>Cancel</button>
         <button className="ad-btn ad-btn-primary" onClick={() => alert('Saved!')}>Save & Continue</button>
       </div> */}
+
+      {/* ==================== CONFIRMATION POPUP ==================== */}
+      {popupLot && (
+        <div className="ad-popup-overlay">
+          <div className="ad-popup-box">
+            <p>
+              2nd Sampling for <strong>{popupLot.type === 'dim' ? 'Dimensional' : 'Deflection'}</strong> is no longer required.<br />
+              Do you want to hide it?
+            </p>
+            <div className="ad-popup-actions">
+              <button className="ad-popup-btn" onClick={handlePopupNoClearHide}>
+                No (Clear & Hide)
+              </button>
+              <button className="ad-popup-btn ad-popup-primary" onClick={handlePopupYesHideOnly}>
+                Yes (Hide Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== PAGE STYLES ==================== */}
+      <style>{`
+        .ad-popup-overlay {
+          position: fixed;
+          top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0, 0, 0, 0.4);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 10000;
+        }
+        .ad-popup-box {
+          background: white; padding: 24px; border-radius: 12px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+          text-align: center; max-width: 400px; width: 90%;
+        }
+        .ad-popup-box p {
+          font-size: 16px; color: #334155; margin-bottom: 20px;
+          line-height: 1.5; font-weight: 500;
+        }
+        .ad-popup-actions { display: flex; gap: 12px; justify-content: center; }
+        .ad-popup-btn {
+          padding: 10px 20px; border-radius: 6px; font-size: 14px;
+          font-weight: 600; cursor: pointer; transition: all 0.2s;
+          border: 1px solid #e2e8f0; background: #f1f5f9; color: #475569;
+        }
+        .ad-popup-btn:hover { background: #e2e8f0; }
+        .ad-popup-btn.ad-popup-primary {
+          background: #0d9488; color: white; border-color: #0d9488;
+        }
+        .ad-popup-btn.ad-popup-primary:hover { background: #0f766e; }
+      `}</style>
     </div>
   );
 };

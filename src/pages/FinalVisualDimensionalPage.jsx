@@ -55,6 +55,9 @@ const getAvailableLots = (lotsFromVendor = []) => {
 };
 
 const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
+  // State for lot selection toggle
+  const [activeLotTab, setActiveLotTab] = useState(0);
+
   // Get live lot data from context
   const { getFpCachedData, selectedCall } = useInspection();
 
@@ -64,7 +67,7 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
   // Get cached dashboard data with fallback to sessionStorage
   const lotsFromVendor = useMemo(() => {
     const cachedData = getFpCachedData(callNo);
-    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    let lots = cachedData?.finalLotDetails || [];
 
     // Fallback: Check sessionStorage directly if context cache is empty
     if (lots.length === 0 && callNo) {
@@ -195,21 +198,23 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
           console.log('Dimensional data from DB:', dimensionalData);
 
           // Merge database data with initialized lot data
-          const mergedData = { ...availableLots.reduce((acc, lot) => ({
-            ...acc,
-            [lot.lotNo]: {
-              visualR1: "",
-              visualR2: "",
-              visualRemark: "",
-              dimGo1: "",
-              dimNoGo1: "",
-              dimFlat1: "",
-              dimGo2: "",
-              dimNoGo2: "",
-              dimFlat2: "",
-              dimRemark: ""
-            }
-          }), {}) };
+          const mergedData = {
+            ...availableLots.reduce((acc, lot) => ({
+              ...acc,
+              [lot.lotNo]: {
+                visualR1: "",
+                visualR2: "",
+                visualRemark: "",
+                dimGo1: "",
+                dimNoGo1: "",
+                dimFlat1: "",
+                dimGo2: "",
+                dimNoGo2: "",
+                dimFlat2: "",
+                dimRemark: ""
+              }
+            }), {})
+          };
 
           // Merge visual inspection data
           visualData.forEach(record => {
@@ -253,11 +258,16 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
     }
   }, [callNo, availableLots, initializeLotData]);
 
-  // Persist data whenever lotData changes
+  // Persist data whenever lotData changes (debounced)
   useEffect(() => {
-    if (Object.keys(lotData).length > 0 && callNo) {
+    if (Object.keys(lotData).length === 0 || !callNo) return;
+
+    const timeoutId = setTimeout(() => {
       localStorage.setItem(`visualDimensionalData_${callNo}`, JSON.stringify(lotData));
-    }
+      console.log('💾 Persisted visual dimensional data to localStorage (debounced)');
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
   }, [lotData, callNo]);
 
   const handleChange = (lotNo, field, value) => {
@@ -417,6 +427,44 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
   };
 
   const styles = `
+    .lot-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 0 4px;
+      flex-wrap: wrap;
+    }
+    .lot-single {
+      margin-bottom: 16px;
+      padding: 4px 12px;
+      background: #f1f5f9;
+      border-radius: 6px;
+      display: inline-block;
+      font-weight: 600;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+    .lot-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid #e2e8f0;
+      background: white;
+      color: #64748b;
+    }
+    .lot-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+    .lot-btn.active {
+      background: #0ea5e9;
+      color: white;
+      border-color: #0ea5e9;
+      box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);
+    }
     .section-wrapper {
       background: #ffffff;
       border: 1px solid #dce1e7;
@@ -629,6 +677,29 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
 
       <FinalSubmoduleNav currentSubmodule="final-visual-dimensional" onNavigate={onNavigateSubmodule} />
 
+      {/* Lot Selector */}
+      {availableLots.length > 0 && (
+        <>
+          {availableLots.length === 1 ? (
+            <div className="lot-single">
+              <span>📦 {availableLots[0].lotNo} | Heat {availableLots[0].heatNo}</span>
+            </div>
+          ) : (
+            <div className="lot-selector">
+              {availableLots.map((lot, idx) => (
+                <button
+                  key={lot.lotNo}
+                  className={`lot-btn ${activeLotTab === idx ? 'active' : ''}`}
+                  onClick={() => setActiveLotTab(idx)}
+                >
+                  Lot {lot.lotNo}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* Show message if no lots available */}
       {availableLots.length === 0 && (
         <div style={{
@@ -654,7 +725,8 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
 
         {visualExpanded && (
           <div className="section-content">
-            {availableLots.map(lot => {
+            {availableLots.map((lot, idx) => {
+              if (activeLotTab !== idx) return null;
               const d = lotData[lot.lotNo];
               const r1 = safe(d.visualR1);
               const r2 = safe(d.visualR2);
@@ -662,18 +734,21 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
               const totalRejected = r1 + (show2nd ? r2 : 0);
 
               // Check if any data has been filled
-              const hasData = d.visualR1 !== "" || d.visualR2 !== "" || d.visualRemark !== "";
+              // Check if any data has been filled
 
-              /* 2nd sampling logic: If R1 > Acceptance No., show 2nd sampling */
-              /* Final status: OK if R1 <= AccpNo, NOT OK if total >= CummRejNo, PENDING if no data */
+              /* Final status: OK if r1 <= AccpNo and filled, NOT OK if rejected criteria met, PENDING otherwise */
               const status =
-                !hasData
-                  ? { text: "PENDING", color: "#f59e0b" }
-                  : r1 <= lot.accpNo
-                  ? { text: "OK", color: "#22c55e" }
-                  : totalRejected >= lot.cummRejNo
+                r1 >= lot.rejNo
                   ? { text: "NOT OK", color: "#ef4444" }
-                  : { text: "Pending", color: "#f59e0b" };
+                  : (r1 <= lot.accpNo && d.visualR1 !== "")
+                    ? { text: "OK", color: "#22c55e" }
+                    : show2nd
+                      ? (d.visualR2 !== ""
+                        ? (r1 + safe(d.visualR2)) >= lot.cummRejNo
+                          ? { text: "NOT OK", color: "#ef4444" }
+                          : { text: "OK", color: "#22c55e" }
+                        : { text: "PENDING", color: "#f59e0b" })
+                      : { text: "PENDING", color: "#f59e0b" };
 
               return (
                 <div key={lot.lotNo} className="lot-card">
@@ -696,6 +771,11 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
                     <span className="lot-header-item">
                       <span className="lot-header-label">Re:</span> {lot.rejNo}
                     </span>
+                    {lot.cummRejNo && (
+                      <span className="lot-header-item">
+                        <span className="lot-header-label">Cumm R:</span> {lot.cummRejNo}
+                      </span>
+                    )}
                   </div>
 
                   {/* 1st Sampling Row - All fields in one row on desktop */}
@@ -771,27 +851,29 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
 
         {dimensionalExpanded && (
           <div className="section-content">
-            {availableLots.map(lot => {
+            {availableLots.map((lot, idx) => {
+              if (activeLotTab !== idx) return null;
               const d = lotData[lot.lotNo];
               const r1 = safe(d.dimGo1) + safe(d.dimNoGo1) + safe(d.dimFlat1);
               const r2 = safe(d.dimGo2) + safe(d.dimNoGo2) + safe(d.dimFlat2);
               const show2nd = !!showDim2ndMap[lot.lotNo];
               const totalRejected = r1 + (show2nd ? r2 : 0);
 
-              // Check if any data has been filled
-              const hasData = d.dimGo1 !== "" || d.dimNoGo1 !== "" || d.dimFlat1 !== "" ||
-                              d.dimGo2 !== "" || d.dimNoGo2 !== "" || d.dimFlat2 !== "" ||
-                              d.dimRemark !== "";
 
-              /* Final status: OK if R1 <= AccpNo, NOT OK if total >= CummRejNo, PENDING if no data */
+              /* Final status logic strictly following IS 2500 Double Sampling rules */
+              const isFullR1 = d.dimGo1 !== "" && d.dimNoGo1 !== "" && d.dimFlat1 !== "";
+              const isFullR2 = d.dimGo2 !== "" && d.dimNoGo2 !== "" && d.dimFlat2 !== "";
+
               const status =
-                !hasData
-                  ? { text: "PENDING", color: "#f59e0b" }
-                  : r1 <= lot.accpNo
-                  ? { text: "OK", color: "#22c55e" }
-                  : totalRejected >= lot.cummRejNo
+                r1 >= lot.rejNo
                   ? { text: "NOT OK", color: "#ef4444" }
-                  : { text: "Pending", color: "#f59e0b" };
+                  : (r1 <= lot.accpNo && isFullR1)
+                    ? { text: "OK", color: "#22c55e" }
+                    : show2nd
+                      ? (r1 + r2 >= lot.cummRejNo
+                        ? { text: "NOT OK", color: "#ef4444" }
+                        : (isFullR1 && isFullR2 ? { text: "OK", color: "#22c55e" } : { text: "PENDING", color: "#f59e0b" }))
+                      : { text: "PENDING", color: "#f59e0b" };
 
               return (
                 <div key={lot.lotNo} className="lot-card">
@@ -814,6 +896,11 @@ const FinalVisualDimensionalPage = ({ onBack, onNavigateSubmodule }) => {
                     <span className="lot-header-item">
                       <span className="lot-header-label">Re:</span> {lot.rejNo}
                     </span>
+                    {lot.cummRejNo && (
+                      <span className="lot-header-item">
+                        <span className="lot-header-label">Cumm R:</span> {lot.cummRejNo}
+                      </span>
+                    )}
                   </div>
 
                   {/* 1st Sampling */}

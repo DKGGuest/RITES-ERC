@@ -37,7 +37,7 @@ export const calculateBagsForSampling = (totalBags) => {
  */
 export const getDimensionWeightAQL = (lotSize) => {
   const size = parseInt(lotSize, 10) || 0;
-  
+
   // 2-150: Double sampling not provided, use single sampling
   if (size <= 150) {
     return { n1: calculateSampleSize(size), ac1: 0, re1: 1, n2: 0, cummRej: 1, useSingleSampling: true };
@@ -45,12 +45,12 @@ export const getDimensionWeightAQL = (lotSize) => {
   if (size <= 280) return { n1: 20, ac1: 0, re1: 3, n2: 20, cummRej: 4, useSingleSampling: false };
   if (size <= 500) return { n1: 32, ac1: 1, re1: 3, n2: 32, cummRej: 5, useSingleSampling: false };
   if (size <= 1200) return { n1: 50, ac1: 2, re1: 5, n2: 50, cummRej: 7, useSingleSampling: false };
-  if (size <= 3200) return { n1: 80, ac1: 3, re1: 6, n2: 125, cummRej: 10, useSingleSampling: false };
-  if (size <= 10000) return { n1: 125, ac1: 5, re1: 9, n2: 200, cummRej: 13, useSingleSampling: false };
-  if (size <= 35000) return { n1: 200, ac1: 7, re1: 11, n2: 315, cummRej: 19, useSingleSampling: false };
-  if (size <= 150000) return { n1: 315, ac1: 11, re1: 16, n2: 500, cummRej: 27, useSingleSampling: false };
-  if (size <= 500000) return { n1: 500, ac1: 11, re1: 16, n2: 800, cummRej: 27, useSingleSampling: false };
-  return { n1: 500, ac1: 11, re1: 16, n2: 800, cummRej: 27, useSingleSampling: false };
+  if (size <= 3200) return { n1: 80, ac1: 3, re1: 6, n2: 80, cummRej: 10, useSingleSampling: false };
+  if (size <= 10000) return { n1: 125, ac1: 5, re1: 9, n2: 125, cummRej: 13, useSingleSampling: false };
+  if (size <= 35000) return { n1: 200, ac1: 7, re1: 11, n2: 200, cummRej: 19, useSingleSampling: false };
+  if (size <= 150000) return { n1: 315, ac1: 11, re1: 16, n2: 315, cummRej: 27, useSingleSampling: false };
+  if (size <= 500000) return { n1: 500, ac1: 11, re1: 16, n2: 500, cummRej: 27, useSingleSampling: false };
+  return { n1: 500, ac1: 11, re1: 16, n2: 500, cummRej: 27, useSingleSampling: false };
 };
 
 /**
@@ -59,7 +59,7 @@ export const getDimensionWeightAQL = (lotSize) => {
  */
 export const getHardnessToeLoadAQL = (lotSize) => {
   const size = parseInt(lotSize, 10) || 0;
-  
+
   // 2-150: Double sampling not provided, use single sampling
   if (size <= 150) {
     return { n1: calculateSampleSize(size), ac1: 0, re1: 1, n2: 0, cummRej: 1, useSingleSampling: true };
@@ -67,11 +67,11 @@ export const getHardnessToeLoadAQL = (lotSize) => {
   if (size <= 280) return { n1: 20, ac1: 0, re1: 2, n2: 20, cummRej: 2, useSingleSampling: false };
   if (size <= 500) return { n1: 32, ac1: 0, re1: 3, n2: 32, cummRej: 4, useSingleSampling: false };
   if (size <= 1200) return { n1: 50, ac1: 1, re1: 3, n2: 50, cummRej: 5, useSingleSampling: false };
-  if (size <= 3200) return { n1: 125, ac1: 2, re1: 5, n2: 125, cummRej: 7, useSingleSampling: false };
-  if (size <= 10000) return { n1: 200, ac1: 3, re1: 6, n2: 200, cummRej: 10, useSingleSampling: false };
-  if (size <= 35000) return { n1: 315, ac1: 5, re1: 9, n2: 315, cummRej: 13, useSingleSampling: false };
-  if (size <= 150000) return { n1: 500, ac1: 7, re1: 11, n2: 500, cummRej: 19, useSingleSampling: false };
-  if (size <= 500000) return { n1: 800, ac1: 11, re1: 16, n2: 800, cummRej: 27, useSingleSampling: false };
-  return { n1: 800, ac1: 11, re1: 16, n2: 800, cummRej: 27, useSingleSampling: false };
+  if (size <= 3200) return { n1: 80, ac1: 2, re1: 5, n2: 80, cummRej: 7, useSingleSampling: false };
+  if (size <= 10000) return { n1: 125, ac1: 3, re1: 6, n2: 125, cummRej: 10, useSingleSampling: false };
+  if (size <= 35000) return { n1: 200, ac1: 5, re1: 9, n2: 200, cummRej: 13, useSingleSampling: false };
+  if (size <= 150000) return { n1: 315, ac1: 7, re1: 11, n2: 315, cummRej: 19, useSingleSampling: false };
+  if (size <= 500000) return { n1: 500, ac1: 11, re1: 16, n2: 500, cummRej: 27, useSingleSampling: false };
+  return { n1: 500, ac1: 11, re1: 16, n2: 500, cummRej: 27, useSingleSampling: false };
 };
 

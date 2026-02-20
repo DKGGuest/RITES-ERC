@@ -7,6 +7,7 @@ import {
   getMicrostructureTestByCall,
   getFreedomFromDefectsTestByCall
 } from '../services/finalInspectionSubmoduleService';
+import { getHardnessToeLoadAQL } from '../utils/is2500Calculations';
 
 /*
   Lots Data - Auto-fetched from Final Product Dashboard
@@ -15,6 +16,13 @@ import {
 */
 
 const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
+  // State for lot selection toggle
+  const [activeLotTab, setActiveLotTab] = useState(0);
+
+  // 2nd Sampling visibility and confirmation modal state
+  const [showSubsamplingMap, setShowSubsamplingMap] = useState({}); // { lotNo: { microstructure: bool, decarb: bool, inclusion: bool, defects: bool } }
+  const [popupLot, setPopupLot] = useState(null); // { lotNo, section, sectionLabel }
+
   // Get live lot data from context
   const { getFpCachedData, selectedCall } = useInspection();
 
@@ -26,7 +34,7 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
 
   // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
   const lotsFromVendor = useMemo(() => {
-    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    let lots = cachedData?.finalLotDetails || [];
 
     // Fallback: Check sessionStorage directly if context cache is empty
     if (lots.length === 0 && callNo) {
@@ -44,8 +52,10 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
   }, [cachedData, callNo]);
 
   /*
-    Calculate sample size for each lot: 6 or 0.5% of lot size (whichever is higher)
-    Formula: max(6, ceil(lotSize * 0.5 / 100)) = max(6, ceil(lotSize * 0.005))
+    Calculate sample size for each lot based on Hardness Test Sample Size (IS 2500)
+    Rules:
+    - General (Decarb, Microstructure, Defects): 5% of Hardness Sample Size (ceil)
+    - Inclusion: Max(6, General Sample Size)
   */
   const lotsWithSampleSize = useMemo(() => {
     return lotsFromVendor.map((lot) => {
@@ -54,16 +64,25 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       const heatNo = lot.heatNo || lot.heatNumber;
       const lotSize = lot.lotSize || lot.offeredQty || 0;
 
-      const halfPercent = Math.ceil(lotSize * 0.005);
-      const sampleSize = Math.max(6, halfPercent);
-      /* Max decarb limit: ≤ 0.25mm (default) */
-      const maxDecarb = 0.25;
+      // New Logic: Sample Size based on Hardness Test Sample Size
+      const hardnessAQL = getHardnessToeLoadAQL(lotSize);
+      const hardnessSampleSize = hardnessAQL.n1;
+
+      // General Sample Size (Decarb, Micro, Defects) = 5% of Hardness Sample Size
+      const calculatedGeneralSampleSize = Math.ceil(hardnessSampleSize * 0.05);
+
+      // Inclusion Sample Size = Max(6, General Sample Size)
+      const finalInclusionSampleSize = Math.max(6, calculatedGeneralSampleSize);
+
       return {
+        ...lot,
         lotNo,
         heatNo,
         quantity: lotSize,
-        sampleSize,
-        maxDecarb
+        generalSampleSize: calculatedGeneralSampleSize,
+        inclusionSampleSize: finalInclusionSampleSize,
+        // Max Decarb limit: Depth of decarburization shall not exceed 0.25mm or (d/100)mm, whichever is less.
+        maxDecarb: lot.barDia ? Math.min(0.25, parseFloat(lot.barDia) / 100) : 0.25
       };
     });
   }, [lotsFromVendor]);
@@ -85,17 +104,28 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     const initial = {};
     lotsWithSampleSize.forEach((lot) => {
       initial[lot.lotNo] = {
-        /* Microstructure - array of dropdown values equal to sample size */
-        microstructure1st: Array(lot.sampleSize).fill(''),
-        /* Decarb - array of values equal to sample size */
-        decarb1st: Array(lot.sampleSize).fill(''),
-        decarb2nd: Array(lot.sampleSize).fill(''),
-        /* Inclusion - array of samples, each sample has A, B, C, D ratings + Thick/Thin */
-        inclusion1st: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
-        inclusion2nd: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
-        /* Freedom from Defects - array equal to sample size (default: empty string for "Select") */
-        defects1st: Array(lot.sampleSize).fill(''),
-        defects2nd: Array(lot.sampleSize).fill(''),
+        /* Microstructure - uses generalSampleSize */
+        microstructure1st: Array(lot.generalSampleSize).fill(''),
+        microstructure2nd: Array(lot.generalSampleSize).fill(''),
+        /* Decarb - uses generalSampleSize */
+        decarb1st: Array(lot.generalSampleSize).fill(''),
+        decarb2nd: Array(lot.generalSampleSize).fill(''),
+        /* Inclusion - uses inclusionSampleSize */
+        inclusion1st: Array(lot.inclusionSampleSize).fill(null).map(() => ({
+          A: '', AType: '',
+          B: '', BType: '',
+          C: '', CType: '',
+          D: '', DType: ''
+        })),
+        inclusion2nd: Array(lot.inclusionSampleSize).fill(null).map(() => ({
+          A: '', AType: '',
+          B: '', BType: '',
+          C: '', CType: '',
+          D: '', DType: ''
+        })),
+        /* Freedom from Defects - uses generalSampleSize */
+        defects1st: Array(lot.generalSampleSize).fill(''),
+        defects2nd: Array(lot.generalSampleSize).fill(''),
         /* Separate remarks for each section */
         microstructureRemarks: '',
         decarbRemarks: '',
@@ -106,11 +136,16 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     return initial;
   });
 
-  // Persist data whenever lotData changes
+  // Persist data whenever lotData changes (debounced to avoid performance lag)
   useEffect(() => {
-    if (Object.keys(lotData).length > 0 && callNo) {
+    if (Object.keys(lotData).length === 0 || !callNo) return;
+
+    const timeoutId = setTimeout(() => {
       localStorage.setItem(`inclusionRatingData_${callNo}`, JSON.stringify(lotData));
-    }
+      console.log('💾 Persisted inclusion rating data to localStorage (debounced)');
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
   }, [lotData, callNo]);
 
   // Load data from backend when page loads (after pause/resume)
@@ -157,13 +192,24 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
           const mergedData = {};
           lotsWithSampleSize.forEach((lot) => {
             mergedData[lot.lotNo] = {
-              microstructure1st: Array(lot.sampleSize).fill(''),
-              decarb1st: Array(lot.sampleSize).fill(''),
-              decarb2nd: Array(lot.sampleSize).fill(''),
-              inclusion1st: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
-              inclusion2nd: Array(lot.sampleSize).fill(null).map(() => ({ A: '', B: '', C: '', D: '', type: 'Thick' })),
-              defects1st: Array(lot.sampleSize).fill(''),
-              defects2nd: Array(lot.sampleSize).fill(''),
+              microstructure1st: Array(lot.generalSampleSize).fill(''),
+              microstructure2nd: Array(lot.generalSampleSize).fill(''),
+              decarb1st: Array(lot.generalSampleSize).fill(''),
+              decarb2nd: Array(lot.generalSampleSize).fill(''),
+              inclusion1st: Array(lot.inclusionSampleSize).fill(null).map(() => ({
+                A: '', AType: '',
+                B: '', BType: '',
+                C: '', CType: '',
+                D: '', DType: ''
+              })),
+              inclusion2nd: Array(lot.inclusionSampleSize).fill(null).map(() => ({
+                A: '', AType: '',
+                B: '', BType: '',
+                C: '', CType: '',
+                D: '', DType: ''
+              })),
+              defects1st: Array(lot.generalSampleSize).fill(''),
+              defects2nd: Array(lot.generalSampleSize).fill(''),
               microstructureRemarks: '',
               decarbRemarks: '',
               inclusionRemarks: '',
@@ -207,10 +253,13 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                     const sampleIndex = sample.sampleNo - 1;
                     const sampleData = {
                       A: sample.sampleValueA || '',
+                      AType: (sample.sampleValueA && sample.sampleTypeA) ? sample.sampleTypeA : '',
                       B: sample.sampleValueB || '',
+                      BType: (sample.sampleValueB && sample.sampleTypeB) ? sample.sampleTypeB : '',
                       C: sample.sampleValueC || '',
+                      CType: (sample.sampleValueC && sample.sampleTypeC) ? sample.sampleTypeC : '',
                       D: sample.sampleValueD || '',
-                      type: 'Thick'
+                      DType: (sample.sampleValueD && sample.sampleTypeD) ? sample.sampleTypeD : ''
                     };
 
                     if (sample.samplingNo === 1) {
@@ -235,7 +284,11 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                 // Populate microstructure samples
                 if (test.samples && Array.isArray(test.samples)) {
                   test.samples.forEach((sample) => {
-                    mergedData[lotNo].microstructure1st[sample.sampleNo - 1] = sample.sampleType || '';
+                    if (sample.samplingNo === 1) {
+                      mergedData[lotNo].microstructure1st[sample.sampleNo - 1] = sample.sampleType || '';
+                    } else if (sample.samplingNo === 2) {
+                      mergedData[lotNo].microstructure2nd[sample.sampleNo - 1] = sample.sampleType || '';
+                    }
                   });
                 }
               }
@@ -271,7 +324,7 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
               if (mergedData[lotNo]) {
                 // Preserve user-edited values from localStorage
                 // For arrays: keep non-empty user values
-                ['microstructure1st', 'decarb1st', 'decarb2nd', 'defects1st', 'defects2nd'].forEach((key) => {
+                ['microstructure1st', 'microstructure2nd', 'decarb1st', 'decarb2nd', 'defects1st', 'defects2nd'].forEach((key) => {
                   if (persistedData[lotNo][key]) {
                     persistedData[lotNo][key].forEach((val, idx) => {
                       if (val !== '' && val !== null && val !== undefined) {
@@ -285,10 +338,21 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                 ['inclusion1st', 'inclusion2nd'].forEach((key) => {
                   if (persistedData[lotNo][key]) {
                     persistedData[lotNo][key].forEach((sample, idx) => {
-                      if (sample && typeof sample === 'object') {
-                        ['A', 'B', 'C', 'D', 'type'].forEach((field) => {
-                          if (sample[field] !== '' && sample[field] !== null && sample[field] !== undefined) {
-                            mergedData[lotNo][key][idx][field] = sample[field];
+                      if (sample && typeof sample === 'object' && mergedData[lotNo][key][idx]) {
+                        ['A', 'B', 'C', 'D', 'AType', 'BType', 'CType', 'DType'].forEach((field) => {
+                          const val = sample[field];
+                          if (val !== '' && val !== null && val !== undefined) {
+                            // Fix: If persisting a Type (e.g. AType) but the Value (A) is empty/missing, 
+                            // ignore the Type and let it default to Select (''). 
+                            // This clears old "Thick" defaults from local storage for empty rows.
+                            if (field.endsWith('Type')) {
+                              const valueField = field.replace('Type', '');
+                              const valueContent = sample[valueField];
+                              if (valueContent === '' || valueContent === null || valueContent === undefined) {
+                                return;
+                              }
+                            }
+                            mergedData[lotNo][key][idx][field] = val;
                           }
                         });
                       }
@@ -322,12 +386,140 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     }
   }, [callNo, lotsWithSampleSize]);
 
+  /* ------------------------------
+     2ND SAMPLING LOGIC & POPUP
+  ------------------------------ */
+  useEffect(() => {
+    lotsWithSampleSize.forEach((lot) => {
+      const data = lotData[lot.lotNo];
+      if (!data) return;
+
+      const lotNo = lot.lotNo;
+      const currentVisibility = showSubsamplingMap[lotNo] || {
+        microstructure: false,
+        decarb: false,
+        inclusion: false,
+        defects: false
+      };
+
+      // 1. Calculate R1 for each section
+      const microstructureRej1st = data.microstructure1st.filter((v) => v === 'Not Tempered Martensite').length;
+      const decarbRej1st = data.decarb1st.filter((v) => v !== '' && parseFloat(v) > lot.maxDecarb).length;
+      const dInclusion = data.inclusion1st || [];
+      const inclusionRej1st = dInclusion.filter((sample) => {
+        return ['A', 'B', 'C', 'D'].some((field) => sample[field] !== '' && parseFloat(sample[field]) > 2.0);
+      }).length;
+      const defectsRej1st = data.defects1st.filter((v) => v === 'NOT OK').length;
+
+      // 2. Determine if 2nd sampling is required based on R1 (Ac1=0, Re1=2)
+      const required = {
+        microstructure: microstructureRej1st === 1,
+        decarb: decarbRej1st === 1,
+        inclusion: inclusionRej1st === 1,
+        defects: defectsRej1st === 1
+      };
+
+      // 3. Check for data in 2nd sampling sections
+      const has2ndData = {
+        microstructure: data.microstructure2nd.some(v => v !== ''),
+        decarb: data.decarb2nd.some(v => v !== ''),
+        inclusion: data.inclusion2nd.some(s => ['A', 'B', 'C', 'D'].some(k => s[k] !== '')),
+        defects: data.defects2nd.some(v => v !== '')
+      };
+
+      // 4. Handle visibility changes
+      const sections = [
+        { key: 'microstructure', label: 'Microstructure' },
+        { key: 'decarb', label: 'Depth of Decarburization' },
+        { key: 'inclusion', label: 'Inclusion Rating' },
+        { key: 'defects', label: 'Freedom from Defects' }
+      ];
+
+      let visibilityUpdated = false;
+      const nextVisibility = { ...currentVisibility };
+
+      for (const section of sections) {
+        const isReq = required[section.key];
+        const isShown = !!currentVisibility[section.key];
+        const hasData = has2ndData[section.key];
+
+        if (isReq && !isShown) {
+          // Auto-show
+          nextVisibility[section.key] = true;
+          visibilityUpdated = true;
+        } else if (!isReq && isShown && !popupLot) {
+          // Condition for hiding met
+          if (hasData) {
+            // Data exists -> Trigger popup
+            setPopupLot({ lotNo, section: section.key, sectionLabel: section.label });
+          } else {
+            // No data -> Auto-hide
+            nextVisibility[section.key] = false;
+            visibilityUpdated = true;
+          }
+        }
+      }
+
+      if (visibilityUpdated) {
+        setShowSubsamplingMap(prev => ({ ...prev, [lotNo]: nextVisibility }));
+      }
+    });
+  }, [lotData, lotsWithSampleSize, popupLot, showSubsamplingMap]);
+
+  const handlePopupYesKeep = () => {
+    if (!popupLot) return;
+    const { lotNo, section } = popupLot;
+    setShowSubsamplingMap(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], [section]: false }
+    }));
+    setPopupLot(null);
+  };
+
+  const handlePopupNoDelete = () => {
+    if (!popupLot) return;
+    const { lotNo, section } = popupLot;
+    const lot = lotsWithSampleSize.find(l => l.lotNo === lotNo);
+    if (!lot) return;
+
+    // Clear data
+    setLotData(prev => {
+      const updatedLot = { ...prev[lotNo] };
+      if (section === 'microstructure') updatedLot.microstructure2nd = Array(lot.generalSampleSize).fill('');
+      if (section === 'decarb') updatedLot.decarb2nd = Array(lot.generalSampleSize).fill('');
+      if (section === 'inclusion') updatedLot.inclusion2nd = Array(lot.inclusionSampleSize).fill(null).map(() => ({
+        A: '', AType: '', B: '', BType: '', C: '', CType: '', D: '', DType: ''
+      }));
+      if (section === 'defects') updatedLot.defects2nd = Array(lot.generalSampleSize).fill('');
+
+      return { ...prev, [lotNo]: updatedLot };
+    });
+
+    // Hide
+    setShowSubsamplingMap(prev => ({
+      ...prev,
+      [lotNo]: { ...prev[lotNo], [section]: false }
+    }));
+    setPopupLot(null);
+  };
+
   /* Handler for Microstructure change */
-  const handleMicrostructureChange = (lotNo, idx, value) => {
+  const handleMicrostructureChange = (lotNo, idx, value, is2nd = false) => {
     setLotData((prev) => {
-      const arr = [...prev[lotNo].microstructure1st];
+      const key = is2nd ? 'microstructure2nd' : 'microstructure1st';
+      const arr = [...prev[lotNo][key]];
       arr[idx] = value;
-      return { ...prev, [lotNo]: { ...prev[lotNo], microstructure1st: arr } };
+      return { ...prev, [lotNo]: { ...prev[lotNo], [key]: arr } };
+    });
+  };
+
+  const handleMicrostructureBulkChange = (lotNo, value, is2nd = false) => {
+    if (!value || value === '') return;
+    setLotData((prev) => {
+      const key = is2nd ? 'microstructure2nd' : 'microstructure1st';
+      const lot = prev[lotNo];
+      const updatedArr = lot[key].map(() => value);
+      return { ...prev, [lotNo]: { ...lot, [key]: updatedArr } };
     });
   };
 
@@ -342,12 +534,28 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
   };
 
   /* Handler for Inclusion change */
-  const handleInclusionChange = (lotNo, sampleIdx, type, value, is2nd = false) => {
+  const handleInclusionChange = (lotNo, sampleIdx, field, value, is2nd = false) => {
     setLotData((prev) => {
       const key = is2nd ? 'inclusion2nd' : 'inclusion1st';
       const arr = [...prev[lotNo][key]];
-      arr[sampleIdx] = { ...arr[sampleIdx], [type]: value };
+      arr[sampleIdx] = { ...arr[sampleIdx], [field]: value };
       return { ...prev, [lotNo]: { ...prev[lotNo], [key]: arr } };
+    });
+  };
+
+  const handleInclusionBulkTypeChange = (lotNo, type, is2nd = false) => {
+    if (!type || type === '') return;
+    setLotData((prev) => {
+      const key = is2nd ? 'inclusion2nd' : 'inclusion1st';
+      const lot = prev[lotNo];
+      const updatedArr = lot[key].map(sample => ({
+        ...sample,
+        AType: type,
+        BType: type,
+        CType: type,
+        DType: type,
+      }));
+      return { ...prev, [lotNo]: { ...lot, [key]: updatedArr } };
     });
   };
 
@@ -358,6 +566,16 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       const arr = [...prev[lotNo][key]];
       arr[idx] = value;
       return { ...prev, [lotNo]: { ...prev[lotNo], [key]: arr } };
+    });
+  };
+
+  const handleDefectsBulkChange = (lotNo, value, is2nd = false) => {
+    if (!value || value === '') return;
+    setLotData((prev) => {
+      const key = is2nd ? 'defects2nd' : 'defects1st';
+      const lot = prev[lotNo];
+      const updatedArr = lot[key].map(() => value);
+      return { ...prev, [lotNo]: { ...lot, [key]: updatedArr } };
     });
   };
 
@@ -390,55 +608,127 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     return num <= 2.0 ? 'pass' : 'fail';
   };
 
+  const getDefectsStatus = (value) => {
+    if (!value || value === '') return '';
+    return value === 'OK' ? 'pass' : 'fail';
+  };
+
   /* Calculate rejections per lot - per test basis */
   const getLotRejections = (lot) => {
     const data = lotData[lot.lotNo];
+    if (!data) return {};
 
-    /* Microstructure rejection: count "Not Tempered Martensite" values */
-    const microstructureRej = data.microstructure1st.filter((v) => v === 'Not Tempered Martensite').length;
+    /* Microstructure */
+    const microstructureRej1st = data.microstructure1st.filter((v) => v === 'Not Tempered Martensite').length;
+    const microstructureRej2nd = data.microstructure2nd ? data.microstructure2nd.filter((v) => v === 'Not Tempered Martensite').length : 0;
+    const isMicroFull1 = data.microstructure1st.every(v => v !== '');
+    const isMicroFull2 = data.microstructure2nd.every(v => v !== '');
 
-    /* Decarb rejection: count values exceeding max limit */
+    /* Decarb */
     const decarbRej1st = data.decarb1st.filter((v) => v !== '' && parseFloat(v) > lot.maxDecarb).length;
     const decarbRej2nd = data.decarb2nd.filter((v) => v !== '' && parseFloat(v) > lot.maxDecarb).length;
+    const isDecarbFull1 = data.decarb1st.every(v => v !== '');
+    const isDecarbFull2 = data.decarb2nd.every(v => v !== '');
 
-    /* Inclusion rejection: ONE rejection per sample if ANY of A/B/C/D > 2.0 */
-    const inclusionRej1st = data.inclusion1st.filter((sample) => {
-      return Object.values(sample).some((v) => v !== '' && parseFloat(v) > 2.0);
+    /* Inclusion */
+    const dInclusion1 = data.inclusion1st || [];
+    const inclusionRej1st = dInclusion1.filter((sample) => {
+      return ['A', 'B', 'C', 'D'].some((field) => sample[field] !== '' && parseFloat(sample[field]) > 2.0);
     }).length;
-    const inclusionRej2nd = data.inclusion2nd.filter((sample) => {
-      return Object.values(sample).some((v) => v !== '' && parseFloat(v) > 2.0);
+    const dInclusion2 = data.inclusion2nd || [];
+    const inclusionRej2nd = dInclusion2.filter((sample) => {
+      return ['A', 'B', 'C', 'D'].some((field) => sample[field] !== '' && parseFloat(sample[field]) > 2.0);
     }).length;
+    const isInclusionFull1 = dInclusion1.every(s => ['A', 'B', 'C', 'D'].some(k => s[k] !== ''));
+    const isInclusionFull2 = dInclusion2.every(s => ['A', 'B', 'C', 'D'].some(k => s[k] !== ''));
 
-    /* Defects rejection */
+    /* Defects */
     const defectsRej1st = data.defects1st.filter((v) => v === 'NOT OK').length;
     const defectsRej2nd = data.defects2nd.filter((v) => v === 'NOT OK').length;
+    const isDefectsFull1 = data.defects1st.every(v => v !== '');
+    const isDefectsFull2 = data.defects2nd.every(v => v !== '');
 
-    /* 2nd Sampling opens if rejected pieces in ANY test > 1 */
-    const showDecarb2nd = decarbRej1st > 1;
-    const showInclusion2nd = inclusionRej1st > 1;
-    const showDefects2nd = defectsRej1st > 1;
-    const show2nd = showDecarb2nd || showInclusion2nd || showDefects2nd;
+    const getStatus = (r1, r2, full1, full2) => {
+      if (r1 > 1 || (r1 + r2) > 1) return 'REJECTED';
+      if (r1 === 0) return full1 ? 'ACCEPTED' : 'PENDING';
+      if (r1 === 1) return (full1 && full2) ? 'ACCEPTED' : 'PENDING';
+      return 'PENDING';
+    };
 
-    const total1st = microstructureRej + decarbRej1st + inclusionRej1st + defectsRej1st;
-    const total2nd = decarbRej2nd + inclusionRej2nd + defectsRej2nd;
+    const microStatus = getStatus(microstructureRej1st, microstructureRej2nd, isMicroFull1, isMicroFull2);
+    const decarbStatus = getStatus(decarbRej1st, decarbRej2nd, isDecarbFull1, isDecarbFull2);
+    const inclusionStatus = getStatus(inclusionRej1st, inclusionRej2nd, isInclusionFull1, isInclusionFull2);
+    const defectsStatus = getStatus(defectsRej1st, defectsRej2nd, isDefectsFull1, isDefectsFull2);
+
+    const statuses = [microStatus, decarbStatus, inclusionStatus, defectsStatus];
+    const hasAnyRejected = statuses.includes('REJECTED');
+    const allAccepted = statuses.every(s => s === 'ACCEPTED');
+
+    let lotStatus = 'PENDING';
+    if (hasAnyRejected) lotStatus = 'REJECTED';
+    else if (allAccepted) lotStatus = 'ACCEPTED';
 
     return {
-      microstructureRej,
-      decarbRej1st, inclusionRej1st, defectsRej1st, total1st,
-      decarbRej2nd, inclusionRej2nd, defectsRej2nd, total2nd,
-      showDecarb2nd, showInclusion2nd, showDefects2nd, show2nd,
-      totalCombined: show2nd ? total1st + total2nd : total1st
+      microstructureRej1st, microstructureRej2nd,
+      decarbRej1st, inclusionRej1st, defectsRej1st,
+      decarbRej2nd, inclusionRej2nd, defectsRej2nd,
+      showMicrostructure2nd: microstructureRej1st === 1,
+      showDecarb2nd: decarbRej1st === 1,
+      showInclusion2nd: inclusionRej1st === 1,
+      showDefects2nd: defectsRej1st === 1,
+      show2nd: (microstructureRej1st === 1 || decarbRej1st === 1 || inclusionRej1st === 1 || defectsRej1st === 1),
+      microStatus, decarbStatus, inclusionStatus, defectsStatus,
+      lotStatus
     };
   };
 
   const pageStyles = `
-    .ir-test-section {
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
-    }
+      .ir-test-section {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+      }
+      /* Lot Selector Component */
+      .lot-selector {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 16px;
+        padding: 0 4px;
+        flex-wrap: wrap;
+      }
+      .lot-single {
+        margin-bottom: 16px;
+        padding: 4px 12px;
+        background: #f1f5f9;
+        border-radius: 6px;
+        display: inline-block;
+        font-weight: 600;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+      }
+      .lot-btn {
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: #64748b;
+      }
+      .lot-btn:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+      }
+      .lot-btn.active {
+        background: #0ea5e9;
+        color: white;
+        border-color: #0ea5e9;
+        box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);
+      }
     .ir-test-title {
       font-size: 15px;
       font-weight: 700;
@@ -560,6 +850,31 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       background: #f1f5f9;
       border-radius: 4px;
       display: inline-block;
+    }
+    .ir-cell-flex {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .ir-series-select {
+      font-size: 10px;
+      padding: 2px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #f8fafc;
+      width: 58px;
+      cursor: pointer;
+      height: 26px;
+    }
+    .ir-inclusion-table input {
+      width: 42px;
+      padding: 4px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 12px;
+      height: 26px;
     }
     .ir-summary-row {
       display: flex;
@@ -749,6 +1064,59 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
       .page-subtitle {
         font-size: 10px;
       }
+      }
+      /* Popup Styles */
+      .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .popup-box {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        max-width: 400px;
+        width: 90%;
+      }
+      .popup-box p {
+        font-size: 16px;
+        color: #334155;
+        margin-bottom: 20px;
+        line-height: 1.5;
+        font-weight: 500;
+      }
+      .popup-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+      }
+      .popup-btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid #e2e8f0;
+        background: #f1f5f9;
+        color: #475569;
+      }
+      .popup-btn:hover { background: #e2e8f0; }
+      .popup-btn.primary {
+        background: #0d9488;
+        color: white;
+        border-color: #0d9488;
+      }
+      .popup-btn.primary:hover { background: #0f766e; }
     }
   `;
 
@@ -769,16 +1137,60 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
     <div>
       <style>{pageStyles}</style>
 
+      {/* Confirmation Popup */}
+      {popupLot && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <p>
+              2nd Sampling for <strong>{popupLot.sectionLabel}</strong> is no longer required.
+              <br />
+              Do you want to hide it?
+            </p>
+            <div className="popup-actions">
+              <button className="popup-btn" onClick={handlePopupNoDelete}>
+                No (Clear & Hide)
+              </button>
+              <button className="popup-btn primary" onClick={handlePopupYesKeep}>
+                Yes (Hide Only)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h1 className="page-title">Inclusion Rating, Depth of Decarb, Freedom from Defects</h1>
-          <p className="page-subtitle">No. of Readings: 6 or 0.5% of hardness sample size (whichever is higher)</p>
+          <p className="page-subtitle">Sample size = 5% of Hardness test sample size (Minimum 6)</p>
         </div>
         <button className="btn btn-outline" onClick={onBack}>← Back</button>
       </div>
 
       <FinalSubmoduleNav currentSubmodule="final-inclusion-rating" onNavigate={onNavigateSubmodule} />
+
+      {/* Lot Selector */}
+      {lotsWithSampleSize.length > 0 && (
+        <>
+          {lotsWithSampleSize.length === 1 ? (
+            <div className="lot-single">
+              <span>📦 {lotsWithSampleSize[0].lotNo} | Heat {lotsWithSampleSize[0].heatNo}</span>
+            </div>
+          ) : (
+            <div className="lot-selector">
+              {lotsWithSampleSize.map((lot, idx) => (
+                <button
+                  key={lot.lotNo}
+                  className={`lot-btn ${activeLotTab === idx ? 'active' : ''}`}
+                  onClick={() => setActiveLotTab(idx)}
+                >
+                  Lot {lot.lotNo}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* ==================== SECTION 1: DEPTH OF DECARB ==================== */}
       <div className="ir-test-section">
@@ -793,16 +1205,17 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
             <div className="ir-acceptance-condition">
               <strong>Acceptance Condition (IS 3195):</strong> Depth of decarburization shall not exceed 0.25mm or (d/100)mm, whichever is less. Where d = Bar Diameter.
             </div>
-            {lotsWithSampleSize.map((lot) => {
+            {lotsWithSampleSize.map((lot, idx) => {
+              if (activeLotTab !== idx) return null;
               const data = lotData[lot.lotNo];
               const rej = getLotRejections(lot);
               return (
                 <div key={lot.lotNo} className="ir-lot-block">
                   <div className="ir-lot-header">
-                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.sampleSize} | Max Decarb: {lot.maxDecarb.toFixed(2)}mm
+                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.generalSampleSize} | Ac1: 0 | Re1: 2 | Cumm: 2
                   </div>
                   {/* 1st Sampling */}
-                  <div className="ir-sampling-label">1st Sampling (n1: {lot.sampleSize})</div>
+                  <div className="ir-sampling-label">1st Sampling (n1: {lot.generalSampleSize})</div>
                   <div className="ir-values-grid">
                     {data.decarb1st.map((val, idx) => {
                       const status = getDecarbStatus(val, lot.maxDecarb);
@@ -819,10 +1232,10 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                       );
                     })}
                   </div>
-                  {/* 2nd Sampling - show only if decarb rejected > 1 */}
-                  {rej.showDecarb2nd && (
+                  {/* 2nd Sampling - show only if decarb rejected == 1 */}
+                  {showSubsamplingMap[lot.lotNo]?.decarb && (
                     <div className="ir-2nd-sampling">
-                      <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.decarbRej1st} &gt; 1)</div>
+                      <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.decarbRej1st})</div>
                       <div className="ir-values-grid">
                         {data.decarb2nd.map((val, idx) => {
                           const status = getDecarbStatus(val, lot.maxDecarb);
@@ -873,29 +1286,24 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
             <div className="ir-acceptance-condition">
               <strong>Acceptance Condition (IS 4163):</strong> All inclusion ratings (A, B, C, D) shall not exceed 2.0 for both Thick and Thin series.
             </div>
-            {lotsWithSampleSize.map((lot) => {
+            {lotsWithSampleSize.map((lot, idx) => {
+              if (activeLotTab !== idx) return null;
               const data = lotData[lot.lotNo];
               const rej = getLotRejections(lot);
               return (
                 <div key={lot.lotNo} className="ir-lot-block">
-                  <div className="ir-lot-header">📦 {lot.lotNo} | Heat: {lot.heatNo} | Sample: {lot.sampleSize}</div>
+                  <div className="ir-lot-header">
+                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.inclusionSampleSize} | Ac1: 0 | Re1: 2 | Cumm: 2
+                  </div>
                   {/* 1st Sampling Table */}
-                  <div className="ir-sampling-label">
-                    1st Sampling (n1: {lot.sampleSize})
+                  <div className="ir-sampling-label" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span>1st Sampling (n1: {lot.inclusionSampleSize})</span>
                     <select
-                      className="ir-type-select"
-                      value={data.inclusion1st[0]?.type || 'Thick'}
-                      onChange={(e) => {
-                        const newType = e.target.value;
-                        setLotData((prev) => ({
-                          ...prev,
-                          [lot.lotNo]: {
-                            ...prev[lot.lotNo],
-                            inclusion1st: prev[lot.lotNo].inclusion1st.map(s => ({ ...s, type: newType }))
-                          }
-                        }));
-                      }}
+                      className="ir-series-select"
+                      style={{ width: 'auto', height: '28px' }}
+                      onChange={(e) => handleInclusionBulkTypeChange(lot.lotNo, e.target.value)}
                     >
+                      <option value="">Set All Series</option>
                       <option value="Thick">Thick</option>
                       <option value="Thin">Thin</option>
                     </select>
@@ -915,17 +1323,28 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                         {data.inclusion1st.map((sample, idx) => (
                           <tr key={idx}>
                             <td>{idx + 1}</td>
-                            {['A', 'B', 'C', 'D'].map((type) => {
-                              const status = getInclusionStatus(sample[type]);
+                            {['A', 'B', 'C', 'D'].map((field) => {
+                              const status = getInclusionStatus(sample[field]);
                               return (
-                                <td key={type}>
-                                  <input
-                                    type="number"
-                                    step="0.1"
-                                    className={status}
-                                    value={sample[type]}
-                                    onChange={(e) => handleInclusionChange(lot.lotNo, idx, type, e.target.value)}
-                                  />
+                                <td key={field}>
+                                  <div className="ir-cell-flex">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      className={status}
+                                      value={sample[field]}
+                                      onChange={(e) => handleInclusionChange(lot.lotNo, idx, field, e.target.value)}
+                                    />
+                                    <select
+                                      className="ir-series-select"
+                                      value={sample[field + 'Type']}
+                                      onChange={(e) => handleInclusionChange(lot.lotNo, idx, field + 'Type', e.target.value)}
+                                    >
+                                      <option value="">Select</option>
+                                      <option value="Thick">Thick</option>
+                                      <option value="Thin">Thin</option>
+                                    </select>
+                                  </div>
                                 </td>
                               );
                             })}
@@ -934,25 +1353,17 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                       </tbody>
                     </table>
                   </div>
-                  {/* 2nd Sampling - show only if inclusion rejected > 1 */}
-                  {rej.showInclusion2nd && (
+                  {/* 2nd Sampling - show only if inclusion rejected == 1 */}
+                  {showSubsamplingMap[lot.lotNo]?.inclusion && (
                     <div className="ir-2nd-sampling">
-                      <div className="ir-2nd-title">
-                        ⚠️ 2nd Sampling (R1: {rej.inclusionRej1st} &gt; 1)
+                      <div className="ir-2nd-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span>⚠️ 2nd Sampling (R1: {rej.inclusionRej1st})</span>
                         <select
-                          className="ir-type-select"
-                          value={data.inclusion2nd[0]?.type || 'Thick'}
-                          onChange={(e) => {
-                            const newType = e.target.value;
-                            setLotData((prev) => ({
-                              ...prev,
-                              [lot.lotNo]: {
-                                ...prev[lot.lotNo],
-                                inclusion2nd: prev[lot.lotNo].inclusion2nd.map(s => ({ ...s, type: newType }))
-                              }
-                            }));
-                          }}
+                          className="ir-series-select"
+                          style={{ width: 'auto', height: '28px', background: 'white' }}
+                          onChange={(e) => handleInclusionBulkTypeChange(lot.lotNo, e.target.value, true)}
                         >
+                          <option value="">Set All Series</option>
                           <option value="Thick">Thick</option>
                           <option value="Thin">Thin</option>
                         </select>
@@ -972,17 +1383,28 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                             {data.inclusion2nd.map((sample, idx) => (
                               <tr key={idx}>
                                 <td>{idx + 1}</td>
-                                {['A', 'B', 'C', 'D'].map((type) => {
-                                  const status = getInclusionStatus(sample[type]);
+                                {['A', 'B', 'C', 'D'].map((field) => {
+                                  const status = getInclusionStatus(sample[field]);
                                   return (
-                                    <td key={type}>
-                                      <input
-                                        type="number"
-                                        step="0.1"
-                                        className={status}
-                                        value={sample[type]}
-                                        onChange={(e) => handleInclusionChange(lot.lotNo, idx, type, e.target.value, true)}
-                                      />
+                                    <td key={field}>
+                                      <div className="ir-cell-flex">
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          className={status}
+                                          value={sample[field]}
+                                          onChange={(e) => handleInclusionChange(lot.lotNo, idx, field, e.target.value, true)}
+                                        />
+                                        <select
+                                          className="ir-series-select"
+                                          value={sample[field + 'Type']}
+                                          onChange={(e) => handleInclusionChange(lot.lotNo, idx, field + 'Type', e.target.value, true)}
+                                        >
+                                          <option value="">Select</option>
+                                          <option value="Thick">Thick</option>
+                                          <option value="Thin">Thin</option>
+                                        </select>
+                                      </div>
                                     </td>
                                   );
                                 })}
@@ -1025,15 +1447,27 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
             <div className="ir-acceptance-condition">
               <strong>Acceptance Condition:</strong> Microstructure shall be Tempered Martensite as per IS 3195.
             </div>
-            {lotsWithSampleSize.map((lot) => {
+            {lotsWithSampleSize.map((lot, idx) => {
+              if (activeLotTab !== idx) return null;
               const data = lotData[lot.lotNo];
               const rej = getLotRejections(lot);
               return (
                 <div key={lot.lotNo} className="ir-lot-block">
                   <div className="ir-lot-header">
-                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.sampleSize}
+                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.generalSampleSize} | Ac1: 0 | Re1: 2 | Cumm: 2
                   </div>
-                  <div className="ir-sampling-label">Samples (n: {lot.sampleSize})</div>
+                  <div className="ir-sampling-label" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span>Samples (n: {lot.generalSampleSize})</span>
+                    <select
+                      className="ir-defect-select"
+                      style={{ width: 'auto', height: '28px', padding: '0 8px' }}
+                      onChange={(e) => handleMicrostructureBulkChange(lot.lotNo, e.target.value)}
+                    >
+                      <option value="">Set All Status</option>
+                      <option value="Tempered Martensite">Tempered Martensite</option>
+                      <option value="Not Tempered Martensite">Not Tempered Martensite</option>
+                    </select>
+                  </div>
                   <div className="ir-values-grid">
                     {data.microstructure1st.map((val, idx) => {
                       const status = getMicrostructureStatus(val);
@@ -1051,8 +1485,42 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                       );
                     })}
                   </div>
+                  {/* 2nd Sampling - show only if microstructure rejected == 1 */}
+                  {showSubsamplingMap[lot.lotNo]?.microstructure && (
+                    <div className="ir-2nd-sampling">
+                      <div className="ir-2nd-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span>⚠️ 2nd Sampling (R1: {rej.microstructureRej1st})</span>
+                        <select
+                          className="ir-defect-select"
+                          style={{ width: 'auto', height: '28px', padding: '0 8px', background: 'white' }}
+                          onChange={(e) => handleMicrostructureBulkChange(lot.lotNo, e.target.value, true)}
+                        >
+                          <option value="">Set All Status</option>
+                          <option value="Tempered Martensite">Tempered Martensite</option>
+                          <option value="Not Tempered Martensite">Not Tempered Martensite</option>
+                        </select>
+                      </div>
+                      <div className="ir-values-grid">
+                        {data.microstructure2nd.map((val, idx) => {
+                          const status = getMicrostructureStatus(val);
+                          return (
+                            <select
+                              key={idx}
+                              className={`ir-defect-select ${status}`}
+                              value={val}
+                              onChange={(e) => handleMicrostructureChange(lot.lotNo, idx, e.target.value, true)}
+                            >
+                              <option value="">Select</option>
+                              <option value="Tempered Martensite">Tempered Martensite</option>
+                              <option value="Not Tempered Martensite">Not Tempered Martensite</option>
+                            </select>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div className="ir-rej-info">
-                    Rejected: {rej.microstructureRej}
+                    R1: {rej.microstructureRej1st} {rej.showMicrostructure2nd && `| R2: ${rej.microstructureRej2nd}`}
                   </div>
                   <div className="ir-section-remarks">
                     <label>Remarks (Microstructure - {lot.lotNo}):</label>
@@ -1082,19 +1550,33 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
             <div className="ir-acceptance-condition">
               <strong>Acceptance Condition:</strong> Material shall be free from injurious surface defects such as cracks, seams, laps, and other visible defects as per IS 3195.
             </div>
-            {lotsWithSampleSize.map((lot) => {
+            {lotsWithSampleSize.map((lot, idx) => {
+              if (activeLotTab !== idx) return null;
               const data = lotData[lot.lotNo];
               const rej = getLotRejections(lot);
               return (
                 <div key={lot.lotNo} className="ir-lot-block">
-                  <div className="ir-lot-header">📦 {lot.lotNo} | Heat: {lot.heatNo} | Sample: {lot.sampleSize}</div>
+                  <div className="ir-lot-header">
+                    📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize} | Sample: {lot.generalSampleSize} | Ac1: 0 | Re1: 2 | Cumm: 2
+                  </div>
                   {/* 1st Sampling */}
-                  <div className="ir-sampling-label">1st Sampling (n1: {lot.sampleSize})</div>
+                  <div className="ir-sampling-label" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span>1st Sampling (n1: {lot.generalSampleSize})</span>
+                    <select
+                      className="ir-defect-select"
+                      style={{ width: 'auto', height: '28px', padding: '0 8px' }}
+                      onChange={(e) => handleDefectsBulkChange(lot.lotNo, e.target.value)}
+                    >
+                      <option value="">Set All Status</option>
+                      <option value="OK">OK</option>
+                      <option value="NOT OK">NOT OK</option>
+                    </select>
+                  </div>
                   <div className="ir-values-grid">
                     {data.defects1st.map((val, idx) => (
                       <select
                         key={idx}
-                        className="ir-defect-select"
+                        className={`ir-defect-select ${getDefectsStatus(val)}`}
                         value={val}
                         onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value)}
                       >
@@ -1104,15 +1586,26 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                       </select>
                     ))}
                   </div>
-                  {/* 2nd Sampling - show only if defects rejected > 1 */}
-                  {rej.showDefects2nd && (
+                  {/* 2nd Sampling - show only if defects rejected == 1 */}
+                  {showSubsamplingMap[lot.lotNo]?.defects && (
                     <div className="ir-2nd-sampling">
-                      <div className="ir-2nd-title">⚠️ 2nd Sampling (R1: {rej.defectsRej1st} &gt; 1)</div>
+                      <div className="ir-2nd-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span>⚠️ 2nd Sampling (R1: {rej.defectsRej1st})</span>
+                        <select
+                          className="ir-defect-select"
+                          style={{ width: 'auto', height: '28px', padding: '0 8px', background: 'white' }}
+                          onChange={(e) => handleDefectsBulkChange(lot.lotNo, e.target.value, true)}
+                        >
+                          <option value="">Set All Status</option>
+                          <option value="OK">OK</option>
+                          <option value="NOT OK">NOT OK</option>
+                        </select>
+                      </div>
                       <div className="ir-values-grid">
                         {data.defects2nd.map((val, idx) => (
                           <select
                             key={idx}
-                            className="ir-defect-select"
+                            className={`ir-defect-select ${getDefectsStatus(val)}`}
                             value={val}
                             onChange={(e) => handleDefectsChange(lot.lotNo, idx, e.target.value, true)}
                           >
@@ -1153,11 +1646,21 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
         </div>
         {!collapsed.summary && (
           <>
-            {lotsWithSampleSize.map((lot) => {
+            {lotsWithSampleSize.map((lot, idx) => {
+              if (activeLotTab !== idx) return null;
               const rej = getLotRejections(lot);
               const data = lotData[lot.lotNo];
-              /* Accept if no 2nd sampling needed (all tests R1 ≤ 1) OR if 2nd sampling and total ≤ 2 */
-              const isAccepted = !rej.show2nd || rej.totalCombined <= 2;
+
+              const status = rej.lotStatus; // 'ACCEPTED', 'REJECTED', 'PENDING'
+              const isAccepted = status === 'ACCEPTED';
+              const isPending = status === 'PENDING';
+
+              /* Helper for individual badge styles */
+              const getBadgeStyle = (s) => {
+                if (s === 'REJECTED') return { background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca' };
+                if (s === 'ACCEPTED') return { background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' };
+                return { background: '#f1f5f9', color: '#475569', border: 'none' };
+              };
 
               /* Concatenate all remarks with section and lot info */
               const allRemarks = [
@@ -1172,16 +1675,16 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: 600 }}>📦 {lot.lotNo}</span>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
-                        Microstructure: {rej.microstructureRej}
+                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', ...getBadgeStyle(rej.microStatus) }}>
+                        Microstructure: {rej.microstructureRej1st}{rej.showMicrostructure2nd && `+${rej.microstructureRej2nd}`}
                       </span>
-                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', ...getBadgeStyle(rej.decarbStatus) }}>
                         Decarb: {rej.decarbRej1st}{rej.showDecarb2nd && `+${rej.decarbRej2nd}`}
                       </span>
-                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', ...getBadgeStyle(rej.inclusionStatus) }}>
                         Inclusion: {rej.inclusionRej1st}{rej.showInclusion2nd && `+${rej.inclusionRej2nd}`}
                       </span>
-                      <span style={{ fontSize: '11px', padding: '3px 8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', ...getBadgeStyle(rej.defectsStatus) }}>
                         Defects: {rej.defectsRej1st}{rej.showDefects2nd && `+${rej.defectsRej2nd}`}
                       </span>
                       <span style={{
@@ -1189,10 +1692,11 @@ const FinalInclusionRatingPage = ({ onBack, onNavigateSubmodule }) => {
                         borderRadius: '4px',
                         fontWeight: 700,
                         fontSize: '11px',
-                        background: isAccepted ? '#dcfce7' : '#fee2e2',
-                        color: isAccepted ? '#166534' : '#991b1b'
+                        background: isAccepted ? '#dcfce7' : (isPending ? '#fef3c7' : '#fee2e2'),
+                        color: isAccepted ? '#166534' : (isPending ? '#92400e' : '#991b1b'),
+                        border: isAccepted ? '1px solid #bbf7d0' : (isPending ? '1px solid #fde68a' : '1px solid #fecaca')
                       }}>
-                        {isAccepted ? '✓ OK' : '✗ NOT OK'}
+                        {isAccepted ? '✓ OK' : (isPending ? '⏳ PENDING' : '✗ NOT OK')}
                       </span>
                     </div>
                   </div>
