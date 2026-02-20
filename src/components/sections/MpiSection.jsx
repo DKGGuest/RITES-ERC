@@ -274,7 +274,7 @@ const MpiSection = ({
                     <div className="mpi-mobile-field__value">
                       <input
                         type="number"
-                        value={row.rejectedQty || ''}
+                        value={row.rejectedQty ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value)}
                         disabled={!isRejectionEnabled(row)}
                       />

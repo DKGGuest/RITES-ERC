@@ -523,11 +523,11 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       forgingDefect: row.forgingDefect || ['', ''],
       embossingDefect: row.embossingDefect || ['', ''],
       // 5 separate rejection fields
-      forgingTemperatureRejected: row.forgingTemperatureRejected || '',
-      forgingStabilisationRejected: row.forgingStabilisationRejected || '',
-      improperForgingRejected: row.improperForgingRejected || '',
-      forgingDefectRejected: row.forgingDefectRejected || '',
-      embossingDefectRejected: row.embossingDefectRejected || '',
+      forgingTemperatureRejected: row.forgingTemperatureRejected ?? '',
+      forgingStabilisationRejected: row.forgingStabilisationRejected ?? '',
+      improperForgingRejected: row.improperForgingRejected ?? '',
+      forgingDefectRejected: row.forgingDefectRejected ?? '',
+      embossingDefectRejected: row.embossingDefectRejected ?? '',
       remarks: row.remarks || ''
     }));
   }, []);
@@ -555,12 +555,12 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       flatBearingArea: row.flatBearingArea || ['', ''],
       fallingGauge: row.fallingGauge || ['', ''],
       // 6 separate rejection fields
-      quenchingTemperatureRejected: row.quenchingTemperatureRejected || '',
-      quenchingDurationRejected: row.quenchingDurationRejected || '',
-      quenchingHardnessRejected: row.quenchingHardnessRejected || '',
-      boxGaugeRejected: row.boxGaugeRejected || '',
-      flatBearingAreaRejected: row.flatBearingAreaRejected || '',
-      fallingGaugeRejected: row.fallingGaugeRejected || '',
+      quenchingTemperatureRejected: row.quenchingTemperatureRejected ?? '',
+      quenchingDurationRejected: row.quenchingDurationRejected ?? '',
+      quenchingHardnessRejected: row.quenchingHardnessRejected ?? '',
+      boxGaugeRejected: row.boxGaugeRejected ?? '',
+      flatBearingAreaRejected: row.flatBearingAreaRejected ?? '',
+      fallingGaugeRejected: row.fallingGaugeRejected ?? '',
       remarks: row.remarks || ''
     }));
   }, []);
@@ -577,11 +577,11 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       temperingTemperature: typeof row.temperingTemperature === 'string' ?
         [row.temperingTemperature, ''] :
         (Array.isArray(row.temperingTemperature) ? row.temperingTemperature : ['', '']),
-      temperingTemperatureRejected: row.temperingTemperatureRejected || '',
+      temperingTemperatureRejected: row.temperingTemperatureRejected ?? '',
       temperingDuration: typeof row.temperingDuration === 'string' ?
         [row.temperingDuration, ''] :
         (Array.isArray(row.temperingDuration) ? row.temperingDuration : ['', '']),
-      temperingDurationRejected: row.temperingDurationRejected || '',
+      temperingDurationRejected: row.temperingDurationRejected ?? '',
       remarks: row.remarks || ''
     }));
   }, []);
@@ -603,13 +603,13 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       marking: row.marking || ['', ''],
       temperingHardness: row.temperingHardness || ['', ''],
       // Rejection inputs for each measurement
-      boxGaugeRejected: row.boxGaugeRejected || '',
-      flatBearingAreaRejected: row.flatBearingAreaRejected || '',
-      fallingGaugeRejected: row.fallingGaugeRejected || '',
-      surfaceDefectRejected: row.surfaceDefectRejected || '',
-      embossingDefectRejected: row.embossingDefectRejected || '',
-      markingRejected: row.markingRejected || '',
-      temperingHardnessRejected: row.temperingHardnessRejected || '',
+      boxGaugeRejected: row.boxGaugeRejected ?? '',
+      flatBearingAreaRejected: row.flatBearingAreaRejected ?? '',
+      fallingGaugeRejected: row.fallingGaugeRejected ?? '',
+      surfaceDefectRejected: row.surfaceDefectRejected ?? '',
+      embossingDefectRejected: row.embossingDefectRejected ?? '',
+      markingRejected: row.markingRejected ?? '',
+      temperingHardnessRejected: row.temperingHardnessRejected ?? '',
       remarks: row.remarks || ''
     }));
   }, []);
@@ -628,10 +628,10 @@ const ProcessParametersGridPage = ({ call, onBack, lotNumbers = [], shift: selec
       paintIdentification: row.paintIdentification || ['', ''],
       ercCoating: row.ercCoating || ['', ''],
       // 4 separate rejection fields
-      toeLoadRejected: row.toeLoadRejected || '',
-      weightRejected: row.weightRejected || '',
-      paintIdentificationRejected: row.paintIdentificationRejected || '',
-      ercCoatingRejected: row.ercCoatingRejected || '',
+      toeLoadRejected: row.toeLoadRejected ?? '',
+      weightRejected: row.weightRejected ?? '',
+      paintIdentificationRejected: row.paintIdentificationRejected ?? '',
+      ercCoatingRejected: row.ercCoatingRejected ?? '',
       remarks: row.remarks || ''
     }));
   }, []);

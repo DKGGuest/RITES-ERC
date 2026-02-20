@@ -284,7 +284,7 @@ const TurningSection = ({
                       <input
                         type="number"
                         className="form-control turning-input turning-input--rejected"
-                        value={row.rejectedQty[0] || ''}
+                        value={row.rejectedQty[0] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
                         disabled={!isRejectionEnabled(row, 'parallel')}
                       />
@@ -293,7 +293,7 @@ const TurningSection = ({
                       <input
                         type="number"
                         className="form-control turning-input turning-input--rejected"
-                        value={row.rejectedQty[1] || ''}
+                        value={row.rejectedQty[1] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
                         disabled={!isRejectionEnabled(row, 'full')}
                       />
@@ -302,7 +302,7 @@ const TurningSection = ({
                       <input
                         type="number"
                         className="form-control turning-input turning-input--rejected"
-                        value={row.rejectedQty[2] || ''}
+                        value={row.rejectedQty[2] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
                         disabled={!isRejectionEnabled(row, 'dia')}
                       />
@@ -490,7 +490,7 @@ const TurningSection = ({
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
-                        value={row.rejectedQty[0] || ''}
+                        value={row.rejectedQty[0] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
                         disabled={!isRejectionEnabled(row, 'parallel')}
                       />
@@ -501,7 +501,7 @@ const TurningSection = ({
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
-                        value={row.rejectedQty[1] || ''}
+                        value={row.rejectedQty[1] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
                         disabled={!isRejectionEnabled(row, 'full')}
                       />
@@ -512,7 +512,7 @@ const TurningSection = ({
                     <div className="turning-mobile-field__value">
                       <input
                         type="number"
-                        value={row.rejectedQty[2] || ''}
+                        value={row.rejectedQty[2] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
                         disabled={!isRejectionEnabled(row, 'dia')}
                       />

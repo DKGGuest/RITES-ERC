@@ -328,7 +328,7 @@ const ShearingSection = ({
                       <input
                         type="number"
                         className="form-control shearing-input shearing-input--rejected"
-                        value={row.rejectedQty[0] || ''}
+                        value={row.rejectedQty[0] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 0)}
                         disabled={!isRejectionEnabled(row, 'length')}
                         title={!isRejectionEnabled(row, 'length') ? "Reject enabled only if Length is out of tolerance" : ""}
@@ -338,7 +338,7 @@ const ShearingSection = ({
                       <input
                         type="number"
                         className="form-control shearing-input shearing-input--rejected"
-                        value={row.rejectedQty[1] || ''}
+                        value={row.rejectedQty[1] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 1)}
                         disabled={!isRejectionEnabled(row, 'quality')}
                         title={!isRejectionEnabled(row, 'quality') ? "Reject enabled only if Quality is NOT OK" : ""}
@@ -348,7 +348,7 @@ const ShearingSection = ({
                       <input
                         type="number"
                         className="form-control shearing-input shearing-input--rejected"
-                        value={row.rejectedQty[2] || ''}
+                        value={row.rejectedQty[2] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 2)}
                         disabled={!isRejectionEnabled(row, 'sharpEdges')}
                         title={!isRejectionEnabled(row, 'sharpEdges') ? "Reject enabled only if Sharp Edge is NOT OK" : ""}
@@ -358,7 +358,7 @@ const ShearingSection = ({
                       <input
                         type="number"
                         className="form-control shearing-input shearing-input--rejected"
-                        value={row.rejectedQty[3] || ''}
+                        value={row.rejectedQty[3] ?? ''}
                         onChange={e => updateData(idx, 'rejectedQty', e.target.value, 3)}
                         disabled={!isRejectionEnabled(row, 'crackedEdges')}
                         title={!isRejectionEnabled(row, 'crackedEdges') ? "Reject enabled only if Cracked Edge is NOT OK" : ""}

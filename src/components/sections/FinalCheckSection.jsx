@@ -359,7 +359,7 @@ const FinalCheckSection = ({
                         type="number"
                         className="form-control final-check-input"
                         placeholder="0"
-                        value={row.boxGaugeRejected || ''}
+                        value={row.boxGaugeRejected ?? ''}
                         onChange={e => wrappedUpdateData(idx, 'boxGaugeRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'boxGauge')}
                       />
@@ -369,7 +369,7 @@ const FinalCheckSection = ({
                         type="number"
                         className="form-control final-check-input"
                         placeholder="0"
-                        value={row.flatBearingAreaRejected || ''}
+                        value={row.flatBearingAreaRejected ?? ''}
                         onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'flatBearingArea')}
                       />
@@ -379,7 +379,7 @@ const FinalCheckSection = ({
                         type="number"
                         className="form-control final-check-input"
                         placeholder="0"
-                        value={row.fallingGaugeRejected || ''}
+                        value={row.fallingGaugeRejected ?? ''}
                         onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'fallingGauge')}
                       />
@@ -389,7 +389,7 @@ const FinalCheckSection = ({
                         type="number"
                         className="form-control final-check-input"
                         placeholder="0"
-                        value={row.surfaceDefectRejected || ''}
+                        value={row.surfaceDefectRejected ?? ''}
                         onChange={e => updateData(idx, 'surfaceDefectRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'surfaceDefect')}
                       />
@@ -399,7 +399,7 @@ const FinalCheckSection = ({
                         type="number"
                         className="form-control final-check-input"
                         placeholder="0"
-                        value={row.embossingDefectRejected || ''}
+                        value={row.embossingDefectRejected ?? ''}
                         onChange={e => updateData(idx, 'embossingDefectRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'embossingDefect')}
                       />
@@ -409,7 +409,7 @@ const FinalCheckSection = ({
                         type="number"
                         className="form-control final-check-input"
                         placeholder="0"
-                        value={row.markingRejected || ''}
+                        value={row.markingRejected ?? ''}
                         onChange={e => updateData(idx, 'markingRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'marking')}
                       />
@@ -419,7 +419,7 @@ const FinalCheckSection = ({
                         type="number"
                         className="form-control final-check-input"
                         placeholder="0"
-                        value={row.temperingHardnessRejected || ''}
+                        value={row.temperingHardnessRejected ?? ''}
                         onChange={e => updateData(idx, 'temperingHardnessRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'temperingHardness')}
                       />
@@ -601,7 +601,7 @@ const FinalCheckSection = ({
                       <input
                         type="number"
                         placeholder="0"
-                        value={row.boxGaugeRejected || ''}
+                        value={row.boxGaugeRejected ?? ''}
                         onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'boxGauge')}
                       />
@@ -613,7 +613,7 @@ const FinalCheckSection = ({
                       <input
                         type="number"
                         placeholder="0"
-                        value={row.flatBearingAreaRejected || ''}
+                        value={row.flatBearingAreaRejected ?? ''}
                         onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'flatBearingArea')}
                       />
@@ -625,7 +625,7 @@ const FinalCheckSection = ({
                       <input
                         type="number"
                         placeholder="0"
-                        value={row.fallingGaugeRejected || ''}
+                        value={row.fallingGaugeRejected ?? ''}
                         onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'fallingGauge')}
                       />
@@ -637,7 +637,7 @@ const FinalCheckSection = ({
                       <input
                         type="number"
                         placeholder="0"
-                        value={row.surfaceDefectRejected || ''}
+                        value={row.surfaceDefectRejected ?? ''}
                         onChange={e => updateData(idx, 'surfaceDefectRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'surfaceDefect')}
                       />
@@ -649,7 +649,7 @@ const FinalCheckSection = ({
                       <input
                         type="number"
                         placeholder="0"
-                        value={row.embossingDefectRejected || ''}
+                        value={row.embossingDefectRejected ?? ''}
                         onChange={e => updateData(idx, 'embossingDefectRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'embossingDefect')}
                       />
@@ -661,7 +661,7 @@ const FinalCheckSection = ({
                       <input
                         type="number"
                         placeholder="0"
-                        value={row.markingRejected || ''}
+                        value={row.markingRejected ?? ''}
                         onChange={e => updateData(idx, 'markingRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'marking')}
                       />
@@ -673,7 +673,7 @@ const FinalCheckSection = ({
                       <input
                         type="number"
                         placeholder="0"
-                        value={row.temperingHardnessRejected || ''}
+                        value={row.temperingHardnessRejected ?? ''}
                         onChange={e => updateData(idx, 'temperingHardnessRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'temperingHardness')}
                       />

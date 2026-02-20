@@ -266,16 +266,16 @@ const TestingFinishingSection = ({
                       <span className="testing-finishing-rejected-label">Rejected No.</span>
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.toeLoadRejected || ''} onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'toeLoad')} />
+                      <input type="number" value={row.toeLoadRejected ?? ''} onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'toeLoad')} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.weightRejected || ''} onChange={e => updateData(idx, 'weightRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'weight')} />
+                      <input type="number" value={row.weightRejected ?? ''} onChange={e => updateData(idx, 'weightRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'weight')} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.paintIdentificationRejected || ''} onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'paintIdentification')} />
+                      <input type="number" value={row.paintIdentificationRejected ?? ''} onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'paintIdentification')} />
                     </td>
                     <td className="testing-finishing-td testing-finishing-td--rejected-input">
-                      <input type="number" value={row.ercCoatingRejected || ''} onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'ercCoating')} />
+                      <input type="number" value={row.ercCoatingRejected ?? ''} onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'ercCoating')} />
                     </td>
                   </tr>
 
@@ -408,7 +408,7 @@ const TestingFinishingSection = ({
                     <div className="testing-finishing-mobile-field__value">
                       <input
                         type="number"
-                        value={row.toeLoadRejected || ''}
+                        value={row.toeLoadRejected ?? ''}
                         onChange={e => updateData(idx, 'toeLoadRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'toeLoad')}
                       />
@@ -420,7 +420,7 @@ const TestingFinishingSection = ({
                     <div className="testing-finishing-mobile-field__value">
                       <input
                         type="number"
-                        value={row.weightRejected || ''}
+                        value={row.weightRejected ?? ''}
                         onChange={e => updateData(idx, 'weightRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'weight')}
                       />
@@ -432,7 +432,7 @@ const TestingFinishingSection = ({
                     <div className="testing-finishing-mobile-field__value">
                       <input
                         type="number"
-                        value={row.paintIdentificationRejected || ''}
+                        value={row.paintIdentificationRejected ?? ''}
                         onChange={e => updateData(idx, 'paintIdentificationRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'paintIdentification')}
                       />
@@ -444,7 +444,7 @@ const TestingFinishingSection = ({
                     <div className="testing-finishing-mobile-field__value">
                       <input
                         type="number"
-                        value={row.ercCoatingRejected || ''}
+                        value={row.ercCoatingRejected ?? ''}
                         onChange={e => updateData(idx, 'ercCoatingRejected', e.target.value)}
                         disabled={!isRejectionEnabled(row, 'ercCoating')}
                       />

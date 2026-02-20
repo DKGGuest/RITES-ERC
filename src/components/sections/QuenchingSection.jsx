@@ -308,22 +308,22 @@ const QuenchingSection = ({
                       <span className="quenching-rejected-label">Rejected No.</span>
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.quenchingTemperatureRejected || ''} onChange={e => updateData(idx, 'quenchingTemperatureRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingTemperature')} />
+                      <input type="number" value={row.quenchingTemperatureRejected ?? ''} onChange={e => updateData(idx, 'quenchingTemperatureRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingTemperature')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.quenchingDurationRejected || ''} onChange={e => updateData(idx, 'quenchingDurationRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingDuration')} />
+                      <input type="number" value={row.quenchingDurationRejected ?? ''} onChange={e => updateData(idx, 'quenchingDurationRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingDuration')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.quenchingHardnessRejected || ''} onChange={e => updateData(idx, 'quenchingHardnessRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingHardness')} />
+                      <input type="number" value={row.quenchingHardnessRejected ?? ''} onChange={e => updateData(idx, 'quenchingHardnessRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'quenchingHardness')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.boxGaugeRejected || ''} onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'boxGauge')} />
+                      <input type="number" value={row.boxGaugeRejected ?? ''} onChange={e => updateData(idx, 'boxGaugeRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'boxGauge')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.flatBearingAreaRejected || ''} onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'flatBearingArea')} />
+                      <input type="number" value={row.flatBearingAreaRejected ?? ''} onChange={e => updateData(idx, 'flatBearingAreaRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'flatBearingArea')} />
                     </td>
                     <td className="quenching-td quenching-td--rejected-input">
-                      <input type="number" value={row.fallingGaugeRejected || ''} onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'fallingGauge')} />
+                      <input type="number" value={row.fallingGaugeRejected ?? ''} onChange={e => updateData(idx, 'fallingGaugeRejected', e.target.value)} disabled={!isRejectionEnabled(row, 'fallingGauge')} />
                     </td>
                   </tr>
                   {/* Row 4: Remarks */}

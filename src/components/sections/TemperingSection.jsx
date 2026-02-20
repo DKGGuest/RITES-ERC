@@ -253,7 +253,7 @@ const TemperingSection = ({
                           type="number"
                           className="form-control tempering-input"
                           placeholder="0"
-                          value={row.temperingTemperatureRejected || ''}
+                          value={row.temperingTemperatureRejected ?? ''}
                           onChange={e => updateData(idx, 'temperingTemperatureRejected', e.target.value)}
                           disabled={!isRejectionEnabled(row, 'temperingTemperature')}
                         />
@@ -263,7 +263,7 @@ const TemperingSection = ({
                           type="number"
                           className="form-control tempering-input"
                           placeholder="0"
-                          value={row.temperingDurationRejected || ''}
+                          value={row.temperingDurationRejected ?? ''}
                           onChange={e => updateData(idx, 'temperingDurationRejected', e.target.value)}
                           disabled={!isRejectionEnabled(row, 'temperingDuration')}
                         />
@@ -364,7 +364,7 @@ const TemperingSection = ({
                         <input
                           type="number"
                           placeholder="0"
-                          value={row.temperingTemperatureRejected || ''}
+                          value={row.temperingTemperatureRejected ?? ''}
                           onChange={e => updateData(idx, 'temperingTemperatureRejected', e.target.value)}
                           disabled={!isRejectionEnabled(row, 'temperingTemperature')}
                         />
@@ -376,7 +376,7 @@ const TemperingSection = ({
                         <input
                           type="number"
                           placeholder="0"
-                          value={row.temperingDurationRejected || ''}
+                          value={row.temperingDurationRejected ?? ''}
                           onChange={e => updateData(idx, 'temperingDurationRejected', e.target.value)}
                           disabled={!isRejectionEnabled(row, 'temperingDuration')}
                         />
