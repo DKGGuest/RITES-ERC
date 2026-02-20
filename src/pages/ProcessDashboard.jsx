@@ -3908,7 +3908,7 @@ return {
             isEnabled = true;
           }
 
-          if (isEnabled && (isEmpty(hourData[rejectionField]) || Number(hourData[rejectionField]) <= 0)) {
+          if (isEnabled && isEmpty(hourData[rejectionField])) {
             missingFields.push(`Rejection Qty for ${label}`);
           }
         };
