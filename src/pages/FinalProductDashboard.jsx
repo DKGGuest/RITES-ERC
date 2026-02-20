@@ -9,6 +9,7 @@ import {
   saveInspectionSummary,
   saveLotResults
 } from '../services/finalProductInspectionService';
+import { getHardnessToeLoadAQL, getDimensionWeightAQL } from '../utils/is2500Calculations';
 import { finishInspection } from '../services/finalInspectionSubmoduleService';
 import { performTransitionAction } from '../services/workflowService';
 import { getStoredUser } from '../services/authService';
@@ -33,8 +34,153 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   const [poData, setPoData] = useState(null);
   const [lotsFromVendorCall, setLotsFromVendorCall] = useState([]);
   const [testResultsPerLot, setTestResultsPerLot] = useState({});
+  const [rejectedCountsPerLot, setRejectedCountsPerLot] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [pauseSuccessData, setPauseSuccessData] = useState(null); // for pause success modal
+  const [pauseErrorData, setPauseErrorData] = useState(null);    // for pause failure modal
+  const [showPauseConfirm, setShowPauseConfirm] = useState(false); // for pause confirmation modal
+
+  // Calculate Rejected Counts (R1 + R2) per lot from all submodules
+  useEffect(() => {
+    if (!selectedCall?.call_no || lotsFromVendorCall.length === 0) return;
+
+    const callNo = selectedCall.call_no;
+    const counts = {};
+
+    lotsFromVendorCall.forEach(lot => {
+      let totalRejected = 0;
+
+      // 1. Visual & Dimensional
+      try {
+        const stored = localStorage.getItem(`visualDimensionalData_${callNo}`);
+        if (stored) {
+          const data = JSON.parse(stored)[lot.lotNo];
+          if (data) {
+            // Visual R1 + R2
+            totalRejected += (parseInt(data.visualR1) || 0) + (parseInt(data.visualR2) || 0);
+
+            // Dimensional (Go/NoGo/Flat) for 1st & 2nd sampling
+            // Note: In FinalVisualDimensionalPage, they are stored as separate fields
+            const dim1 = (parseInt(data.dimGo1) || 0) + (parseInt(data.dimNoGo1) || 0) + (parseInt(data.dimFlat1) || 0);
+            const dim2 = (parseInt(data.dimGo2) || 0) + (parseInt(data.dimNoGo2) || 0) + (parseInt(data.dimFlat2) || 0);
+            totalRejected += dim1 + dim2;
+          }
+        }
+      } catch (e) { console.error('Error reading Visual/Dim data:', e); }
+
+      // 2. Hardness (Values outside 40-44)
+      try {
+        const stored = localStorage.getItem(`hardnessTestData_${callNo}`);
+        if (stored) {
+          const data = JSON.parse(stored)[lot.lotNo];
+          if (data) {
+            const r1 = (data.hardness1st || []).filter(v => v && (parseFloat(v) < 40 || parseFloat(v) > 44)).length;
+            const r2 = (data.hardness2nd || []).filter(v => v && (parseFloat(v) < 40 || parseFloat(v) > 44)).length;
+            totalRejected += r1 + r2;
+          }
+        }
+      } catch (e) { console.error('Error reading Hardness data:', e); }
+
+      // 3. Toe Load (Values outside tolerance based on Spring Type)
+      try {
+        const stored = localStorage.getItem(`toeLoadTestData_${callNo}`);
+        if (stored) {
+          const data = JSON.parse(stored)[lot.lotNo];
+          if (data) {
+            const springType = lot.springType || selectedCall?.ercType || 'MK-III';
+            const min = springType === 'MK-V' ? 1200 : (springType === 'ERC-J' ? 650 : 850);
+            const max = springType === 'MK-V' ? 1500 : (springType === 'ERC-J' ? Infinity : 1100);
+
+            const check = (v) => {
+              if (!v) return false;
+              const val = parseFloat(v);
+              if (isNaN(val)) return false;
+              if (springType === 'ERC-J') return val <= 650; // ERC-J > 650 is Pass, so <= 650 is Fail
+              return val < min || val > max;
+            };
+
+            const r1 = (data.toe1st || []).filter(check).length;
+            const r2 = (data.toe2nd || []).filter(check).length;
+
+            // ERC-J special case: value > 650 is PASS. So <= 650 is FAIL.
+            // MK-III/V: value within range is PASS. Outside is FAIL.
+            totalRejected += r1 + r2;
+          }
+        }
+      } catch (e) { console.error('Error reading Toe Load data:', e); }
+
+      // 4. Weight (Values < Min Weight)
+      try {
+        const stored = localStorage.getItem(`weightTestData_${callNo}`);
+        if (stored) {
+          const data = JSON.parse(stored)[lot.lotNo];
+          if (data) {
+            const springType = lot.springType || selectedCall?.ercType || 'MK-III';
+            const minWeight = springType === 'MK-V' ? 1068 : 904; // ERC-J and MK-III are 904
+
+            const check = (v) => v && !isNaN(parseFloat(v)) && parseFloat(v) < minWeight;
+
+            const r1 = (data.weight1st || []).filter(check).length;
+            const r2 = (data.weight2nd || []).filter(check).length;
+            totalRejected += r1 + r2;
+          }
+        }
+      } catch (e) { console.error('Error reading Weight data:', e); }
+
+      // 5. Deflection & Application Test (plus Dimensional if stored here)
+      try {
+        const stored = localStorage.getItem(`deflectionTestData_${callNo}`);
+        if (stored) {
+          const data = JSON.parse(stored)[lot.lotNo];
+          if (data) {
+            // Application & Deflection R1 + R2
+            const defR1 = parseInt(data.deflectionR1) || 0;
+            const defR2 = parseInt(data.deflectionR2) || 0;
+            totalRejected += defR1 + defR2;
+
+            // Dimensional (Go/NoGo/Flat) - stored here as well in FinalApplicationDeflectionPage
+            const dim1 = (parseInt(data.dimGo1) || 0) + (parseInt(data.dimNoGo1) || 0) + (parseInt(data.dimFlat1) || 0);
+            const dim2 = (parseInt(data.dimGo2) || 0) + (parseInt(data.dimNoGo2) || 0) + (parseInt(data.dimFlat2) || 0);
+            totalRejected += dim1 + dim2;
+          }
+        }
+      } catch (e) { console.error('Error reading Deflection/App data:', e); }
+
+      // 6. Inclusion Rating, Decarb, Microstructure, Freedom from Defects
+      try {
+        const stored = localStorage.getItem(`inclusionRatingData_${callNo}`);
+        if (stored) {
+          const data = JSON.parse(stored)[lot.lotNo];
+          if (data) {
+            // Microstructure Rejection
+            const micro1 = (data.microstructure1st || []).filter(v => v === 'Not Tempered Martensite').length;
+            const micro2 = (data.microstructure2nd || []).filter(v => v === 'Not Tempered Martensite').length;
+
+            // Decarb Rejection (Max 0.8)
+            const maxDecarb = lot.maxDecarb || 0.8;
+            const decarb1 = (data.decarb1st || []).filter(v => v !== '' && parseFloat(v) > maxDecarb).length;
+            const decarb2 = (data.decarb2nd || []).filter(v => v !== '' && parseFloat(v) > maxDecarb).length;
+
+            // Inclusion Rejection (> 2.0)
+            const checkInc = (sample) => ['A', 'B', 'C', 'D'].some(k => sample[k] !== '' && parseFloat(sample[k]) > 2.0);
+            const inc1 = (data.inclusion1st || []).filter(checkInc).length;
+            const inc2 = (data.inclusion2nd || []).filter(checkInc).length;
+
+            // Defects Rejection
+            const def1 = (data.defects1st || []).filter(v => v === 'NOT OK').length;
+            const def2 = (data.defects2nd || []).filter(v => v === 'NOT OK').length;
+
+            totalRejected += (micro1 + micro2 + decarb1 + decarb2 + inc1 + inc2 + def1 + def2);
+          }
+        }
+      } catch (e) { console.error('Error reading Inclusion Rating data:', e); }
+
+      counts[lot.lotNo] = totalRejected;
+    });
+
+    setRejectedCountsPerLot(counts);
+  }, [selectedCall?.call_no, lotsFromVendorCall, testResultsPerLot, selectedCall?.ercType]);
 
   // Fetch live data from backend with caching
   useEffect(() => {
@@ -96,7 +242,13 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
           inspPlace: dashboardData.poData.inspPlace || '',
           itemDesc: dashboardData.poData.itemDesc || '',
           unit: dashboardData.poData.unit || 'Nos.',
-          poQty: dashboardData.poData.poQty || 0
+          poQty: dashboardData.poData.poQty || 0,
+          poSrQty: dashboardData.poData.poSrQty || 0,
+          cummQtyOfferedPreviously: dashboardData.poData.cummQtyOfferedPreviously || 0,
+          cummQtyPassedPreviously: dashboardData.poData.cummQtyPassedPreviously || 0,
+          cummQtyRejectedPreviously: dashboardData.poData.cummQtyRejectedPreviously || 0,
+          rlyCd: dashboardData.poData.rlyCd || '',
+          rlyShortName: dashboardData.poData.rlyShortName || ''
         };
         setPoData(mappedPoData);
         console.log('✅ PO Data mapped and set:', mappedPoData);
@@ -111,8 +263,10 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
           lotNo: lot.lotNumber,
           heatNo: lot.heatNumber,
           lotSize: lot.offeredQty || 0,
+          noOfBags: lot.noOfBags || 0,
           manufacturer: lot.manufacturer,
-          manufacturerHeat: lot.manufacturerHeat
+          manufacturerHeat: lot.manufacturerHeat,
+          springType: lot.springType || selectedCall?.ercType // Store spring type
         }));
         setLotsFromVendorCall(mappedLots);
         console.log('✅ Lots set:', mappedLots);
@@ -144,75 +298,278 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     };
 
     fetchLiveData();
-  }, [selectedCall?.call_no, selectedCall?.po_no, getFpCachedData, updateFpDashboardDataCache]);
+  }, [selectedCall?.call_no, selectedCall?.po_no, getFpCachedData, updateFpDashboardDataCache, selectedCall?.ercType]);
 
   // Validation function for calibration data
-  const validateCalibrationData = useCallback((lotData) => {
-    if (!lotData) return 'Pending';
-    // Check if calibration data is filled
-    const hasCalibrationData = lotData.calibrationCertNo || lotData.calibrationDate || lotData.calibrationRemark;
-    return hasCalibrationData ? 'OK' : 'Pending';
+  // Calibration is call-level (not per-lot): all 5 checkboxes must be verified
+  const validateCalibrationData = useCallback((data) => {
+    if (!data) return 'Pending';
+    const requiredKeys = ['rdsoApproval', 'rawMaterialIC', 'dimensionCheck', 'packingList', 'rdsoGauges'];
+    const allVerified = requiredKeys.every(key => data[key]?.verified === true);
+    return allVerified ? 'OK' : 'Pending';
   }, []);
 
   // Validation function for visual & dimensional data
-  const validateVisualDimensionalData = useCallback((lotData) => {
+  const validateVisualDimensionalData = useCallback((lotData, lot) => {
     if (!lotData) return 'Pending';
     // Check if any visual or dimensional data is filled
-    const hasVisualData = lotData.visualR1 || lotData.visualR2 || lotData.visualRemark;
-    const hasDimData = lotData.dimGo1 || lotData.dimNoGo1 || lotData.dimFlat1 || lotData.dimGo2 || lotData.dimNoGo2 || lotData.dimFlat2 || lotData.dimRemark;
-    return (hasVisualData || hasDimData) ? 'OK' : 'Pending';
+    const hasVisualData = lotData.visualR1 || lotData.visualR2;
+    const hasDimData = lotData.dimGo1 || lotData.dimNoGo1 || lotData.dimFlat1;
+
+    if (!hasVisualData && !hasDimData) return 'Pending';
+
+    // Get AQL values based on Lot Size using central utility
+    const aql = getDimensionWeightAQL(lot?.lotSize || 0);
+
+    // Check Visual
+    const vR1 = parseInt(lotData.visualR1) || 0;
+    const vR2 = parseInt(lotData.visualR2) || 0;
+    const vTotal = vR1 + vR2;
+
+    if (vR1 >= aql.re1) return 'NOT OK';
+    if (!aql.useSingleSampling && vTotal >= aql.cummRej) return 'NOT OK';
+
+    // Check Dimensional (Sum of Go/NoGo/Flat)
+    const dR1 = (parseInt(lotData.dimGo1) || 0) + (parseInt(lotData.dimNoGo1) || 0) + (parseInt(lotData.dimFlat1) || 0);
+    const dR2 = (parseInt(lotData.dimGo2) || 0) + (parseInt(lotData.dimNoGo2) || 0) + (parseInt(lotData.dimFlat2) || 0);
+    const dTotal = dR1 + dR2;
+
+    if (dR1 >= aql.re1) return 'NOT OK';
+    if (!aql.useSingleSampling && dTotal >= aql.cummRej) return 'NOT OK';
+
+    return 'OK';
   }, []);
 
   // Validation function for hardness test data
-  const validateHardnessData = useCallback((lotData) => {
-    if (!lotData || !Array.isArray(lotData)) return 'Pending';
-    const hasData = lotData.some(sample => sample && (sample.hardnessValue || sample.result || sample.remarks));
-    return hasData ? 'OK' : 'Pending';
+  const validateHardnessData = useCallback((lotData, lot) => {
+    if (!lotData) return 'Pending';
+    // Get AQL using central utility
+    const aql = getHardnessToeLoadAQL(lot?.lotSize || 0);
+
+    const h1 = (lotData.hardness1st || []).filter(v => v && (parseFloat(v) < 40 || parseFloat(v) > 44)).length;
+    const h2 = (lotData.hardness2nd || []).filter(v => v && (parseFloat(v) < 40 || parseFloat(v) > 44)).length;
+
+    const hasData = (lotData.hardness1st || []).some(v => !!v);
+    if (!hasData) return 'Pending';
+
+    if (h1 >= aql.re1) return 'NOT OK';
+    if (!aql.useSingleSampling && (h1 + h2) >= aql.cummRej) return 'NOT OK';
+
+    return 'OK';
   }, []);
 
-  // Validation function for inclusion rating data
-  const validateInclusionData = useCallback((lotData) => {
-    if (!lotData || !Array.isArray(lotData)) return 'Pending';
-    const hasData = lotData.some(sample => sample && (sample.inclusionRating || sample.decarb || sample.remarks));
-    return hasData ? 'OK' : 'Pending';
+  const validateInclusionData = useCallback((lotData, lot) => {
+    if (!lotData) return 'Pending';
+
+    // Check if any data exists
+    const hasData = (lotData.microstructure1st || []).some(v => v) ||
+      (lotData.decarb1st || []).some(v => v) ||
+      (lotData.defects1st || []).some(v => v);
+
+    // Also check inclusion object array
+    const hasIncData = (lotData.inclusion1st || []).some(s => s.A || s.B || s.C || s.D);
+
+    if (!hasData && !hasIncData && !lotData.remarks) return 'Pending';
+
+    // Calculate Failures
+    // Microstructure
+    const micro1 = (lotData.microstructure1st || []).filter(v => v === 'Not Tempered Martensite').length;
+    const micro2 = (lotData.microstructure2nd || []).filter(v => v === 'Not Tempered Martensite').length;
+
+    // Decarb (Max 0.8)
+    const maxDecarb = lot.maxDecarb || 0.8;
+    const decarb1 = (lotData.decarb1st || []).filter(v => v !== '' && parseFloat(v) > maxDecarb).length;
+    const decarb2 = (lotData.decarb2nd || []).filter(v => v !== '' && parseFloat(v) > maxDecarb).length;
+
+    // Inclusion (> 2.0)
+    const checkInc = (sample) => ['A', 'B', 'C', 'D'].some(k => sample[k] !== '' && parseFloat(sample[k]) > 2.0);
+    const inc1 = (lotData.inclusion1st || []).filter(checkInc).length;
+    const inc2 = (lotData.inclusion2nd || []).filter(checkInc).length;
+
+    // Defects
+    const def1 = (lotData.defects1st || []).filter(v => v === 'NOT OK').length;
+    const def2 = (lotData.defects2nd || []).filter(v => v === 'NOT OK').length;
+
+    const totalFailures = micro1 + micro2 + decarb1 + decarb2 + inc1 + inc2 + def1 + def2;
+
+    // Logic from FinalInclusionRatingPage: Ac1: 0 | Re1: 2 | Cumm: 2
+    // Failing if any individual test has R1 > 1 or R1+R2 > 1
+    const microFail = micro1 > 1 || (micro1 + micro2) > 1;
+    const decarbFail = decarb1 > 1 || (decarb1 + decarb2) > 1;
+    const incFail = inc1 > 1 || (inc1 + inc2) > 1;
+    const defFail = def1 > 1 || (def1 + def2) > 1;
+
+    if (microFail || decarbFail || incFail || defFail) return 'NOT OK';
+
+    return 'OK';
   }, []);
 
   // Validation function for deflection test data
-  const validateDeflectionData = useCallback((lotData) => {
-    if (!lotData || !Array.isArray(lotData)) return 'Pending';
-    const hasData = lotData.some(sample => sample && (sample.deflectionValue || sample.result || sample.remarks));
-    return hasData ? 'OK' : 'Pending';
+  const validateDeflectionData = useCallback((lotData, lot) => {
+    if (!lotData) return 'Pending';
+
+    // Check if data exists
+    const hasData = lotData.deflectionR1 || lotData.deflectionR2 || lotData.dimGo1 || lotData.dimNoGo1; // Check both defl and dim fields
+    if (!hasData) return 'Pending';
+
+    // AQL Check (Same as Visual/Dim AQL)
+    const aql = getDimensionWeightAQL(lot.lotSize || 0);
+
+    // 1. Check Deflection Failures
+    const defR1 = parseInt(lotData.deflectionR1) || 0;
+    const defR2 = parseInt(lotData.deflectionR2) || 0;
+    const defTotal = defR1 + defR2;
+
+    if (defR1 >= aql.re1) return 'NOT OK';
+    if (!aql.useSingleSampling && defTotal >= aql.cummRej) return 'NOT OK';
+
+    // 2. Check Dimensional Failures (if stored here)
+    const dim1 = (parseInt(lotData.dimGo1) || 0) + (parseInt(lotData.dimNoGo1) || 0) + (parseInt(lotData.dimFlat1) || 0);
+    const dim2 = (parseInt(lotData.dimGo2) || 0) + (parseInt(lotData.dimNoGo2) || 0) + (parseInt(lotData.dimFlat2) || 0);
+    const dimTotal = dim1 + dim2;
+
+    if (dim1 >= aql.re1) return 'NOT OK';
+    if (!aql.useSingleSampling && dimTotal >= aql.cummRej) return 'NOT OK';
+
+    return 'OK';
   }, []);
 
   // Validation function for toe load test data
-  const validateToeLoadData = useCallback((lotData) => {
-    if (!lotData || !Array.isArray(lotData)) return 'Pending';
-    const hasData = lotData.some(sample => sample && (sample.toeLoadValue || sample.result || sample.remarks));
-    return hasData ? 'OK' : 'Pending';
+  const validateToeLoadData = useCallback((lotData, lot) => {
+    if (!lotData) return 'Pending';
+
+    // Spring Type Logic
+    const springType = lot.springType || 'MK-III';
+    const min = springType === 'MK-V' ? 1200 : (springType === 'ERC-J' ? 650 : 850);
+    const max = springType === 'MK-V' ? 1500 : (springType === 'ERC-J' ? Infinity : 1100);
+
+    // Get AQL using central utility
+    const aql = getHardnessToeLoadAQL(lot.lotSize || 0);
+
+    const check = (v) => {
+      if (!v) return false;
+      const val = parseFloat(v);
+      if (isNaN(val)) return false;
+      if (springType === 'ERC-J') return val <= 650;
+      return val < min || val > max;
+    };
+
+    const r1 = (lotData.toe1st || []).filter(check).length;
+    const r2 = (lotData.toe2nd || []).filter(check).length;
+
+    const hasData = (lotData.toe1st || []).some(v => !!v);
+    if (!hasData) return 'Pending';
+
+    if (r1 >= aql.re1) return 'NOT OK';
+    if ((r1 + r2) >= aql.cummRej) return 'NOT OK';
+
+    return 'OK';
   }, []);
 
   // Validation function for weight test data
-  const validateWeightData = useCallback((lotData) => {
-    if (!lotData || !Array.isArray(lotData)) return 'Pending';
-    const hasData = lotData.some(sample => sample && (sample.weight || sample.result || sample.remarks));
-    return hasData ? 'OK' : 'Pending';
+  const validateWeightData = useCallback((lotData, lot) => {
+    if (!lotData) return 'Pending';
+
+    const springType = lot.springType || 'MK-III';
+    const minWeight = springType === 'MK-V' ? 1068 : 904;
+
+    // Get AQL using central utility
+    const aql = getDimensionWeightAQL(lot?.lotSize || 0);
+
+    const check = (v) => v && !isNaN(parseFloat(v)) && parseFloat(v) < minWeight;
+
+    const r1 = (lotData.weight1st || []).filter(check).length;
+    const r2 = (lotData.weight2nd || []).filter(check).length;
+
+    const hasData = (lotData.weight1st || []).some(v => !!v);
+    if (!hasData) return 'Pending';
+
+    if (r1 >= aql.re1) return 'NOT OK';
+    if (!aql.useSingleSampling && (r1 + r2) >= aql.cummRej) return 'NOT OK';
+
+    return 'OK';
   }, []);
 
   // Validation function for chemical analysis data
-  const validateChemicalData = useCallback((lotData) => {
-    if (!lotData || !Array.isArray(lotData)) return 'Pending';
-    const hasData = lotData.some(sample => sample && (sample.carbon || sample.silicon || sample.remarks));
-    return hasData ? 'OK' : 'Pending';
+  const validateChemicalData = useCallback((allChemData, lot) => {
+    if (!allChemData || !allChemData.chemValues) return 'Pending';
+
+    const lotNo = lot.lotNo;
+    const heatNo = lot.heatNo;
+    const chemValues = allChemData.chemValues[lotNo];
+    const ladleValues = allChemData.ladleValues || [];
+
+    if (!chemValues || Object.keys(chemValues).length === 0) return 'Pending';
+
+    // Find ladle values for this lot
+    const ladleData = ladleValues.find(l => l.lotNo === lotNo || l.heatNo === heatNo);
+    if (!ladleData) return 'Pending';
+
+    const ladleAnalysis = {
+      c: ladleData.percentC || 0,
+      si: ladleData.percentSi || 0,
+      mn: ladleData.percentMn || 0,
+      s: ladleData.percentS || 0,
+      p: ladleData.percentP || 0
+    };
+
+    const elementRanges = {
+      c: { min: 0.5, max: 0.6 },
+      mn: { min: 0.8, max: 1.0 },
+      si: { min: 1.5, max: 2.0 },
+      s: { min: 0, max: 0.03 },
+      p: { min: 0, max: 0.03 },
+    };
+
+    const tolerances = {
+      c: 0.03,
+      mn: 0.04,
+      si: 0.05,
+      s: 0.005,
+      p: 0.005,
+    };
+
+    const elements = ['c', 'si', 'mn', 's', 'p'];
+
+    for (const element of elements) {
+      const productValue = chemValues[element];
+      const ladleValue = ladleAnalysis[element];
+
+      if (productValue === undefined || productValue === "") return 'Pending';
+
+      const pVal = parseFloat(productValue);
+      const lVal = parseFloat(ladleValue);
+      const range = elementRanges[element];
+      const tolerance = tolerances[element];
+
+      if (isNaN(pVal)) return 'Pending';
+
+      // Special rule for Sulphur and Phosphorus: only upper bound check against ladle
+      if (element === "s" || element === "p") {
+        if (pVal > (lVal + tolerance)) return 'NOT OK';
+      } else {
+        // Standard rule for Carbon, Silicon, Manganese (± tolerance)
+        const diff = Math.abs(pVal - lVal);
+        const withinTolerance = diff <= (tolerance + 0.0001);
+
+        // Ensure it's within "Permissible Variation" limits
+        const expandedMin = range.min - tolerance;
+        const expandedMax = range.max + tolerance;
+        const withinExpandedRange = pVal >= (expandedMin - 0.0001) && pVal <= (expandedMax + 0.0001);
+
+        if (!withinTolerance || !withinExpandedRange) return 'NOT OK';
+      }
+    }
+
+    return 'OK';
   }, []);
 
   // Update test results from submodule data stored in sessionStorage
   const updateTestResultsFromStorage = useCallback(() => {
     const callNo = selectedCall?.call_no;
-    if (!callNo) return;
+    if (!callNo || lotsFromVendorCall.length === 0) return;
 
     setTestResultsPerLot(prevResults => {
-      if (Object.keys(prevResults).length === 0) return prevResults;
-
       const updatedResults = { ...prevResults };
       let hasUpdates = false;
 
@@ -235,16 +592,19 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
           try {
             const data = JSON.parse(storedData);
             // Update test results for each lot based on stored data
-            Object.keys(data).forEach(lotNo => {
-              if (updatedResults[lotNo]) {
-                const lotData = data[lotNo];
-                const status = validator(lotData);
-                // Always update the status, regardless of whether it's Pending or not
-                if (updatedResults[lotNo][testName] !== status) {
-                  console.log(`📊 Status update for lot ${lotNo}, test ${testName}: ${updatedResults[lotNo][testName]} → ${status}`);
-                  updatedResults[lotNo][testName] = status;
-                  hasUpdates = true;
-                }
+            lotsFromVendorCall.forEach(lot => {
+              const lotNo = lot.lotNo;
+              // Calibration and chemical are call-level (not per-lot), pass whole data object
+              const lotData = (testName === 'chemical' || testName === 'calibration') ? data : data[lotNo];
+              // Pass lot object to validator for AQL checks
+              const status = validator(lotData, lot);
+
+              if (!updatedResults[lotNo]) updatedResults[lotNo] = {}; // Ensure lot object exists
+
+              if (updatedResults[lotNo][testName] !== status) {
+                // console.log(`📊 Status update for lot ${lotNo}, test ${testName}: ${updatedResults[lotNo][testName]} -> ${status}`);
+                updatedResults[lotNo][testName] = status;
+                hasUpdates = true;
               }
             });
           } catch (e) {
@@ -258,7 +618,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       }
       return hasUpdates ? updatedResults : prevResults;
     });
-  }, [selectedCall?.call_no, validateCalibrationData, validateVisualDimensionalData, validateHardnessData, validateInclusionData, validateDeflectionData, validateToeLoadData, validateWeightData, validateChemicalData]);
+  }, [selectedCall?.call_no, lotsFromVendorCall, validateCalibrationData, validateVisualDimensionalData, validateHardnessData, validateInclusionData, validateDeflectionData, validateToeLoadData, validateWeightData, validateChemicalData]);
 
   // Update test results when component mounts or when returning from submodule
   useEffect(() => {
@@ -305,24 +665,25 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   };
 
   /* Table 1 - Sample Size for Bags for Sampling calculation */
-  const calculateBagsForSampling = (totalSampleSize) => {
-    if (totalSampleSize <= 0) return 0;
-    if (totalSampleSize <= 8) return 2;
-    if (totalSampleSize <= 15) return 3;
-    if (totalSampleSize <= 25) return 5;
-    if (totalSampleSize <= 50) return 8;
-    if (totalSampleSize <= 90) return 13;
-    if (totalSampleSize <= 150) return 20;
-    if (totalSampleSize <= 280) return 32;
-    if (totalSampleSize <= 500) return 50;
-    if (totalSampleSize <= 1200) return 80;
-    if (totalSampleSize <= 3200) return 125;
-    if (totalSampleSize <= 10000) return 200;
-    if (totalSampleSize <= 35000) return 315;
-    if (totalSampleSize <= 150000) return 500;
-    if (totalSampleSize <= 500000) return 800;
+  const calculateBagsForSampling = (quantity) => {
+    if (quantity <= 0) return 0;
+    if (quantity <= 8) return 2;
+    if (quantity <= 15) return 3;
+    if (quantity <= 25) return 5;
+    if (quantity <= 50) return 8;
+    if (quantity <= 90) return 13;
+    if (quantity <= 150) return 20;
+    if (quantity <= 280) return 32;
+    if (quantity <= 500) return 50;
+    if (quantity <= 1200) return 80;
+    if (quantity <= 3200) return 125;
+    if (quantity <= 10000) return 200;
+    if (quantity <= 35000) return 315;
+    if (quantity <= 150000) return 500;
+    if (quantity <= 500000) return 800;
     return 1250;
   };
+
 
   /* -------------------- LOTS DATA (Fetched from Backend) -------------------- */
   // lotsFromVendorCall is now fetched from backend in useEffect above
@@ -330,9 +691,9 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   /* Calculate Sample Size for each lot based on Lot Size (IS 2500 Table 2) */
   const lotsWithSampling = (lotsFromVendorCall && Array.isArray(lotsFromVendorCall) && lotsFromVendorCall.length > 0)
     ? lotsFromVendorCall.map((lot) => {
-        const sampleSize = calculateSampleSize(lot.lotSize);
-        return { ...lot, sampleSize };
-      })
+      const sampleSize = calculateSampleSize(lot.lotSize);
+      return { ...lot, sampleSize };
+    })
     : [];
 
   /* Calculate totals */
@@ -342,7 +703,7 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
 
   /* No. of Bags Offered - Auto-fetched from Vendor Call */
   const bagsOffered = (lotsFromVendorCall && Array.isArray(lotsFromVendorCall) && lotsFromVendorCall.length > 0)
-    ? lotsFromVendorCall.reduce((sum, lot) => sum + Math.ceil(lot.lotSize / 50), 0)
+    ? lotsFromVendorCall.reduce((sum, lot) => sum + (parseInt(lot.noOfBags) || 0), 0)
     : 0;
 
   /* -------------------- FINAL INSPECTION RESULTS DATA -------------------- */
@@ -441,12 +802,17 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
     }
   }, [lotInspectionData, selectedCall?.call_no]);
 
-  /* Check if lot is rejected (any test NOT OK) */
-  const isLotRejected = (lotNo) => {
+  /* Get overall lot status: 'REJECTED' | 'PENDING' | 'ACCEPTED' */
+  const getLotStatus = (lotNo) => {
     const tests = testResultsPerLot[lotNo];
-    if (!tests) return false;
-    return Object.values(tests).some(v => v === 'NOT OK');
+    if (!tests || Object.keys(tests).length === 0) return 'PENDING';
+    if (Object.values(tests).some(v => v === 'NOT OK')) return 'REJECTED';
+    if (Object.values(tests).some(v => v === 'Pending')) return 'PENDING';
+    return 'ACCEPTED';
   };
+
+  /* Keep isLotRejected for backward-compat with qty calculations */
+  const isLotRejected = (lotNo) => getLotStatus(lotNo) === 'REJECTED';
 
   /* Packing verification checkboxes - with localStorage persistence */
   const [packedInHDPE, setPackedInHDPE] = useState(() => {
@@ -518,12 +884,14 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
   };
 
   const updateNonStdBagsCount = (lotNo, count) => {
+    // Allow empty string so user can clear the field; coerce to number only for array resize
+    const raw = count === '' ? '' : count;
     const num = parseInt(count) || 0;
     setLotInspectionData(prev => ({
       ...prev,
       [lotNo]: {
         ...prev[lotNo],
-        nonStdBagsCount: num,
+        nonStdBagsCount: raw,
         nonStdBagsQty: Array(num).fill('').slice(0, num)
       }
     }));
@@ -720,11 +1088,12 @@ export default function FinalProductDashboard({ onBack, onNavigateToSubModule })
       const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
       const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
       const poQty = poData?.poQty || 10000;
+      const poSrQty = poData?.poSrQty || 0;
       const cummPassed = poData?.cummQtyPassedPreviously || 0;
-      const qtyStillDue = poQty - cummPassed - qtyNowPassed;
+      const qtyStillDue = poSrQty - cummPassed - qtyNowPassed;
 
       // Get current user for audit fields
-      const currentUser = getStoredUser()?.username || 'SYSTEM';
+      const currentUser = getStoredUser()?.userId || 'SYSTEM';
       const now = new Date().toISOString();
 
       // 1. Prepare cumulative results data
@@ -885,19 +1254,18 @@ Workflow Status: ✅ Transitioned to COMPLETED
   };
 
   /* -------------------- PAUSE INSPECTION HANDLER -------------------- */
-  const handlePauseInspection = async () => {
+  const handlePauseInspection = () => {
     const callNo = selectedCall?.call_no;
     if (!callNo) {
-      alert('❌ Call number not found. Cannot pause inspection.');
+      setPauseErrorData({ message: 'Call number not found. Cannot pause inspection.' });
       return;
     }
+    setShowPauseConfirm(true);
+  };
 
-    // Confirm before pausing
-    const confirmed = window.confirm(
-      '⚠️ Are you sure you want to pause the inspection? This will save all submodule data to the database and pause the inspection.'
-    );
-    if (!confirmed) return;
-
+  const confirmPauseInspection = async () => {
+    setShowPauseConfirm(false);
+    const callNo = selectedCall?.call_no;
     setIsPausingInspection(true);
 
     try {
@@ -908,11 +1276,12 @@ Workflow Status: ✅ Transitioned to COMPLETED
       const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
       const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
       const poQty = poData?.poQty || 10000;
+      const poSrQty = poData?.poSrQty || 0;
       const cummPassed = poData?.cummQtyPassedPreviously || 0;
-      const qtyStillDue = poQty - cummPassed - qtyNowPassed;
+      const qtyStillDue = poSrQty - cummPassed - qtyNowPassed;
 
       // Get current user for audit fields
-      const currentUser = getStoredUser()?.username || 'SYSTEM';
+      const currentUser = getStoredUser()?.userId || 'SYSTEM';
       const now = new Date().toISOString();
 
       // 1. Prepare cumulative results data
@@ -1018,33 +1387,19 @@ Workflow Status: ✅ Transitioned to COMPLETED
         console.warn('Inspection saved but workflow transition failed');
       }
 
-      // Show summary
-      const summary = `
-✅ Inspection Paused Successfully!
-
-Dashboard Results Saved:
-  ✓ Cumulative Results
-  ✓ Inspection Summary
-  ✓ Lot Results (${lotsWithSampling.length} lots)
-
-Saved Modules: ${results.success.length}
-${results.success.map(m => `  ✓ ${m}`).join('\n')}
-
-${results.skipped.length > 0 ? `Skipped (No Data): ${results.skipped.length}\n${results.skipped.map(m => `  - ${m}`).join('\n')}\n` : ''}
-
-${results.failed.length > 0 ? `Failed: ${results.failed.length}\n${results.failed.map(f => `  ✗ ${f.module}: ${f.error}`).join('\n')}` : ''}
-
-Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
-      `;
-
-      alert(summary);
-
-      // Navigate back
-      onBack();
+      // Show custom modal instead of browser alert
+      setPauseSuccessData({
+        callNo,
+        savedModules: results.success,
+        skippedModules: results.skipped,
+        failedModules: results.failed,
+        lotCount: lotsWithSampling.length
+      });
+      // onBack() is called when the user clicks OK in the modal
     } catch (error) {
       console.error('❌ Error pausing inspection:', error);
       const errorMsg = error.message || 'Failed to pause inspection. Please try again.';
-      alert(`❌ Error: ${errorMsg}`);
+      setPauseErrorData({ message: errorMsg });
     } finally {
       setIsPausingInspection(false);
     }
@@ -1061,7 +1416,7 @@ Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
         / Inspection Initiation / <b>ERC Final Product</b>
       </div>
 
-      <h1 className="fp-title">ERC Final Product Inspection</h1>
+      <h1 className="fp-title">ERC Final Product Inspection - {selectedCall?.call_no}</h1>
 
       {/* LOADING STATE */}
       {isLoading && (
@@ -1090,10 +1445,10 @@ Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
             </div>
             <div className="fp-grid">
               <div className="fp-form-group">
-                <label className="fp-form-label">PO Number</label>
+                <label className="fp-form-label">Rly zone / PO Sr No</label>
                 <input
                   className="fp-input"
-                  value={poData?.sub_po_no || poData?.po_no || selectedCall?.po_no || ''}
+                  value={`${poData?.rlyShortName || poData?.rlyCd || ''}/${poData?.poSerialNo || ''}`}
                   disabled
                 />
               </div>
@@ -1119,389 +1474,433 @@ Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
           {/* PRE-INSPECTION DATA ENTRY */}
           <div className="fp-card">
             <h2 className="fp-card-title">Pre-Inspection Data Entry</h2>
-        {/* <p className="fp-card-subtitle">
+            {/* <p className="fp-card-subtitle">
           Lots auto-fetched from Vendor Call (Lot No., Heat No. &amp; Lot Size
           from Process IC). Sample size and AQL limits are auto calculated as
           per IS 2500.
         </p> */}
 
-        {/* Lot-wise info table - Acc/Rej/Cumm will be in respective submodules */}
-        <div className="fp-lots-table-wrapper">
-          <table className="fp-lots-table">
-            <thead>
-              <tr>
-                <th>Lot No.</th>
-                <th>Heat No.</th>
-                <th>Lot Size</th>
-                <th>Sample Size</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(lotsWithSampling && Array.isArray(lotsWithSampling)) ? lotsWithSampling.map((lotRow) => (
-                <tr key={lotRow.lotNo}>
-                  <td className="fp-lot-cell">{lotRow.lotNo}</td>
-                  <td className="fp-lot-cell">{lotRow.heatNo}</td>
-                  <td className="fp-lot-cell">{lotRow.lotSize}</td>
-                  <td className="fp-lot-cell">{lotRow.sampleSize}</td>
-                </tr>
-              )) : null}
-            </tbody>
-          </table>
-        </div>
+            {/* Lot-wise info table - Acc/Rej/Cumm will be in respective submodules */}
+            <div className="fp-lots-table-wrapper">
+              <table className="fp-lots-table">
+                <thead>
+                  <tr>
+                    <th>Lot No.</th>
+                    <th>Heat No.</th>
+                    <th>Lot Size</th>
+                    <th>No. of Bags</th>
+                    <th>Sample Size</th>
+                    <th>No. of Sample Bags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(lotsWithSampling && Array.isArray(lotsWithSampling)) ? lotsWithSampling.map((lotRow) => (
+                    <tr key={lotRow.lotNo}>
+                      <td className="fp-lot-cell">{lotRow.lotNo}</td>
+                      <td className="fp-lot-cell">{lotRow.heatNo}</td>
+                      <td className="fp-lot-cell">{lotRow.lotSize}</td>
+                      <td className="fp-lot-cell">{lotRow.noOfBags}</td>
+                      <td className="fp-lot-cell">{lotRow.sampleSize}</td>
+                      <td className="fp-lot-cell" style={{ fontWeight: 'bold', color: '#0d9488' }}>
+                        {calculateBagsForSampling(lotRow.noOfBags)}
+                      </td>
+                    </tr>
+                  )) : null}
+                </tbody>
+              </table>
+            </div>
 
-        {/* Summary Row */}
-        <div className="fp-summary-row fp-summary-4col">
-          <FormField label="Total Qty Offered">
-            <input className="fp-input" value={totalQtyOffered || "-"} disabled />
-          </FormField>
+            {/* Summary Row */}
+            <div className="fp-summary-row fp-summary-4col">
+              <FormField label="Total Qty Offered">
+                <input className="fp-input" value={totalQtyOffered || "-"} disabled />
+              </FormField>
 
-          <FormField label="Total Sample Size">
-            <input className="fp-input" value={totalSampleSize || "-"} disabled />
-          </FormField>
+              <FormField label="Total Sample Size">
+                <input className="fp-input" value={totalSampleSize || "-"} disabled />
+              </FormField>
 
-          <FormField label="No. of Bags Offered">
-            <input
-              type="number"
-              className="fp-input"
-              value={bagsOffered || "-"}
-              disabled
-            />
-          </FormField>
 
-          <FormField label="Bags for Sampling">
-            <input className="fp-input" value={bagsForSampling || "-"} disabled />
-          </FormField>
-        </div>
-      </div>
+              <FormField label="Total No.of Bags Offered">
+                <input
+                  type="number"
+                  className="fp-input"
+                  value={bagsOffered || "-"}
+                  disabled
+                />
+              </FormField>
 
-      {/* SUBMODULE GRID */}
-      <div className="fp-submodule-section">
-        <h2 className="fp-section-title">Sub Modules</h2>
-        <div className="fp-submodule-grid">
-          {SUBMODULES.map((m) => (
-            <button
-              key={m.key}
-              className="fp-submodule-btn"
-              onClick={() => onNavigateToSubModule(m.key)}
-            >
-              <span className="fp-submodule-icon">{m.icon}</span>
-              <span className="fp-submodule-title">{m.title}</span>
-              <span className="fp-submodule-desc">{m.desc}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* PACKING VERIFICATION CHECKBOXES */}
-      <div className="fp-card">
-        <h2 className="fp-card-title">Packing Verification</h2>
-        <div className="fp-checkbox-group">
-          <label className="fp-checkbox-item">
-            <input
-              type="checkbox"
-              checked={packedInHDPE}
-              onChange={(e) => setPackedInHDPE(e.target.checked)}
-            />
-            <span>Packed in double HDPE Bags</span>
-          </label>
-          <label className="fp-checkbox-item">
-            <input
-              type="checkbox"
-              checked={cleanedWithCoating}
-              onChange={(e) => setCleanedWithCoating(e.target.checked)}
-            />
-            <span>Cleaned & protected with coating</span>
-          </label>
-        </div>
-      </div>
-  {/* CUMULATIVE RESULTS SECTION */}
-          <div className="fp-card">
-        <h2 className="fp-card-title">Cumulative Results</h2>
-        <div className="fp-cumulative-grid">
-          <FormField label="1. Quantity on Order (PO Qty)">
-            <input className="fp-input" value={poData?.po_qty || 10000} disabled />
-          </FormField>
-          <FormField label="2. Cumm. Qty Offered Previously">
-            <input className="fp-input" value={poData?.cummQtyOfferedPreviously || 2500} disabled />
-          </FormField>
-          <FormField label="3. Cumm. Qty Passed Previously">
-            <input className="fp-input" value={poData?.cummQtyPassedPreviously || 2400} disabled />
-          </FormField>
-          <FormField label="4. Qty Now Offered">
-            <input className="fp-input" value={totalQtyOffered} disabled />
-          </FormField>
-          <FormField label="5. Qty Now Passed">
-            <input
-              className="fp-input"
-              value={(() => {
-                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
-                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
-                return totalQtyOffered - ercUsed - qtyRejected;
-              })()}
-              disabled
-            />
-          </FormField>
-          <FormField label="6. Qty Now Rejected">
-            <input
-              className="fp-input"
-              value={lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0)}
-              disabled
-            />
-          </FormField>
-          <FormField label="7. Qty Still Due">
-            <input
-              className="fp-input"
-              value={(() => {
-                const poQty = poData?.po_qty || 10000;
-                const cummPassed = poData?.cummQtyPassedPreviously || 2400;
-                const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
-                const qtyRejected = lotsWithSampling.filter(lot => isLotRejected(lot.lotNo)).reduce((sum, lot) => sum + lot.lotSize, 0);
-                const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
-                return poQty - cummPassed - qtyNowPassed;
-              })()}
-              disabled
-            />
-          </FormField>
+              <FormField label="Total No.of Sampling Bags">
+                <input className="fp-input" value={lotsWithSampling.reduce((sum, lot) => sum + calculateBagsForSampling(lot.noOfBags), 0) || "-"} disabled />
+              </FormField>
             </div>
           </div>
 
-      {/* FINAL INSPECTION RESULTS - Each Lot Displayed Separately */}
-      <div className="fp-card">
-        <h2 className="fp-card-title">Final Inspection Results</h2>
+          {/* SUBMODULE GRID */}
+          <div className="fp-submodule-section">
+            <h2 className="fp-section-title">Sub Modules</h2>
+            <div className="fp-submodule-grid">
+              {SUBMODULES.map((m) => (
+                <button
+                  key={m.key}
+                  className="fp-submodule-btn"
+                  onClick={() => onNavigateToSubModule(m.key)}
+                >
+                  <span className="fp-submodule-icon">{m.icon}</span>
+                  <span className="fp-submodule-title">{m.title}</span>
+                  <span className="fp-submodule-desc">{m.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {(lotsWithSampling && Array.isArray(lotsWithSampling)) ? lotsWithSampling.map(lot => {
-          const data = lotInspectionData[lot.lotNo] || {
-            stdPackingNo: 50,
-            bagsStdPacking: '',
-            nonStdBagsCount: 0,
-            nonStdBagsQty: [],
-            holograms: [{ type: 'range', from: '', to: '' }],
-            remarks: '',
-            ercUsedForTesting: ''
-          };
-          const rejected = isLotRejected(lot.lotNo);
-          const tests = testResultsPerLot[lot.lotNo];
-          const bagsStdCount = Math.ceil(lot.lotSize / (data?.stdPackingNo || 50));
+          {/* PACKING VERIFICATION CHECKBOXES */}
+          <div className="fp-card">
+            <h2 className="fp-card-title">Packing Verification</h2>
+            <div className="fp-checkbox-group">
+              <label className="fp-checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={packedInHDPE}
+                  onChange={(e) => setPackedInHDPE(e.target.checked)}
+                />
+                <span>Packed in double HDPE Bags</span>
+              </label>
+              <label className="fp-checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={cleanedWithCoating}
+                  onChange={(e) => setCleanedWithCoating(e.target.checked)}
+                />
+                <span>Cleaned & protected with coating</span>
+              </label>
+            </div>
+          </div>
+          {/* CUMULATIVE RESULTS SECTION */}
+          <div className="fp-card">
+            <h2 className="fp-card-title">Cumulative Results</h2>
+            <div className="fp-cumulative-grid">
+              <FormField label="1. Po Sr Qty">
+                <input className="fp-input" value={poData?.poSrQty || 0} disabled />
+              </FormField>
+              <FormField label="2. Cumm. Qty Offered Previously">
+                <input className="fp-input" value={poData?.cummQtyOfferedPreviously || 0} disabled />
+              </FormField>
+              <FormField label="3. Cumm. Qty Passed Previously">
+                <input className="fp-input" value={poData?.cummQtyPassedPreviously || 0} disabled />
+              </FormField>
+              <FormField label="4. Cumm. Qty Rejected Previously">
+                <input className="fp-input" value={poData?.cummQtyRejectedPreviously || 0} disabled />
+              </FormField>
+              <FormField label="5. Qty Now Offered">
+                <input className="fp-input" value={totalQtyOffered} disabled />
+              </FormField>
+              <FormField label="6. Qty Now Passed">
+                <input
+                  className="fp-input"
+                  value={(() => {
+                    const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+                    const qtyRejected = lotsWithSampling.reduce((sum, lot) => {
+                      if (isLotRejected(lot.lotNo)) {
+                        return sum + lot.lotSize;
+                      }
+                      return sum + (rejectedCountsPerLot[lot.lotNo] || 0);
+                    }, 0);
+                    return totalQtyOffered - ercUsed - qtyRejected;
+                  })()}
+                  disabled
+                />
+              </FormField>
+              <FormField label="7. Qty Now Rejected">
+                <input
+                  className="fp-input"
+                  value={lotsWithSampling.reduce((sum, lot) => {
+                    if (isLotRejected(lot.lotNo)) {
+                      return sum + lot.lotSize;
+                    }
+                    return sum + (rejectedCountsPerLot[lot.lotNo] || 0);
+                  }, 0)}
+                  disabled
+                />
+              </FormField>
+              <FormField label="8. Qty Still Due">
+                <input
+                  className="fp-input"
+                  value={(() => {
+                    // Recalculate based on newly available data
+                    const ercUsed = lotsWithSampling.reduce((sum, lot) => sum + (parseInt(lotInspectionData[lot.lotNo]?.ercUsedForTesting) || 0), 0);
+                    const qtyRejected = lotsWithSampling.reduce((sum, lot) => {
+                      if (isLotRejected(lot.lotNo)) {
+                        return sum + lot.lotSize;
+                      }
+                      return sum + (rejectedCountsPerLot[lot.lotNo] || 0);
+                    }, 0);
+                    const qtyNowPassed = totalQtyOffered - ercUsed - qtyRejected;
 
-          return (
-            <div
-              key={lot.lotNo}
-              className="fp-lot-result-block"
-              style={{
-                background: rejected ? '#fef2f2' : '#f0fdf4',
-                border: `1px solid ${rejected ? '#fecaca' : '#bbf7d0'}`,
-                borderRadius: '8px',
-                padding: '16px',
-                marginBottom: '16px'
-              }}
-            >
-              {/* Lot Header with Status */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ fontWeight: 700, fontSize: '14px' }}>
-                  📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize}
-                </div>
-                <span style={{
-                  padding: '4px 12px',
-                  borderRadius: '4px',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                  background: rejected ? '#fee2e2' : '#dcfce7',
-                  color: rejected ? '#991b1b' : '#166534'
-                }}>
-                  {rejected ? '✗ LOT REJECTED' : '✓ LOT ACCEPTED'}
-                </span>
-              </div>
+                    const poSrQty = poData?.poSrQty || 0;
+                    const cummPassed = poData?.cummQtyPassedPreviously || 0;
+                    return poSrQty - cummPassed - qtyNowPassed;
+                  })()}
+                  disabled
+                />
+              </FormField>
 
-              {/* Test Results Summary - All 8 Submodules */}
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
-                  📊 Submodule Status:
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '6px' }}>
-                  {(tests && typeof tests === 'object') ? Object.entries(tests).map(([test, status]) => {
-                    // Map test names to display labels
-                    const testLabels = {
-                      'calibration': '📄 Calibration',
-                      'visualDim': '📏 Visual & Dim',
-                      'hardness': '💎 Hardness',
-                      'inclusion': '🔬 Inclusion',
-                      'deflection': '📐 Deflection',
-                      'toeLoad': '⚖️ Toe Load',
-                      'weight': '⚖️ Weight',
-                      'chemical': '🧪 Chemical'
-                    };
-                    return (
-                      <span key={test} style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        background: status === 'OK' ? '#dcfce7' : '#fee2e2',
-                        color: status === 'OK' ? '#166534' : '#991b1b',
-                        border: status === 'OK' ? '1px solid #86efac' : '1px solid #fca5a5',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {testLabels[test] || test}: {status === 'OK' ? '✓' : '✗'}
-                      </span>
-                    );
-                  }).sort((a) => {
-                    // Sort by status: PENDING first, then OK
-                    const aStatus = tests[a.key.split(':')[0].trim()];
-                    return aStatus === 'OK' ? 1 : -1;
-                  }) : null}
-                </div>
-              </div>
+            </div>
+          </div>
 
-              {/* Packing Info Grid */}
-              <div className="fp-grid" style={{ marginBottom: '12px' }}>
-                <FormField label="No. of ERC used for Testing">
-                  <input
-                    className="fp-input"
-                    type="number"
-                    min="0"
-                    value={data.ercUsedForTesting}
-                    onChange={(e) => updateLotData(lot.lotNo, 'ercUsedForTesting', e.target.value)}
-                    placeholder="Enter count"
-                    style={{ fontSize: '12px', padding: '6px' }}
-                  />
-                </FormField>
-                <FormField label="Std. Packing No.">
-                  <input className="fp-input" value={data.stdPackingNo} disabled style={{ fontSize: '12px', padding: '6px' }} />
-                </FormField>
-                <FormField label="Bags with Std. Packing">
-                  <input
-                    className="fp-input"
-                    type="number"
-                    value={data.bagsStdPacking || bagsStdCount}
-                    onChange={(e) => updateLotData(lot.lotNo, 'bagsStdPacking', e.target.value)}
-                    style={{ fontSize: '12px', padding: '6px' }}
-                  />
-                </FormField>
-                <FormField label="Non-Std Bags Count">
-                  <input
-                    className="fp-input"
-                    type="number"
-                    min="0"
-                    value={data.nonStdBagsCount}
-                    onChange={(e) => updateNonStdBagsCount(lot.lotNo, e.target.value)}
-                    style={{ fontSize: '12px', padding: '6px' }}
-                  />
-                </FormField>
-              </div>
+          {/* FINAL INSPECTION RESULTS - Each Lot Displayed Separately */}
+          <div className="fp-card">
+            <h2 className="fp-card-title">Final Inspection Results</h2>
 
-              {/* Non-Std Bags Qty Inputs */}
-              {data.nonStdBagsCount > 0 && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
-                    Qty in Each Non-Std Bag ({data.nonStdBagsCount} bags)
-                  </label>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    {Array.from({ length: data.nonStdBagsCount }).map((_, idx) => (
-                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <span style={{ fontSize: '9px', color: '#64748b' }}>Bag {idx + 1}</span>
-                        <input
-                          type="number"
-                          className="fp-input"
-                          value={data.nonStdBagsQty[idx] || ''}
-                          onChange={(e) => updateNonStdBagQty(lot.lotNo, idx, e.target.value)}
-                          style={{ width: '60px', fontSize: '11px', padding: '4px', textAlign: 'center' }}
-                        />
+            {(lotsWithSampling && Array.isArray(lotsWithSampling)) ? lotsWithSampling.map(lot => {
+              const data = lotInspectionData[lot.lotNo] || {
+                stdPackingNo: 50,
+                bagsStdPacking: '',
+                nonStdBagsCount: 0,
+                nonStdBagsQty: [],
+                holograms: [{ type: 'range', from: '', to: '' }],
+                remarks: '',
+                ercUsedForTesting: ''
+              };
+              const rejected = isLotRejected(lot.lotNo);
+              const tests = testResultsPerLot[lot.lotNo];
+              const bagsStdCount = Math.ceil(lot.lotSize / (data?.stdPackingNo || 50));
+
+              return (
+                <div
+                  key={lot.lotNo}
+                  className="fp-lot-result-block"
+                  style={{
+                    background: rejected ? '#fef2f2' : '#f0fdf4',
+                    border: `1px solid ${rejected ? '#fecaca' : '#bbf7d0'}`,
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '16px'
+                  }}
+                >
+                  {/* Lot Header with Status */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                      📦 {lot.lotNo} | Heat: {lot.heatNo} | Qty: {lot.lotSize}
+                    </div>
+                    {(() => {
+                      const lotStatus = getLotStatus(lot.lotNo);
+                      const styleMap = {
+                        ACCEPTED: { bg: '#dcfce7', color: '#166534', label: '✓ LOT ACCEPTED' },
+                        REJECTED: { bg: '#fee2e2', color: '#991b1b', label: '✗ LOT REJECTED' },
+                        PENDING: { bg: '#fef9c3', color: '#854d0e', label: '⏳ LOT PENDING' }
+                      };
+                      const s = styleMap[lotStatus];
+                      return (
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          background: s.bg,
+                          color: s.color
+                        }}>
+                          {s.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Test Results Summary - All 8 Submodules */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
+                      📊 Submodule Status:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '6px' }}>
+                      {(tests && typeof tests === 'object') ? Object.entries(tests).map(([test, status]) => {
+                        // Map test names to display labels
+                        const testLabels = {
+                          'calibration': '📄 Calibration',
+                          'visualDim': '📏 Visual & Dim',
+                          'hardness': '💎 Hardness',
+                          'inclusion': '🔬 Inclusion',
+                          'deflection': '📐 Deflection',
+                          'toeLoad': '⚖️ Toe Load',
+                          'weight': '⚖️ Weight',
+                          'chemical': '🧪 Chemical'
+                        };
+                        return (
+                          <span key={test} style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '500',
+                            background: status === 'OK' ? '#dcfce7' : (status === 'Pending' ? '#fef9c3' : '#fee2e2'),
+                            color: status === 'OK' ? '#166534' : (status === 'Pending' ? '#854d0e' : '#991b1b'),
+                            border: status === 'OK' ? '1px solid #86efac' : (status === 'Pending' ? '1px solid #fde047' : '1px solid #fca5a5'),
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {testLabels[test] || test}: {status === 'OK' ? '✓' : (status === 'Pending' ? '⏳' : '✗')}
+                          </span>
+                        );
+                      }).sort((a) => {
+                        // Sort by status: PENDING first, then OK
+                        const aStatus = tests[a.key.split(':')[0].trim()];
+                        return aStatus === 'OK' ? 1 : -1;
+                      }) : null}
+                    </div>
+                  </div>
+
+                  {/* Packing Info Grid */}
+                  <div className="fp-grid" style={{ marginBottom: '12px' }}>
+                    <FormField label="No. of ERC used for Testing">
+                      <input
+                        className="fp-input"
+                        type="number"
+                        min="0"
+                        value={data.ercUsedForTesting}
+                        onChange={(e) => updateLotData(lot.lotNo, 'ercUsedForTesting', e.target.value)}
+                        placeholder="Enter count"
+                        style={{ fontSize: '12px', padding: '6px' }}
+                      />
+                    </FormField>
+                    <FormField label="Std. Packing No.">
+                      <input className="fp-input" value={data.stdPackingNo} disabled style={{ fontSize: '12px', padding: '6px' }} />
+                    </FormField>
+                    <FormField label="Bags with Std. Packing">
+                      <input
+                        className="fp-input"
+                        type="number"
+                        value={data.bagsStdPacking !== undefined && data.bagsStdPacking !== null ? data.bagsStdPacking : bagsStdCount}
+                        onChange={(e) => updateLotData(lot.lotNo, 'bagsStdPacking', e.target.value)}
+                        style={{ fontSize: '12px', padding: '6px' }}
+                      />
+                    </FormField>
+                    <FormField label="Non-Std Bags Count">
+                      <input
+                        className="fp-input"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        min="0"
+                        value={data.nonStdBagsCount ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d+$/.test(val)) updateNonStdBagsCount(lot.lotNo, val);
+                        }}
+                        style={{ fontSize: '12px', padding: '6px' }}
+                      />
+                    </FormField>
+                  </div>
+
+                  {/* Non-Std Bags Qty Inputs */}
+                  {data.nonStdBagsCount > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                        Qty in Each Non-Std Bag ({data.nonStdBagsCount} bags)
+                      </label>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {Array.from({ length: data.nonStdBagsCount }).map((_, idx) => (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <span style={{ fontSize: '9px', color: '#64748b' }}>Bag {idx + 1}</span>
+                            <input
+                              type="number"
+                              className="fp-input"
+                              value={data.nonStdBagsQty[idx] || ''}
+                              onChange={(e) => updateNonStdBagQty(lot.lotNo, idx, e.target.value)}
+                              style={{ width: '60px', fontSize: '11px', padding: '4px', textAlign: 'center' }}
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  )}
 
-              {/* Hologram Section */}
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>
-                    Hologram Details
-                  </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      type="button"
-                      className="fp-btn-sm"
-                      onClick={() => addHologram(lot.lotNo, 'range')}
-                    >
-                      + Range
-                    </button>
-                    <button
-                      type="button"
-                      className="fp-btn-sm"
-                      onClick={() => addHologram(lot.lotNo, 'single')}
-                    >
-                      + Single
-                    </button>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {(data.holograms && Array.isArray(data.holograms)) ? data.holograms.map((holo, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '10px', color: '#64748b', width: '50px' }}>
-                        {holo.type === 'range' ? 'Range:' : 'Single:'}
-                      </span>
-                      {holo.type === 'range' ? (
-                        <>
-                          <input
-                            className="fp-input"
-                            placeholder="From"
-                            value={holo.from || ''}
-                            onChange={(e) => updateHologram(lot.lotNo, idx, 'from', e.target.value)}
-                            style={{ width: '80px', fontSize: '11px', padding: '4px' }}
-                          />
-                          <span style={{ fontSize: '10px' }}>to</span>
-                          <input
-                            className="fp-input"
-                            placeholder="To"
-                            value={holo.to || ''}
-                            onChange={(e) => updateHologram(lot.lotNo, idx, 'to', e.target.value)}
-                            style={{ width: '80px', fontSize: '11px', padding: '4px' }}
-                          />
-                        </>
-                      ) : (
-                        <input
-                          className="fp-input"
-                          placeholder="Hologram No."
-                          value={holo.value || ''}
-                          onChange={(e) => updateHologram(lot.lotNo, idx, 'value', e.target.value)}
-                          style={{ width: '120px', fontSize: '11px', padding: '4px' }}
-                        />
-                      )}
-                      {data.holograms.length > 1 && (
+                  {/* Hologram Section */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>
+                        Hologram Details
+                      </label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
                         <button
                           type="button"
-                          className="fp-btn-danger-sm"
-                          onClick={() => removeHologram(lot.lotNo, idx)}
+                          className="fp-btn-sm"
+                          onClick={() => addHologram(lot.lotNo, 'range')}
                         >
-                          ✕
+                          + Range
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          className="fp-btn-sm"
+                          onClick={() => addHologram(lot.lotNo, 'single')}
+                        >
+                          + Single
+                        </button>
+                      </div>
                     </div>
-                  )) : null}
-                </div>
-              </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(data.holograms && Array.isArray(data.holograms)) ? data.holograms.map((holo, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', color: '#64748b', width: '50px' }}>
+                            {holo.type === 'range' ? 'Range:' : 'Single:'}
+                          </span>
+                          {holo.type === 'range' ? (
+                            <>
+                              <input
+                                className="fp-input"
+                                placeholder="From"
+                                value={holo.from || ''}
+                                onChange={(e) => updateHologram(lot.lotNo, idx, 'from', e.target.value)}
+                                style={{ width: '80px', fontSize: '11px', padding: '4px' }}
+                              />
+                              <span style={{ fontSize: '10px' }}>to</span>
+                              <input
+                                className="fp-input"
+                                placeholder="To"
+                                value={holo.to || ''}
+                                onChange={(e) => updateHologram(lot.lotNo, idx, 'to', e.target.value)}
+                                style={{ width: '80px', fontSize: '11px', padding: '4px' }}
+                              />
+                            </>
+                          ) : (
+                            <input
+                              className="fp-input"
+                              placeholder="Hologram No."
+                              value={holo.value || ''}
+                              onChange={(e) => updateHologram(lot.lotNo, idx, 'value', e.target.value)}
+                              style={{ width: '120px', fontSize: '11px', padding: '4px' }}
+                            />
+                          )}
+                          {data.holograms.length > 1 && (
+                            <button
+                              type="button"
+                              className="fp-btn-danger-sm"
+                              onClick={() => removeHologram(lot.lotNo, idx)}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      )) : null}
+                    </div>
+                  </div>
 
-              {/* Remarks */}
-              <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
-                  Remarks
-                </label>
-                <textarea
-                  rows="1"
-                  className="fp-textarea"
-                  value={data.remarks}
-                  onChange={(e) => updateLotData(lot.lotNo, 'remarks', e.target.value)}
-                  placeholder="Enter remarks..."
-                  style={{ fontSize: '11px', padding: '6px' }}
-                />
-              </div>
-            </div>
-          );
-        }) : null}
+                  {/* Remarks */}
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Remarks
+                    </label>
+                    <textarea
+                      rows="1"
+                      className="fp-textarea"
+                      value={data.remarks}
+                      onChange={(e) => updateLotData(lot.lotNo, 'remarks', e.target.value)}
+                      placeholder="Enter remarks..."
+                      style={{ fontSize: '11px', padding: '6px' }}
+                    />
+                  </div>
+                </div>
+              );
+            }) : null}
           </div>
 
-        
+
           {/* ACTION BUTTONS */}
           <div className="fp-actions">
             <button
@@ -1584,6 +1983,154 @@ Workflow Status: ✅ Transitioned to INSPECTION_PAUSED
       <button className="btn btn-secondary fp-return" onClick={onBack}>
         Return to Landing Page
       </button>
+
+      {/* PAUSE SUCCESS MODAL */}
+      {pauseSuccessData && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '12px', padding: '32px 36px',
+            maxWidth: '480px', width: '90%', boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
+            textAlign: 'center'
+          }}>
+            {/* Green checkmark icon */}
+            <div style={{
+              width: '60px', height: '60px', borderRadius: '50%',
+              background: '#dcfce7', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', margin: '0 auto 16px'
+            }}>
+              <span style={{ fontSize: '28px' }}>✓</span>
+            </div>
+
+            <h2 style={{ margin: '0 0 6px', fontSize: '20px', fontWeight: '700', color: '#166534' }}>
+              Inspection Paused Successfully
+            </h2>
+            <p style={{ margin: '0 0 20px', fontSize: '14px', color: '#64748b', fontWeight: '500' }}>
+              Call No: <strong style={{ color: '#1e293b' }}>{pauseSuccessData.callNo}</strong>
+            </p>
+
+            <div style={{
+              background: '#f8fafc', borderRadius: '8px', padding: '16px',
+              textAlign: 'center', marginBottom: '20px', fontSize: '14px', color: '#475569',
+              lineHeight: '1.6'
+            }}>
+              All inspection data for <strong style={{ color: '#1e293b' }}>{pauseSuccessData.lotCount} lots</strong> has been securely saved.
+              <br /><br />
+              You can safely resume this call from the <strong>Inspection Initiation</strong> page whenever you are ready.
+            </div>
+
+            <button
+              onClick={() => { setPauseSuccessData(null); onBack(); }}
+              style={{
+                background: '#16a34a', color: '#fff', border: 'none',
+                borderRadius: '8px', padding: '10px 40px', fontSize: '15px',
+                fontWeight: '600', cursor: 'pointer', width: '100%'
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PAUSE ERROR MODAL */}
+      {pauseErrorData && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '12px', padding: '32px 36px',
+            maxWidth: '420px', width: '90%', boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
+            textAlign: 'center'
+          }}>
+            {/* Red X icon */}
+            <div style={{
+              width: '60px', height: '60px', borderRadius: '50%',
+              background: '#fee2e2', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', margin: '0 auto 16px'
+            }}>
+              <span style={{ fontSize: '28px', color: '#dc2626' }}>✗</span>
+            </div>
+
+            <h2 style={{ margin: '0 0 12px', fontSize: '20px', fontWeight: '700', color: '#991b1b' }}>
+              Pause Inspection Failed
+            </h2>
+            <p style={{
+              margin: '0 0 24px', fontSize: '13px', color: '#64748b',
+              background: '#fef2f2', borderRadius: '8px', padding: '12px',
+              border: '1px solid #fecaca'
+            }}>
+              {pauseErrorData.message}
+            </p>
+
+            <button
+              onClick={() => setPauseErrorData(null)}
+              style={{
+                background: '#dc2626', color: '#fff', border: 'none',
+                borderRadius: '8px', padding: '10px 40px', fontSize: '15px',
+                fontWeight: '600', cursor: 'pointer', width: '100%'
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* PAUSE CONFIRMATION MODAL */}
+      {showPauseConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '12px', padding: '32px 36px',
+            maxWidth: '420px', width: '90%', boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '60px', height: '60px', borderRadius: '50%',
+              background: '#fff7ed', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', margin: '0 auto 16px'
+            }}>
+              <span style={{ fontSize: '28px', color: '#ea580c' }}>⚠️</span>
+            </div>
+
+            <h2 style={{ margin: '0 0 12px', fontSize: '20px', fontWeight: '700', color: '#9a3412' }}>
+              Pause and Resume Later?
+            </h2>
+            <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#475569', lineHeight: '1.5' }}>
+              Would you like to save your current progress and pause this inspection? You can safely resume this call from where you left off at any time.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowPauseConfirm(false)}
+                style={{
+                  background: '#f1f5f9', color: '#475569', border: 'none',
+                  borderRadius: '8px', padding: '10px 20px', fontSize: '15px',
+                  fontWeight: '600', cursor: 'pointer', flex: 1
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmPauseInspection}
+                style={{
+                  background: '#ea580c', color: '#fff', border: 'none',
+                  borderRadius: '8px', padding: '10px 20px', fontSize: '15px',
+                  fontWeight: '600', cursor: 'pointer', flex: 1
+                }}
+              >
+                Yes, Pause
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

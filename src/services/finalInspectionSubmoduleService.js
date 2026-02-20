@@ -696,8 +696,8 @@ export const finishInspection = async (callNo) => {
 
           // Only save if there's actual dimensional data
           if (lotData.dimGo1 !== "" || lotData.dimNoGo1 !== "" || lotData.dimFlat1 !== "" ||
-              lotData.dimGo2 !== "" || lotData.dimNoGo2 !== "" || lotData.dimFlat2 !== "" ||
-              lotData.dimRemark !== "") {
+            lotData.dimGo2 !== "" || lotData.dimNoGo2 !== "" || lotData.dimFlat2 !== "" ||
+            lotData.dimRemark !== "") {
             const dimensionalFlatPayload = {
               inspectionCallNo: callNo,
               lotNo: lotNo,
@@ -709,7 +709,7 @@ export const finishInspection = async (callNo) => {
               secondSampleNoGoFail: lotData.dimNoGo2 || 0,
               secondSampleFlatBearingFail: lotData.dimFlat2 || 0,
               totalRejected: (lotData.dimGo1 || 0) + (lotData.dimNoGo1 || 0) + (lotData.dimFlat1 || 0) +
-                            (lotData.dimGo2 || 0) + (lotData.dimNoGo2 || 0) + (lotData.dimFlat2 || 0),
+                (lotData.dimGo2 || 0) + (lotData.dimNoGo2 || 0) + (lotData.dimFlat2 || 0),
               remarks: lotData.dimRemark || "",
               status: "PENDING"
             };
@@ -1136,9 +1136,13 @@ export const finishInspection = async (callNo) => {
                     samplingNo: 1,
                     sampleNo: index + 1,
                     sampleValueA: value.A || "",
+                    sampleTypeA: value.AType || "",
                     sampleValueB: value.B || "",
+                    sampleTypeB: value.BType || "",
                     sampleValueC: value.C || "",
-                    sampleValueD: value.D || ""
+                    sampleTypeC: value.CType || "",
+                    sampleValueD: value.D || "",
+                    sampleTypeD: value.DType || ""
                   });
                 }
               });
@@ -1152,9 +1156,13 @@ export const finishInspection = async (callNo) => {
                     samplingNo: 2,
                     sampleNo: index + 1,
                     sampleValueA: value.A || "",
+                    sampleTypeA: value.AType || "",
                     sampleValueB: value.B || "",
+                    sampleTypeB: value.BType || "",
                     sampleValueC: value.C || "",
-                    sampleValueD: value.D || ""
+                    sampleTypeC: value.CType || "",
+                    sampleValueD: value.D || "",
+                    sampleTypeD: value.DType || ""
                   });
                 }
               });
@@ -1190,6 +1198,20 @@ export const finishInspection = async (callNo) => {
               lotData.microstructure1st.forEach((value, index) => {
                 if (value !== "") {
                   microstructureSamples.push({
+                    samplingNo: 1,
+                    sampleNo: index + 1,
+                    sampleType: value
+                  });
+                }
+              });
+            }
+
+            // Add 2nd sampling samples
+            if (lotData.microstructure2nd && Array.isArray(lotData.microstructure2nd)) {
+              lotData.microstructure2nd.forEach((value, index) => {
+                if (value !== "") {
+                  microstructureSamples.push({
+                    samplingNo: 2,
                     sampleNo: index + 1,
                     sampleType: value
                   });
@@ -1394,8 +1416,8 @@ export const finishInspection = async (callNo) => {
 
           // Only save if there's actual dimensional data
           if (lotData.dimGo1 !== "" || lotData.dimNoGo1 !== "" || lotData.dimFlat1 !== "" ||
-              lotData.dimGo2 !== "" || lotData.dimNoGo2 !== "" || lotData.dimFlat2 !== "" ||
-              lotData.dimRemarks !== "") {
+            lotData.dimGo2 !== "" || lotData.dimNoGo2 !== "" || lotData.dimFlat2 !== "" ||
+            lotData.dimRemarks !== "") {
 
             const dimSamples = [];
 

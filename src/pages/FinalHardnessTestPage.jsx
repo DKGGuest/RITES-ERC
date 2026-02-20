@@ -8,6 +8,9 @@ import { getHardnessToeLoadAQL } from "../utils/is2500Calculations";
 import { getHardnessTestsByCall } from "../services/finalInspectionSubmoduleService";
 
 const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
+  // State for lot selection toggle
+  const [activeLotTab, setActiveLotTab] = useState(0);
+
   // Get live lot data from context
   const { getFpCachedData, selectedCall } = useInspection();
 
@@ -19,7 +22,7 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
 
   // Memoize lotsFromVendor to ensure stable reference for useMemo dependency
   const lotsFromVendor = useMemo(() => {
-    let lots = cachedData?.dashboardData?.finalLotDetails || [];
+    let lots = cachedData?.finalLotDetails || [];
 
     // Fallback: Check sessionStorage directly if context cache is empty
     if (lots.length === 0 && callNo) {
@@ -118,14 +121,16 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
           console.log('Hardness test data from DB:', dbData);
 
           // Merge database data with initialized lot data
-          const mergedData = { ...availableLots.reduce((acc, lot) => ({
-            ...acc,
-            [lot.lotNo]: {
-              hardness1st: Array(lot.sampleSize).fill(""),
-              hardness2nd: Array(lot.sample2Size).fill(""),
-              remarks: "",
-            }
-          }), {}) };
+          const mergedData = {
+            ...availableLots.reduce((acc, lot) => ({
+              ...acc,
+              [lot.lotNo]: {
+                hardness1st: Array(lot.sampleSize).fill(""),
+                hardness2nd: Array(lot.sample2Size).fill(""),
+                remarks: "",
+              }
+            }), {})
+          };
 
           // Map database records to frontend format
           dbData.forEach(record => {
@@ -181,11 +186,16 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
     }
   }, [callNo, availableLots]);
 
-  // Persist data whenever lotData changes
+  // Persist data whenever lotData changes (debounced to avoid performance lag)
   useEffect(() => {
-    if (Object.keys(lotData).length > 0 && callNo) {
+    if (Object.keys(lotData).length === 0 || !callNo) return;
+
+    const timeoutId = setTimeout(() => {
       localStorage.setItem(`hardnessTestData_${callNo}`, JSON.stringify(lotData));
-    }
+      console.log('💾 Persisted hardness data to localStorage (debounced)');
+    }, 1000); // 1 second debounce
+
+    return () => clearTimeout(timeoutId);
   }, [lotData, callNo]);
 
   /* ------------------------------
@@ -221,52 +231,52 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
   const [show2ndSamplingMap, setShow2ndSamplingMap] = useState({});
   const [popupLot, setPopupLot] = useState(null);
 
- useEffect(() => {
-  availableLots.forEach((lot) => {
-    const data = lotData[lot.lotNo];
-    if (!data) return;
+  useEffect(() => {
+    availableLots.forEach((lot) => {
+      const data = lotData[lot.lotNo];
+      if (!data) return;
 
-    const R1 = data.hardness1st.filter(
-      (v) => v && (parseFloat(v) < 40 || parseFloat(v) > 44)
-    ).length;
+      const R1 = data.hardness1st.filter(
+        (v) => v && (parseFloat(v) < 40 || parseFloat(v) > 44)
+      ).length;
 
-    const AC = lot.accpNo;
-    const RE = lot.rejNo;
+      const AC = lot.accpNo;
+      const RE = lot.rejNo;
 
-    const secondRequired = R1 > AC && R1 < RE;
-    const secondNotRequired = R1 <= AC || R1 >= RE;
+      const secondRequired = R1 > AC && R1 < RE;
+      const secondNotRequired = R1 <= AC || R1 >= RE;
 
-    const shown = !!show2ndSamplingMap[lot.lotNo];
+      const shown = !!show2ndSamplingMap[lot.lotNo];
 
-    // Auto-open when required
-    if (secondRequired && !shown) {
-      setShow2ndSamplingMap((prev) => ({
-        ...prev,
-        [lot.lotNo]: true,
-      }));
-    }
-
-    // Check if any 2nd sampling value is entered
-    const has2ndData = data.hardness2nd.some((v) => v !== "");
-
-    // Auto-hide or popup when 2nd sampling becomes unnecessary
-    if (secondNotRequired && shown && !popupLot) {
-      if (has2ndData) {
-        // Show popup only if user had entered something
-        setPopupLot(lot.lotNo);
-      } else {
-        // Auto-hide silently (no popup)
+      // Auto-open when required
+      if (secondRequired && !shown) {
         setShow2ndSamplingMap((prev) => ({
           ...prev,
-          [lot.lotNo]: false,
+          [lot.lotNo]: true,
         }));
       }
-    }
-  });
-}, [lotData, availableLots, popupLot, show2ndSamplingMap]);
- /* ------------------------------
-     INPUT HANDLERS
-  ------------------------------ */
+
+      // Check if any 2nd sampling value is entered
+      const has2ndData = data.hardness2nd.some((v) => v !== "");
+
+      // Auto-hide or popup when 2nd sampling becomes unnecessary
+      if (secondNotRequired && shown && !popupLot) {
+        if (has2ndData) {
+          // Show popup only if user had entered something
+          setPopupLot(lot.lotNo);
+        } else {
+          // Auto-hide silently (no popup)
+          setShow2ndSamplingMap((prev) => ({
+            ...prev,
+            [lot.lotNo]: false,
+          }));
+        }
+      }
+    });
+  }, [lotData, availableLots, popupLot, show2ndSamplingMap]);
+  /* ------------------------------
+      INPUT HANDLERS
+   ------------------------------ */
 
   const handleHardnessChange = (lotNo, idx, value, is2nd = false) => {
     setLotData((prev) => {
@@ -374,8 +384,32 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         onNavigate={onNavigateSubmodule}
       />
 
+      {/* Lot Selector */}
+      {availableLots.length > 0 && (
+        <>
+          {availableLots.length === 1 ? (
+            <div className="lot-single">
+              <span>📦 {availableLots[0].lotNo} | Heat {availableLots[0].heatNo}</span>
+            </div>
+          ) : (
+            <div className="lot-selector">
+              {availableLots.map((lot, idx) => (
+                <button
+                  key={lot.lotNo}
+                  className={`lot-btn ${activeLotTab === idx ? 'active' : ''}`}
+                  onClick={() => setActiveLotTab(idx)}
+                >
+                  Lot {lot.lotNo}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {/* LOT LOOP */}
-      {availableLots.map((lot) => {
+      {availableLots.map((lot, idx) => {
+        if (activeLotTab !== idx) return null;
         const data = lotData[lot.lotNo];
         const R1 = data.hardness1st.filter(
           (v) => v && (v < 40 || v > 44)
@@ -390,19 +424,31 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
         /* Calculate result status */
         let result = 'PENDING';
         let color = '#f59e0b';
-        const hasInput = data.hardness1st.some(v => v !== '');
 
-        if (hasInput) {
-          if (R1 <= lot.accpNo) {
-            result = 'OK'; color = '#16a34a';
-          } else if (R1 >= lot.rejNo) {
-            result = 'NOT OK'; color = '#dc2626';
-          } else if (show2ndSampling) {
-            if (totalRejected < lot.cummRejNo) {
-              result = 'OK'; color = '#16a34a';
-            } else if (totalRejected >= lot.cummRejNo) {
-              result = 'NOT OK'; color = '#dc2626';
-            }
+        const isFull1st = data.hardness1st.every(v => v !== '');
+        const isFull2nd = data.hardness2nd.every(v => v !== '');
+
+        if (R1 >= lot.rejNo) {
+          result = 'NOT OK';
+          color = '#dc2626';
+        } else if (R1 <= lot.accpNo) {
+          if (isFull1st) {
+            result = 'OK';
+            color = '#16a34a';
+          } else {
+            result = 'PENDING';
+            color = '#f59e0b';
+          }
+        } else if (show2ndSampling) {
+          if (totalRejected >= lot.cummRejNo) {
+            result = 'NOT OK';
+            color = '#dc2626';
+          } else if (isFull1st && isFull2nd) {
+            result = 'OK';
+            color = '#16a34a';
+          } else {
+            result = 'PENDING';
+            color = '#f59e0b';
           }
         }
 
@@ -471,7 +517,7 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
                       onChange={(e) =>
                         handleHardnessChange(lot.lotNo, actualIdx, e.target.value)
                       }
-                      placeholder="0.0"
+                      placeholder=""
                     />
                   </div>
                 );
@@ -495,7 +541,7 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
                 rows={rows}
                 onRowsChange={(newRows) => setRowsAndResetPage(lot.lotNo, newRows)}
                 onPageChange={(p) =>
-                setPageMap((prev) => ({ ...prev, [lot.lotNo]: p }))
+                  setPageMap((prev) => ({ ...prev, [lot.lotNo]: p }))
                 }
               />
             </div>
@@ -535,7 +581,7 @@ const FinalHardnessTestPage = ({ onBack, onNavigateSubmodule }) => {
                               true
                             )
                           }
-                          placeholder="0.0"
+                          placeholder=""
                         />
                       </div>
                     );

@@ -7,6 +7,8 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 
 const InspectionContext = createContext(null);
 
+const STABLE_NOT_CACHED = { isCached: false };
+
 export const InspectionProvider = ({ children }) => {
   // Selected call from landing page
   const [selectedCall, setSelectedCall] = useState(() => {
@@ -198,25 +200,23 @@ export const InspectionProvider = ({ children }) => {
     });
   }, []);
 
-  /**
-   * Get cached data for a specific call
-   * Returns null if cache is expired (older than 15 minutes)
-   */
+  // Memoize RM cache return to ensure stable reference
   const getRmCachedData = useCallback((callNo) => {
     const timestamp = rmDataCacheTimestamp[callNo];
     const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
-    // Check if cache exists and is not expired
     if (timestamp && (Date.now() - timestamp) < CACHE_DURATION) {
-      return {
-        poData: rmPoDataCache[callNo],
-        callData: rmCallDataCache[callNo],
-        heatData: rmHeatDataCache[callNo],
-        isCached: true
-      };
+      if (rmPoDataCache[callNo] || rmCallDataCache[callNo] || rmHeatDataCache[callNo]) {
+        return {
+          poData: rmPoDataCache[callNo],
+          callData: rmCallDataCache[callNo],
+          heatData: rmHeatDataCache[callNo],
+          isCached: true
+        };
+      }
     }
 
-    return { isCached: false };
+    return STABLE_NOT_CACHED;
   }, [rmDataCacheTimestamp, rmPoDataCache, rmCallDataCache, rmHeatDataCache]);
 
   /**
@@ -269,7 +269,14 @@ export const InspectionProvider = ({ children }) => {
    */
   const updateFpDashboardDataCache = useCallback((callNo, dashboardData) => {
     setFpDashboardDataCache(prev => {
-      const updated = { ...prev, [callNo]: dashboardData };
+      // Add isCached flag and dashboardData self-reference for backward compatibility
+      // This ensures callers expecting { isCached, dashboardData } are satisfied
+      const cachedEntry = {
+        ...dashboardData,
+        isCached: true,
+        dashboardData: dashboardData
+      };
+      const updated = { ...prev, [callNo]: cachedEntry };
       sessionStorage.setItem('fpDashboardDataCache', JSON.stringify(updated));
       return updated;
     });
@@ -291,13 +298,15 @@ export const InspectionProvider = ({ children }) => {
 
     // Check if cache exists and is not expired
     if (timestamp && (Date.now() - timestamp) < CACHE_DURATION) {
-      return {
-        dashboardData: fpDashboardDataCache[callNo],
-        isCached: true
-      };
+      const entry = fpDashboardDataCache[callNo];
+      if (entry && !entry.isCached) {
+        // Handle old cache format for backward compatibility
+        return { ...entry, isCached: true, dashboardData: entry };
+      }
+      return entry || STABLE_NOT_CACHED;
     }
 
-    return { isCached: false };
+    return STABLE_NOT_CACHED;
   }, [fpDataCacheTimestamp, fpDashboardDataCache]);
 
   /**
